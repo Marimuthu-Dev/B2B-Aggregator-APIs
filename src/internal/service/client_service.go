@@ -1,6 +1,8 @@
 package service
 
 import (
+	"time"
+
 	"b2b-diagnostic-aggregator/apis/internal/models"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 )
@@ -42,7 +44,15 @@ func (s *clientService) CreateClient(c *models.Client) error {
 }
 
 func (s *clientService) UpdateClient(id int64, c *models.Client) error {
+	existing, err := s.repo.FindByID(id)
+	if err != nil {
+		return err
+	}
+
 	c.ClientID = id
+	c.CreatedBy = existing.CreatedBy
+	c.CreatedOn = existing.CreatedOn
+	c.LastUpdatedOn = time.Now()
 	return s.repo.Update(c)
 }
 

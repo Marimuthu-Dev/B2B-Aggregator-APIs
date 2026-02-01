@@ -14,7 +14,7 @@ var DB *gorm.DB
 
 func ConnectDatabase() {
 	c := AppConfig.DB
-	
+
 	// dsn := "sqlserver://user:password@server:port?database=dbname"
 	dsn := fmt.Sprintf("sqlserver://%s:%s@%s?database=%s&encrypt=%t&trustServerCertificate=%t",
 		c.User, c.Password, c.Server, c.Database, c.Encrypt, c.TrustServerCertificate)

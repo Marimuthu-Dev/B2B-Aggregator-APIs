@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
-	"golang.org/x/crypto/pbkdf2"
 	"crypto/sha1"
 	"encoding/base64"
 	"errors"
+	"golang.org/x/crypto/pbkdf2"
 	"os"
 
 	"golang.org/x/text/encoding/unicode"

@@ -4,8 +4,8 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/models"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"fmt"
-	"strings"
 	"gorm.io/gorm"
+	"strings"
 )
 
 type LeadService interface {
@@ -37,22 +37,22 @@ func (s *leadService) GetLeadByID(id int64) (*models.Lead, error) {
 
 func (s *leadService) CreateLead(l *models.Lead) error {
 	l.PatientID = s.GeneratePatientID(l.PatientName, l.ContactNumber)
-	
+
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(l).Error; err != nil {
 			return err
 		}
-		
+
 		history := &models.LeadHistory{
 			LeadID:    l.LeadID,
 			Action:    "CREATE",
 			CreatedBy: l.CreatedBy,
 		}
-		
+
 		if err := tx.Create(history).Error; err != nil {
 			return err
 		}
-		
+
 		return nil
 	})
 }
@@ -80,22 +80,22 @@ func (s *leadService) UpdateLead(id int64, l *models.Lead) error {
 		if err := tx.Save(l).Error; err != nil {
 			return err
 		}
-		
+
 		actor := l.LastUpdatedBy
 		if actor == 0 {
 			actor = l.CreatedBy
 		}
-		
+
 		history := &models.LeadHistory{
 			LeadID:    l.LeadID,
 			Action:    "UPDATE",
 			CreatedBy: actor,
 		}
-		
+
 		if err := tx.Create(history).Error; err != nil {
 			return err
 		}
-		
+
 		return nil
 	})
 }
@@ -105,17 +105,17 @@ func (s *leadService) DeleteLead(id int64, actorID int64) error {
 		if err := tx.Delete(&models.Lead{}, id).Error; err != nil {
 			return err
 		}
-		
+
 		history := &models.LeadHistory{
 			LeadID:    id,
 			Action:    "DELETE",
 			CreatedBy: actorID,
 		}
-		
+
 		if err := tx.Create(history).Error; err != nil {
 			return err
 		}
-		
+
 		return nil
 	})
 }
@@ -123,12 +123,12 @@ func (s *leadService) DeleteLead(id int64, actorID int64) error {
 func (s *leadService) BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastUpdatedBy int64) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(&models.Lead{}).Where("LeadID IN ?", leadIDs).Updates(map[string]interface{}{
-			"LeadStatusID":    statusID,
-			"LastUpdatedBy":   lastUpdatedBy,
+			"LeadStatusID":  statusID,
+			"LastUpdatedBy": lastUpdatedBy,
 		}).Error; err != nil {
 			return err
 		}
-		
+
 		histories := make([]models.LeadHistory, len(leadIDs))
 		for i, id := range leadIDs {
 			histories[i] = models.LeadHistory{
@@ -137,11 +137,11 @@ func (s *leadService) BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastU
 				CreatedBy: lastUpdatedBy,
 			}
 		}
-		
+
 		if err := tx.Create(&histories).Error; err != nil {
 			return err
 		}
-		
+
 		return nil
 	})
 }
