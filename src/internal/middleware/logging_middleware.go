@@ -34,8 +34,9 @@ func LoggingMiddleware() gin.HandlerFunc {
 		duration := time.Since(start)
 		status := c.Writer.Status()
 
-		log.Printf(`{"level":"info","event":"http_request","method":"%s","path":"%s","status":%d,"duration_ms":%d,"request_id":"%s","trace_id":"%s","context_id":"%s"}`,
-			method, path, status, duration.Milliseconds(), requestID, traceID, contextID)
+		timestamp := time.Now().UTC().Format(time.RFC3339)
+		log.Printf(`{"timestamp":"%s","context_id":"%s","level":"info","event":"http_request","method":"%s","path":"%s","status":%d,"duration_ms":%d,"request_id":"%s","trace_id":"%s"}`,
+			timestamp, contextID, method, path, status, duration.Milliseconds(), requestID, traceID)
 	}
 }
 
