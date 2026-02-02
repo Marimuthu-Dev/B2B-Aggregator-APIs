@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
 
-	"b2b-diagnostic-aggregator/apis/internal/models"
+	"b2b-diagnostic-aggregator/apis/internal/dto"
+	"b2b-diagnostic-aggregator/apis/internal/middleware"
+	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/service"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -18,91 +20,101 @@ func NewLeadHandler(svc service.LeadService) *LeadHandler {
 }
 
 func (h *LeadHandler) GetAll(c *gin.Context) {
-	data, err := h.svc.GetAllLeads()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": err.Error()})
+	var query dto.LeadListQuery
+	if !middleware.BindQuery(c, &query) {
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": data, "message": "Success"})
+	page := query.PaginationQuery.Normalize("createdOn")
+	filter := repository.LeadListFilter{
+		Page:      page.Page,
+		PageSize:  page.PageSize,
+		SortBy:    page.SortBy,
+		SortOrder: page.SortOrder,
+		ClientID:  query.ClientID,
+		StatusID:  query.StatusID,
+		PackageID: query.PackageID,
+	}
+
+	data, total, err := h.svc.ListLeads(filter)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	respondData(c, http.StatusOK, data, "Success", gin.H{
+		"count":    len(data),
+		"page":     filter.Page,
+		"pageSize": filter.PageSize,
+		"total":    total,
+	})
 }
 
 func (h *LeadHandler) GetByID(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid ID"})
+	var params dto.IDParam
+	if !middleware.BindUri(c, &params) {
 		return
 	}
-	data, err := h.svc.GetLeadByID(id)
+	data, err := h.svc.GetLeadByID(params.ID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "Lead not found"})
+		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": data, "message": "Success"})
+	respondData(c, http.StatusOK, data, "Success", nil)
 }
 
 func (h *LeadHandler) Create(c *gin.Context) {
-	var lead models.Lead
-	if err := c.ShouldBindJSON(&lead); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": err.Error()})
+	var req dto.LeadRequest
+	if !middleware.BindJSON(c, &req) {
 		return
 	}
+	lead := req.ToDomain()
 	if err := h.svc.CreateLead(&lead); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": err.Error()})
+		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"success": true, "data": lead, "message": "Lead created successfully"})
+	respondData(c, http.StatusCreated, lead, "Lead created successfully", nil)
 }
 
 func (h *LeadHandler) Update(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid ID"})
+	var params dto.IDParam
+	if !middleware.BindUri(c, &params) {
 		return
 	}
-	var lead models.Lead
-	if err := c.ShouldBindJSON(&lead); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": err.Error()})
+	var req dto.LeadRequest
+	if !middleware.BindJSON(c, &req) {
 		return
 	}
-	if err := h.svc.UpdateLead(id, &lead); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": err.Error()})
+	lead := req.ToDomain()
+	if err := h.svc.UpdateLead(params.ID, &lead); err != nil {
+		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": lead, "message": "Lead updated successfully"})
+	respondData(c, http.StatusOK, lead, "Lead updated successfully", nil)
 }
 
 func (h *LeadHandler) Delete(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid ID"})
+	var params dto.IDParam
+	if !middleware.BindUri(c, &params) {
 		return
 	}
 	// In Go version, we should probably get actorID from context (set by AuthMiddleware)
 	actorIDInterface, _ := c.Get("userId")
 	actorID, _ := actorIDInterface.(int64)
 
-	if err := h.svc.DeleteLead(id, actorID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": err.Error()})
+	if err := h.svc.DeleteLead(params.ID, actorID); err != nil {
+		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Lead deleted successfully"})
-}
-
-type BulkUpdateLeadStatusRequest struct {
-	LeadIDs       []int64 `json:"leadIds" binding:"required"`
-	LeadStatusID  int8    `json:"leadStatusId" binding:"required"`
-	LastUpdatedBy int64   `json:"lastUpdatedBy" binding:"required"`
+	respondMessage(c, http.StatusOK, "Lead deleted successfully")
 }
 
 func (h *LeadHandler) BulkUpdateStatus(c *gin.Context) {
-	var req BulkUpdateLeadStatusRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": err.Error()})
+	var req dto.BulkUpdateLeadStatusRequest
+	if !middleware.BindJSON(c, &req) {
 		return
 	}
 	if err := h.svc.BulkUpdateLeadStatus(req.LeadIDs, req.LeadStatusID, req.LastUpdatedBy); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": err.Error()})
+		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Lead statuses updated successfully"})
+	respondMessage(c, http.StatusOK, "Lead statuses updated successfully")
 }

@@ -3,7 +3,6 @@ package utils
 import (
 	"time"
 
-	"b2b-diagnostic-aggregator/apis/internal/config"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -13,29 +12,29 @@ type JWTClaims struct {
 	jwt.RegisteredClaims
 }
 
-func GenerateToken(userID int64, role string) (string, string, error) {
+func GenerateToken(userID int64, role string, secret string, accessTTL, refreshTTL time.Duration) (string, string, error) {
 	// Access Token
 	accessClaims := &JWTClaims{
 		UserID: userID,
 		Role:   role,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)), // Use config if available
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(accessTTL)),
 		},
 	}
 
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
-	accessString, err := accessToken.SignedString([]byte(config.AppConfig.JWT.Secret))
+	accessString, err := accessToken.SignedString([]byte(secret))
 	if err != nil {
 		return "", "", err
 	}
 
 	// Refresh Token
 	refreshClaims := &jwt.RegisteredClaims{
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)),
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(refreshTTL)),
 	}
 
 	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
-	refreshString, err := refreshToken.SignedString([]byte(config.AppConfig.JWT.Secret))
+	refreshString, err := refreshToken.SignedString([]byte(secret))
 	if err != nil {
 		return "", "", err
 	}
@@ -43,9 +42,9 @@ func GenerateToken(userID int64, role string) (string, string, error) {
 	return accessString, refreshString, nil
 }
 
-func ValidateToken(tokenString string) (*JWTClaims, error) {
+func ValidateToken(tokenString string, secret string) (*JWTClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte(config.AppConfig.JWT.Secret), nil
+		return []byte(secret), nil
 	})
 
 	if err != nil {

@@ -1,20 +1,25 @@
 package service
 
 import (
-	"b2b-diagnostic-aggregator/apis/internal/models"
+	"errors"
+
+	"b2b-diagnostic-aggregator/apis/internal/apperrors"
+	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
+
+	"gorm.io/gorm"
 )
 
 type LabService interface {
-	GetAllLabs() ([]models.Lab, error)
-	GetLabByID(id int64) (*models.Lab, error)
-	GetLabByContactNumber(contactNumber string) (*models.Lab, error)
-	CreateLab(l *models.Lab) error
-	UpdateLab(id int64, l *models.Lab) error
+	ListLabs(filter repository.LabListFilter) ([]domain.Lab, int64, error)
+	GetLabByID(id int64) (*domain.Lab, error)
+	GetLabByContactNumber(contactNumber string) (*domain.Lab, error)
+	CreateLab(l *domain.Lab) error
+	UpdateLab(id int64, l *domain.Lab) error
 	DeleteLab(id int64) error
-	GetActiveLabs() ([]models.Lab, error)
-	GetLabsByCity(cityID int8) ([]models.Lab, error)
-	GetLabsByState(stateID int8) ([]models.Lab, error)
+	GetActiveLabs() ([]domain.Lab, error)
+	GetLabsByCity(cityID int8) ([]domain.Lab, error)
+	GetLabsByState(stateID int8) ([]domain.Lab, error)
 }
 
 type labService struct {
@@ -25,39 +30,61 @@ func NewLabService(repo repository.LabRepository) LabService {
 	return &labService{repo: repo}
 }
 
-func (s *labService) GetAllLabs() ([]models.Lab, error) {
-	return s.repo.FindAll()
+func (s *labService) ListLabs(filter repository.LabListFilter) ([]domain.Lab, int64, error) {
+	return s.repo.List(filter)
 }
 
-func (s *labService) GetLabByID(id int64) (*models.Lab, error) {
-	return s.repo.FindByID(id)
+func (s *labService) GetLabByID(id int64) (*domain.Lab, error) {
+	lab, err := s.repo.FindByID(id)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, apperrors.NewNotFound("Lab not found", err)
+	}
+	return lab, err
 }
 
-func (s *labService) GetLabByContactNumber(contactNumber string) (*models.Lab, error) {
-	return s.repo.FindByContactNumber(contactNumber)
+func (s *labService) GetLabByContactNumber(contactNumber string) (*domain.Lab, error) {
+	lab, err := s.repo.FindByContactNumber(contactNumber)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, apperrors.NewNotFound("Lab not found", err)
+	}
+	return lab, err
 }
 
-func (s *labService) CreateLab(l *models.Lab) error {
+func (s *labService) CreateLab(l *domain.Lab) error {
 	return s.repo.Create(l)
 }
 
-func (s *labService) UpdateLab(id int64, l *models.Lab) error {
+func (s *labService) UpdateLab(id int64, l *domain.Lab) error {
+	exists, err := s.repo.ExistsByID(id)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return apperrors.NewNotFound("Lab not found", gorm.ErrRecordNotFound)
+	}
 	l.LabID = id
 	return s.repo.Update(l)
 }
 
 func (s *labService) DeleteLab(id int64) error {
+	exists, err := s.repo.ExistsByID(id)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return apperrors.NewNotFound("Lab not found", gorm.ErrRecordNotFound)
+	}
 	return s.repo.Delete(id)
 }
 
-func (s *labService) GetActiveLabs() ([]models.Lab, error) {
+func (s *labService) GetActiveLabs() ([]domain.Lab, error) {
 	return s.repo.FindAllActive()
 }
 
-func (s *labService) GetLabsByCity(cityID int8) ([]models.Lab, error) {
+func (s *labService) GetLabsByCity(cityID int8) ([]domain.Lab, error) {
 	return s.repo.FindByCity(cityID)
 }
 
-func (s *labService) GetLabsByState(stateID int8) ([]models.Lab, error) {
+func (s *labService) GetLabsByState(stateID int8) ([]domain.Lab, error) {
 	return s.repo.FindByState(stateID)
 }

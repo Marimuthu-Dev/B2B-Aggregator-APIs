@@ -1,8 +1,6 @@
 package models
 
-import (
-	"time"
-)
+import "time"
 
 type PackageTestMapping struct {
 	PackageTestID int       `gorm:"primaryKey;column:PackageTestID;autoIncrement"`

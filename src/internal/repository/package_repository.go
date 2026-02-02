@@ -1,20 +1,24 @@
 package repository
 
 import (
-	"b2b-diagnostic-aggregator/apis/internal/models"
+	"b2b-diagnostic-aggregator/apis/internal/domain"
+	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
+
 	"gorm.io/gorm"
 )
 
 type PackageRepository interface {
-	FindAll() ([]models.Package, error)
-	FindByID(id int) (*models.Package, error)
-	Create(p *models.Package) error
-	Update(p *models.Package) error
+	FindAll() ([]domain.Package, error)
+	List(filter PackageListFilter) ([]domain.Package, int64, error)
+	FindByID(id int) (*domain.Package, error)
+	ExistsByID(id int) (bool, error)
+	Create(p *domain.Package) error
+	Update(p *domain.Package) error
 	Delete(id int) error
-	FindAllActive() ([]models.Package, error)
-	FindByName(name string) (*models.Package, error)
-	SearchByName(searchTerm string) ([]models.Package, error)
-	CreateWithTests(p *models.Package, testIDs []int) error
+	FindAllActive() ([]domain.Package, error)
+	FindByName(name string) (*domain.Package, error)
+	SearchByName(searchTerm string) ([]domain.Package, error)
+	CreateWithTests(p *domain.Package, testIDs []int) error
 }
 
 type packageRepository struct {
@@ -25,67 +29,126 @@ func NewPackageRepository(db *gorm.DB) PackageRepository {
 	return &packageRepository{db: db}
 }
 
-func (r *packageRepository) FindAll() ([]models.Package, error) {
-	var packages []models.Package
+func (r *packageRepository) FindAll() ([]domain.Package, error) {
+	var packages []persistencemodels.Package
 	err := r.db.Find(&packages).Error
-	return packages, err
+	return mapPackagesToDomain(packages), err
 }
 
-func (r *packageRepository) FindByID(id int) (*models.Package, error) {
-	var p models.Package
+func (r *packageRepository) List(filter PackageListFilter) ([]domain.Package, int64, error) {
+	query := r.db.Model(&persistencemodels.Package{})
+	if filter.IsActive != nil {
+		query = query.Where("IsActive = ?", *filter.IsActive)
+	}
+	if filter.Search != "" {
+		query = query.Where("PackageName LIKE ?", "%"+filter.Search+"%")
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	sortColumn := mapPackageSortColumn(filter.SortBy)
+	order := normalizeSortOrder(filter.SortOrder)
+	offset := (filter.Page - 1) * filter.PageSize
+
+	var packages []persistencemodels.Package
+	err := query.Order(sortColumn + " " + order).Limit(filter.PageSize).Offset(offset).Find(&packages).Error
+	return mapPackagesToDomain(packages), total, err
+}
+
+func mapPackageSortColumn(sortBy string) string {
+	switch sortBy {
+	case "name":
+		return "PackageName"
+	case "createdOn":
+		return "CreatedOn"
+	default:
+		return "PackageID"
+	}
+}
+
+func (r *packageRepository) FindByID(id int) (*domain.Package, error) {
+	var p persistencemodels.Package
 	err := r.db.First(&p, id).Error
-	return &p, err
+	if err != nil {
+		return nil, err
+	}
+	domainPackage := mapPackageToDomain(p)
+	return &domainPackage, nil
 }
 
-func (r *packageRepository) Create(p *models.Package) error {
-	return r.db.Create(p).Error
+func (r *packageRepository) ExistsByID(id int) (bool, error) {
+	var count int64
+	if err := r.db.Model(&persistencemodels.Package{}).Where("PackageID = ?", id).Limit(1).Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
-func (r *packageRepository) Update(p *models.Package) error {
-	return r.db.Save(p).Error
+func (r *packageRepository) Create(p *domain.Package) error {
+	persist := mapPackageToPersistence(*p)
+	if err := r.db.Create(&persist).Error; err != nil {
+		return err
+	}
+	*p = mapPackageToDomain(persist)
+	return nil
+}
+
+func (r *packageRepository) Update(p *domain.Package) error {
+	persist := mapPackageToPersistence(*p)
+	if err := r.db.Save(&persist).Error; err != nil {
+		return err
+	}
+	*p = mapPackageToDomain(persist)
+	return nil
 }
 
 func (r *packageRepository) Delete(id int) error {
-	return r.db.Delete(&models.Package{}, id).Error
+	return r.db.Delete(&persistencemodels.Package{}, id).Error
 }
 
-func (r *packageRepository) FindAllActive() ([]models.Package, error) {
-	var packages []models.Package
+func (r *packageRepository) FindAllActive() ([]domain.Package, error) {
+	var packages []persistencemodels.Package
 	err := r.db.Where("IsActive = ?", true).Find(&packages).Error
-	return packages, err
+	return mapPackagesToDomain(packages), err
 }
 
-func (r *packageRepository) FindByName(name string) (*models.Package, error) {
-	var p models.Package
+func (r *packageRepository) FindByName(name string) (*domain.Package, error) {
+	var p persistencemodels.Package
 	err := r.db.Where("PackageName = ?", name).First(&p).Error
 	if err != nil {
 		return nil, err
 	}
-	return &p, nil
+	domainPackage := mapPackageToDomain(p)
+	return &domainPackage, nil
 }
 
-func (r *packageRepository) SearchByName(searchTerm string) ([]models.Package, error) {
-	var packages []models.Package
+func (r *packageRepository) SearchByName(searchTerm string) ([]domain.Package, error) {
+	var packages []persistencemodels.Package
 	err := r.db.Where("PackageName LIKE ?", "%"+searchTerm+"%").Find(&packages).Error
-	return packages, err
+	return mapPackagesToDomain(packages), err
 }
 
-func (r *packageRepository) CreateWithTests(p *models.Package, testIDs []int) error {
+func (r *packageRepository) CreateWithTests(p *domain.Package, testIDs []int) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		// Create package
-		if err := tx.Create(p).Error; err != nil {
+		persist := mapPackageToPersistence(*p)
+		if err := tx.Create(&persist).Error; err != nil {
 			return err
 		}
+		*p = mapPackageToDomain(persist)
 
 		// Create mappings
-		mappings := make([]models.PackageTestMapping, len(testIDs))
+		mappings := make([]persistencemodels.PackageTestMapping, len(testIDs))
 		for i, testID := range testIDs {
-			mappings[i] = models.PackageTestMapping{
-				PackageID:     p.PackageID,
+			mappings[i] = persistencemodels.PackageTestMapping{
+				PackageID:     persist.PackageID,
 				TestID:        testID,
 				IsActive:      true,
-				CreatedBy:     p.CreatedBy,
-				LastUpdatedBy: p.LastUpdatedBy,
+				CreatedBy:     persist.CreatedBy,
+				LastUpdatedBy: persist.LastUpdatedBy,
 			}
 		}
 

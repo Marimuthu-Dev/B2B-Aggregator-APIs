@@ -1,8 +1,6 @@
 package models
 
-import (
-	"time"
-)
+import "time"
 
 type Login struct {
 	RecordID      int64     `gorm:"primaryKey;column:RecordID;autoIncrement"`
@@ -15,15 +13,4 @@ type Login struct {
 
 func (Login) TableName() string {
 	return "MediAdmin.tbl_Login"
-}
-
-type LoginRequest struct {
-	UserID   int64  `json:"userId" binding:"required"`
-	Password string `json:"password" binding:"required"`
-}
-
-type LoginResponse struct {
-	User         interface{} `json:"user"`
-	Token        string      `json:"token"`
-	RefreshToken string      `json:"refreshToken"`
 }

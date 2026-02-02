@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"log"
 	"time"
 
 	"gorm.io/driver/sqlserver"
@@ -10,10 +9,7 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-var DB *gorm.DB
-
-func ConnectDatabase() {
-	c := AppConfig.DB
+func ConnectDatabase(c DBConfig) (*gorm.DB, error) {
 
 	// dsn := "sqlserver://user:password@server:port?database=dbname"
 	dsn := fmt.Sprintf("sqlserver://%s:%s@%s?database=%s&encrypt=%t&trustServerCertificate=%t",
@@ -24,18 +20,17 @@ func ConnectDatabase() {
 	})
 
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		return nil, err
 	}
 
 	sqlDB, err := db.DB()
 	if err != nil {
-		log.Fatalf("Failed to get database instance: %v", err)
+		return nil, err
 	}
 
 	sqlDB.SetMaxIdleConns(c.PoolMin)
 	sqlDB.SetMaxOpenConns(c.PoolMax)
 	sqlDB.SetConnMaxLifetime(time.Duration(c.IdleTimeout) * time.Millisecond)
 
-	DB = db
-	log.Println("🗄️ Database connected successfully")
+	return db, nil
 }

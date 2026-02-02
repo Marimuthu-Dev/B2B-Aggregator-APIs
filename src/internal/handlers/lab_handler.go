@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
 
-	"b2b-diagnostic-aggregator/apis/internal/models"
+	"b2b-diagnostic-aggregator/apis/internal/dto"
+	"b2b-diagnostic-aggregator/apis/internal/middleware"
+	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/service"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -18,78 +20,98 @@ func NewLabHandler(svc service.LabService) *LabHandler {
 }
 
 func (h *LabHandler) GetAll(c *gin.Context) {
-	data, err := h.svc.GetAllLabs()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": err.Error()})
+	var query dto.LabListQuery
+	if !middleware.BindQuery(c, &query) {
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": data, "message": "Success"})
+	page := query.PaginationQuery.Normalize("createdOn")
+	filter := repository.LabListFilter{
+		Page:      page.Page,
+		PageSize:  page.PageSize,
+		SortBy:    page.SortBy,
+		SortOrder: page.SortOrder,
+		CityID:    query.CityID,
+		StateID:   query.StateID,
+		IsActive:  query.IsActive,
+	}
+
+	data, total, err := h.svc.ListLabs(filter)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	respondData(c, http.StatusOK, data, "Success", gin.H{
+		"count":    len(data),
+		"page":     filter.Page,
+		"pageSize": filter.PageSize,
+		"total":    total,
+	})
 }
 
 func (h *LabHandler) GetByID(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid ID"})
+	var params dto.IDParam
+	if !middleware.BindUri(c, &params) {
 		return
 	}
-	data, err := h.svc.GetLabByID(id)
+	data, err := h.svc.GetLabByID(params.ID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "Lab not found"})
+		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": data, "message": "Success"})
+	respondData(c, http.StatusOK, data, "Success", nil)
 }
 
 func (h *LabHandler) GetByContactNumber(c *gin.Context) {
-	contactNumber := c.Query("contactNumber")
-	data, err := h.svc.GetLabByContactNumber(contactNumber)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "Lab not found"})
+	var query dto.ContactNumberQuery
+	if !middleware.BindQuery(c, &query) {
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": data, "message": "Success"})
+	data, err := h.svc.GetLabByContactNumber(query.ContactNumber)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	respondData(c, http.StatusOK, data, "Success", nil)
 }
 
 func (h *LabHandler) Create(c *gin.Context) {
-	var lab models.Lab
-	if err := c.ShouldBindJSON(&lab); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": err.Error()})
+	var req dto.LabRequest
+	if !middleware.BindJSON(c, &req) {
 		return
 	}
+	lab := req.ToDomain()
 	if err := h.svc.CreateLab(&lab); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": err.Error()})
+		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"success": true, "data": lab, "message": "Lab created successfully"})
+	respondData(c, http.StatusCreated, lab, "Lab created successfully", nil)
 }
 
 func (h *LabHandler) Update(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid ID"})
+	var params dto.IDParam
+	if !middleware.BindUri(c, &params) {
 		return
 	}
-	var lab models.Lab
-	if err := c.ShouldBindJSON(&lab); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": err.Error()})
+	var req dto.LabRequest
+	if !middleware.BindJSON(c, &req) {
 		return
 	}
-	if err := h.svc.UpdateLab(id, &lab); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": err.Error()})
+	lab := req.ToDomain()
+	if err := h.svc.UpdateLab(params.ID, &lab); err != nil {
+		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": lab, "message": "Lab updated successfully"})
+	respondData(c, http.StatusOK, lab, "Lab updated successfully", nil)
 }
 
 func (h *LabHandler) Delete(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid ID"})
+	var params dto.IDParam
+	if !middleware.BindUri(c, &params) {
 		return
 	}
-	if err := h.svc.DeleteLab(id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": err.Error()})
+	if err := h.svc.DeleteLab(params.ID); err != nil {
+		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Lab deleted successfully"})
+	respondMessage(c, http.StatusOK, "Lab deleted successfully")
 }

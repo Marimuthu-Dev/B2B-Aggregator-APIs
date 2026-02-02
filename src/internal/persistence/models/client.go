@@ -1,8 +1,6 @@
 package models
 
-import (
-	"time"
-)
+import "time"
 
 type Client struct {
 	ClientID                  int64     `gorm:"primaryKey;column:ClientID;autoIncrement"`

@@ -1,55 +1,62 @@
 package service
 
 import (
-	"b2b-diagnostic-aggregator/apis/internal/models"
-	"b2b-diagnostic-aggregator/apis/internal/repository"
+	"errors"
 	"fmt"
-	"gorm.io/gorm"
 	"strings"
+
+	"b2b-diagnostic-aggregator/apis/internal/apperrors"
+	"b2b-diagnostic-aggregator/apis/internal/domain"
+	"b2b-diagnostic-aggregator/apis/internal/repository"
+
+	"gorm.io/gorm"
 )
 
 type LeadService interface {
-	GetAllLeads() ([]models.Lead, error)
-	GetLeadByID(id int64) (*models.Lead, error)
-	CreateLead(l *models.Lead) error
-	UpdateLead(id int64, l *models.Lead) error
+	ListLeads(filter repository.LeadListFilter) ([]domain.Lead, int64, error)
+	GetLeadByID(id int64) (*domain.Lead, error)
+	CreateLead(l *domain.Lead) error
+	UpdateLead(id int64, l *domain.Lead) error
 	DeleteLead(id int64, actorID int64) error
 	BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastUpdatedBy int64) error
 }
 
 type leadService struct {
 	repo        repository.LeadRepository
-	historyRepo repository.LeadHistoryRepository
-	db          *gorm.DB
+	uow         repository.LeadUnitOfWork
 }
 
-func NewLeadService(repo repository.LeadRepository, historyRepo repository.LeadHistoryRepository, db *gorm.DB) LeadService {
-	return &leadService{repo: repo, historyRepo: historyRepo, db: db}
+func NewLeadService(repo repository.LeadRepository, uow repository.LeadUnitOfWork) LeadService {
+	return &leadService{repo: repo, uow: uow}
 }
 
-func (s *leadService) GetAllLeads() ([]models.Lead, error) {
-	return s.repo.FindAll()
+func (s *leadService) ListLeads(filter repository.LeadListFilter) ([]domain.Lead, int64, error) {
+	return s.repo.List(filter)
 }
 
-func (s *leadService) GetLeadByID(id int64) (*models.Lead, error) {
-	return s.repo.FindByID(id)
+func (s *leadService) GetLeadByID(id int64) (*domain.Lead, error) {
+	lead, err := s.repo.FindByID(id)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, apperrors.NewNotFound("Lead not found", err)
+	}
+	return lead, err
 }
 
-func (s *leadService) CreateLead(l *models.Lead) error {
+func (s *leadService) CreateLead(l *domain.Lead) error {
 	l.PatientID = s.GeneratePatientID(l.PatientName, l.ContactNumber)
 
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(l).Error; err != nil {
+	return s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
+		if err := leadRepo.Create(l); err != nil {
 			return err
 		}
 
-		history := &models.LeadHistory{
+		history := &domain.LeadHistory{
 			LeadID:    l.LeadID,
-			Action:    "CREATE",
+			Action:    domain.LeadActionCreate,
 			CreatedBy: l.CreatedBy,
 		}
 
-		if err := tx.Create(history).Error; err != nil {
+		if err := historyRepo.LogAction(history); err != nil {
 			return err
 		}
 
@@ -57,9 +64,12 @@ func (s *leadService) CreateLead(l *models.Lead) error {
 	})
 }
 
-func (s *leadService) UpdateLead(id int64, l *models.Lead) error {
+func (s *leadService) UpdateLead(id int64, l *domain.Lead) error {
 	existing, err := s.repo.FindByID(id)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return apperrors.NewNotFound("Lead not found", err)
+		}
 		return err
 	}
 
@@ -76,8 +86,8 @@ func (s *leadService) UpdateLead(id int64, l *models.Lead) error {
 	}
 
 	l.LeadID = id
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Save(l).Error; err != nil {
+	return s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
+		if err := leadRepo.Update(l); err != nil {
 			return err
 		}
 
@@ -86,13 +96,13 @@ func (s *leadService) UpdateLead(id int64, l *models.Lead) error {
 			actor = l.CreatedBy
 		}
 
-		history := &models.LeadHistory{
+		history := &domain.LeadHistory{
 			LeadID:    l.LeadID,
-			Action:    "UPDATE",
+			Action:    domain.LeadActionUpdate,
 			CreatedBy: actor,
 		}
 
-		if err := tx.Create(history).Error; err != nil {
+		if err := historyRepo.LogAction(history); err != nil {
 			return err
 		}
 
@@ -101,18 +111,25 @@ func (s *leadService) UpdateLead(id int64, l *models.Lead) error {
 }
 
 func (s *leadService) DeleteLead(id int64, actorID int64) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Delete(&models.Lead{}, id).Error; err != nil {
+	exists, err := s.repo.ExistsByID(id)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return apperrors.NewNotFound("Lead not found", gorm.ErrRecordNotFound)
+	}
+	return s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
+		if err := leadRepo.Delete(id); err != nil {
 			return err
 		}
 
-		history := &models.LeadHistory{
+		history := &domain.LeadHistory{
 			LeadID:    id,
-			Action:    "DELETE",
+			Action:    domain.LeadActionDelete,
 			CreatedBy: actorID,
 		}
 
-		if err := tx.Create(history).Error; err != nil {
+		if err := historyRepo.LogAction(history); err != nil {
 			return err
 		}
 
@@ -121,24 +138,21 @@ func (s *leadService) DeleteLead(id int64, actorID int64) error {
 }
 
 func (s *leadService) BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastUpdatedBy int64) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&models.Lead{}).Where("LeadID IN ?", leadIDs).Updates(map[string]interface{}{
-			"LeadStatusID":  statusID,
-			"LastUpdatedBy": lastUpdatedBy,
-		}).Error; err != nil {
+	return s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
+		if err := leadRepo.UpdateStatusForIDs(leadIDs, statusID, lastUpdatedBy); err != nil {
 			return err
 		}
 
-		histories := make([]models.LeadHistory, len(leadIDs))
+		histories := make([]domain.LeadHistory, len(leadIDs))
 		for i, id := range leadIDs {
-			histories[i] = models.LeadHistory{
+			histories[i] = domain.LeadHistory{
 				LeadID:    id,
-				Action:    "STATUS_UPDATE",
+				Action:    domain.LeadActionStatusUpdate,
 				CreatedBy: lastUpdatedBy,
 			}
 		}
 
-		if err := tx.Create(&histories).Error; err != nil {
+		if err := historyRepo.BulkLogActions(histories); err != nil {
 			return err
 		}
 

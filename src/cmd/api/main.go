@@ -3,36 +3,55 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 
 	"b2b-diagnostic-aggregator/apis/internal/config"
 	"b2b-diagnostic-aggregator/apis/internal/handlers"
+	"b2b-diagnostic-aggregator/apis/internal/logging"
 	"b2b-diagnostic-aggregator/apis/internal/middleware"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/service"
+
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
 	// Load configuration
-	config.LoadConfig()
+	cfg := config.LoadConfig()
+
+	logWriter, err := logging.NewHourlyFileWriter(logging.Config{
+		Dir:            cfg.Log.Dir,
+		RetentionHours: cfg.Log.RetentionHours,
+		Prefix:         "api",
+	})
+	if err != nil {
+		log.Printf("Failed to initialize file logger: %v", err)
+		log.SetOutput(os.Stdout)
+	} else {
+		log.SetOutput(logWriter)
+	}
+	log.SetFlags(0)
 
 	// Connect to database
-	config.ConnectDatabase()
+	db, err := config.ConnectDatabase(cfg.DB)
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
 
 	// Initialize Repositories
-	packageRepo := repository.NewPackageRepository(config.DB)
-	loginRepo := repository.NewLoginRepository(config.DB)
-	clientRepo := repository.NewClientRepository(config.DB)
-	labRepo := repository.NewLabRepository(config.DB)
-	leadRepo := repository.NewLeadRepository(config.DB)
-	leadHistoryRepo := repository.NewLeadHistoryRepository(config.DB)
+	packageRepo := repository.NewPackageRepository(db)
+	loginRepo := repository.NewLoginRepository(db)
+	clientRepo := repository.NewClientRepository(db)
+	labRepo := repository.NewLabRepository(db)
+	leadRepo := repository.NewLeadRepository(db)
+	leadUow := repository.NewLeadUnitOfWork(db)
 
 	// Initialize Services
 	packageSvc := service.NewPackageService(packageRepo)
-	loginSvc := service.NewLoginService(loginRepo)
+	loginSvc := service.NewLoginService(loginRepo, cfg.JWT)
 	clientSvc := service.NewClientService(clientRepo)
 	labSvc := service.NewLabService(labRepo)
-	leadSvc := service.NewLeadService(leadRepo, leadHistoryRepo, config.DB)
+	leadSvc := service.NewLeadService(leadRepo, leadUow)
 
 	// Initialize Handlers
 	packageHandler := handlers.NewPackageHandler(packageSvc)
@@ -43,6 +62,10 @@ func main() {
 
 	// Initialize Gin
 	r := gin.Default()
+	r.Use(middleware.RecoveryMiddleware())
+	r.Use(middleware.ContextMiddleware())
+	r.Use(middleware.LoggingMiddleware())
+	r.Use(middleware.ValidationErrorMiddleware())
 
 	// Public Routes
 	v1 := r.Group("/api/v1")
@@ -53,7 +76,7 @@ func main() {
 
 	// Protected Routes
 	api := v1.Group("")
-	api.Use(middleware.AuthMiddleware())
+	api.Use(middleware.AuthMiddleware(cfg.JWT.Secret))
 	{
 		// Packages
 		packages := api.Group("/packages")
@@ -99,7 +122,7 @@ func main() {
 		}
 	}
 
-	port := config.AppConfig.Port
+	port := cfg.Port
 	if port == 0 {
 		port = 5000
 	}

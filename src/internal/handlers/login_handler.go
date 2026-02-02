@@ -3,8 +3,10 @@ package handlers
 import (
 	"net/http"
 
-	"b2b-diagnostic-aggregator/apis/internal/models"
+	"b2b-diagnostic-aggregator/apis/internal/dto"
+	"b2b-diagnostic-aggregator/apis/internal/middleware"
 	"b2b-diagnostic-aggregator/apis/internal/service"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -17,21 +19,16 @@ func NewLoginHandler(svc service.LoginService) *LoginHandler {
 }
 
 func (h *LoginHandler) Login(c *gin.Context) {
-	var req models.LoginRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": err.Error()})
+	var req dto.LoginRequest
+	if !middleware.BindJSON(c, &req) {
 		return
 	}
 
 	resp, err := h.svc.Login(req.UserID, req.Password)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": err.Error()})
+		respondError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    resp,
-		"message": "Authenticated",
-	})
+	respondData(c, http.StatusOK, resp, "Authenticated", nil)
 }

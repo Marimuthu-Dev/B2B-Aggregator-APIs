@@ -13,6 +13,7 @@ type Config struct {
 	Domain      string
 	DB          DBConfig
 	JWT         JWTConfig
+	Log         LogConfig
 	Domains     DomainURLs
 }
 
@@ -34,22 +35,25 @@ type JWTConfig struct {
 	RefreshExpiresIn string
 }
 
+type LogConfig struct {
+	Dir            string
+	RetentionHours int
+}
+
 type DomainURLs struct {
 	Client   string
 	Employee string
 	Lab      string
 }
 
-var AppConfig *Config
-
-func LoadConfig() {
+func LoadConfig() *Config {
 	// Try common .env locations (cwd, repo root, or parent).
 	if err := godotenv.Load(); err != nil {
 		_ = godotenv.Load("../.env")
 		_ = godotenv.Load("../../.env")
 	}
 
-	AppConfig = &Config{
+	return &Config{
 		Environment: getEnv("ENVIRONMENT", "development"),
 		Port:        getEnvAsInt("PORT", 5000),
 		Domain:      getEnv("DOMAIN", ""),
@@ -68,6 +72,10 @@ func LoadConfig() {
 			Secret:           getEnv("JWT_SECRET", "aggreator@123456@"),
 			ExpiresIn:        getEnv("JWT_EXPIRES_IN", "24h"),
 			RefreshExpiresIn: getEnv("JWT_REFRESH_EXPIRES_IN", "7d"),
+		},
+		Log: LogConfig{
+			Dir:            getEnv("LOG_DIR", "logs"),
+			RetentionHours: getEnvAsInt("LOG_RETENTION_HOURS", 24),
 		},
 		Domains: DomainURLs{
 			Client:   getEnv("CLIENT_DOMAIN_URL", ""),

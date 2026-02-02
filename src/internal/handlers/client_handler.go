@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
 
-	"b2b-diagnostic-aggregator/apis/internal/models"
+	"b2b-diagnostic-aggregator/apis/internal/dto"
+	"b2b-diagnostic-aggregator/apis/internal/middleware"
+	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/service"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -18,78 +20,98 @@ func NewClientHandler(svc service.ClientService) *ClientHandler {
 }
 
 func (h *ClientHandler) GetAll(c *gin.Context) {
-	data, err := h.svc.GetAllClients()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": err.Error()})
+	var query dto.ClientListQuery
+	if !middleware.BindQuery(c, &query) {
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": data, "message": "Success"})
+	page := query.PaginationQuery.Normalize("createdOn")
+	filter := repository.ClientListFilter{
+		Page:      page.Page,
+		PageSize:  page.PageSize,
+		SortBy:    page.SortBy,
+		SortOrder: page.SortOrder,
+		CityID:    query.CityID,
+		StateID:   query.StateID,
+		IsActive:  query.IsActive,
+	}
+
+	data, total, err := h.svc.ListClients(filter)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	respondData(c, http.StatusOK, data, "Success", gin.H{
+		"count":    len(data),
+		"page":     filter.Page,
+		"pageSize": filter.PageSize,
+		"total":    total,
+	})
 }
 
 func (h *ClientHandler) GetByID(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid ID"})
+	var params dto.IDParam
+	if !middleware.BindUri(c, &params) {
 		return
 	}
-	data, err := h.svc.GetClientByID(id)
+	data, err := h.svc.GetClientByID(params.ID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "Client not found"})
+		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": data, "message": "Success"})
+	respondData(c, http.StatusOK, data, "Success", nil)
 }
 
 func (h *ClientHandler) GetByContactNumber(c *gin.Context) {
-	contactNumber := c.Query("contactNumber")
-	data, err := h.svc.GetClientByContactNumber(contactNumber)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "Client not found"})
+	var query dto.ContactNumberQuery
+	if !middleware.BindQuery(c, &query) {
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": data, "message": "Success"})
+	data, err := h.svc.GetClientByContactNumber(query.ContactNumber)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	respondData(c, http.StatusOK, data, "Success", nil)
 }
 
 func (h *ClientHandler) Create(c *gin.Context) {
-	var client models.Client
-	if err := c.ShouldBindJSON(&client); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": err.Error()})
+	var req dto.ClientRequest
+	if !middleware.BindJSON(c, &req) {
 		return
 	}
+	client := req.ToDomain()
 	if err := h.svc.CreateClient(&client); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": err.Error()})
+		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"success": true, "data": client, "message": "Client created successfully"})
+	respondData(c, http.StatusCreated, client, "Client created successfully", nil)
 }
 
 func (h *ClientHandler) Update(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid ID"})
+	var params dto.IDParam
+	if !middleware.BindUri(c, &params) {
 		return
 	}
-	var client models.Client
-	if err := c.ShouldBindJSON(&client); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": err.Error()})
+	var req dto.ClientRequest
+	if !middleware.BindJSON(c, &req) {
 		return
 	}
-	if err := h.svc.UpdateClient(id, &client); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": err.Error()})
+	client := req.ToDomain()
+	if err := h.svc.UpdateClient(params.ID, &client); err != nil {
+		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": client, "message": "Client updated successfully"})
+	respondData(c, http.StatusOK, client, "Client updated successfully", nil)
 }
 
 func (h *ClientHandler) Delete(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid ID"})
+	var params dto.IDParam
+	if !middleware.BindUri(c, &params) {
 		return
 	}
-	if err := h.svc.DeleteClient(id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": err.Error()})
+	if err := h.svc.DeleteClient(params.ID); err != nil {
+		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Client deleted successfully"})
+	respondMessage(c, http.StatusOK, "Client deleted successfully")
 }

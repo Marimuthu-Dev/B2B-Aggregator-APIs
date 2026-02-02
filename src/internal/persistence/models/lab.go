@@ -1,8 +1,6 @@
 package models
 
-import (
-	"time"
-)
+import "time"
 
 type Lab struct {
 	LabID                      int64      `gorm:"primaryKey;column:LabID;autoIncrement"`

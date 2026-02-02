@@ -1,8 +1,6 @@
 package models
 
-import (
-	"time"
-)
+import "time"
 
 type Lead struct {
 	LeadID        int64     `gorm:"primaryKey;column:LeadID;autoIncrement"`
