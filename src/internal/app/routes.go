@@ -45,7 +45,15 @@ type routeDeps struct {
 
 func registerPublicRoutes(r *gin.Engine, deps routeDeps) {
 	v1 := r.Group("/api/v1")
-	v1.POST("/login", deps.loginHandler.Login)
+	login := v1.Group("/login")
+	{
+		login.POST("", deps.loginHandler.Login)
+		login.POST("/forgot-password", deps.loginHandler.ForgotPasswordReset)
+		login.POST("/forgot-password-key", deps.loginHandler.CreateForgotPasswordKey)
+		login.GET("/forgot-password-key", deps.loginHandler.GetForgotPasswordKey)
+		login.POST("/change-password", deps.loginHandler.ChangePassword)
+		login.GET("/profile", deps.loginHandler.GetProfile) // public with X-Domain + userId or mobileNumber
+	}
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "pong"})
 	})

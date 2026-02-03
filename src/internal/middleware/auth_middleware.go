@@ -45,9 +45,10 @@ func AuthMiddleware(secret string) gin.HandlerFunc {
 			return
 		}
 
-		// Set user information in context
+		// Set user information in context (Node-compatible: userId, userType)
 		c.Set("userId", claims.UserID)
-		c.Set("role", claims.Role)
+		c.Set("userType", claims.UserType)
+		c.Set("role", claims.Role())
 
 		c.Next()
 	}

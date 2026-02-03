@@ -42,6 +42,7 @@ func Run() error {
 	// Initialize Repositories
 	packageRepo := repository.NewPackageRepository(db)
 	loginRepo := repository.NewLoginRepository(db)
+	forgotPasswordRepo := repository.NewForgotPasswordRepository(db)
 	clientRepo := repository.NewClientRepository(db)
 	labRepo := repository.NewLabRepository(db)
 	leadRepo := repository.NewLeadRepository(db)
@@ -49,7 +50,7 @@ func Run() error {
 
 	// Initialize Services
 	packageSvc := service.NewPackageService(packageRepo)
-	loginSvc := service.NewLoginService(loginRepo, cfg.JWT)
+	loginSvc := service.NewLoginService(loginRepo, forgotPasswordRepo, clientRepo, labRepo, cfg.JWT)
 	clientSvc := service.NewClientService(clientRepo)
 	labSvc := service.NewLabService(labRepo)
 	leadSvc := service.NewLeadService(leadRepo, leadUow)

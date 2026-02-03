@@ -10,3 +10,15 @@ type Login struct {
 	CreatedOn     time.Time
 	LastUpdatedOn time.Time
 }
+
+// ForgotPassword represents a forgot-password reset key record
+type ForgotPassword struct {
+	Uid                 int64
+	UserID              int64
+	UserType            string
+	ForgetPasswordKey   string
+	CreatedOn           time.Time
+	ExpiryTimestamp     time.Time
+	IsPasswordChanged   bool
+	IsPasswordUpdatedOn *time.Time
+}
