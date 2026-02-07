@@ -23,6 +23,13 @@ type Lead struct {
 	LastUpdatedOn time.Time
 }
 
+// LeadDetail is lead with resolved ClientName and PackageName for API response.
+type LeadDetail struct {
+	Lead
+	ClientName  string `json:"clientName,omitempty"`
+	PackageName string `json:"packageName,omitempty"`
+}
+
 type LeadHistory struct {
 	UID       int64
 	LeadID    int64
@@ -36,4 +43,5 @@ const (
 	LeadActionUpdate       = "UPDATE"
 	LeadActionDelete       = "DELETE"
 	LeadActionStatusUpdate = "STATUS_UPDATE"
+	LeadActionCsvImport    = "CSV_IMPORT"
 )

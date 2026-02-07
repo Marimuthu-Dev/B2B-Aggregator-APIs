@@ -34,6 +34,33 @@ type ClientRequest struct {
 	LastUpdatedOn             *time.Time `binding:"omitempty"`
 }
 
+type ClientLocationRequest struct {
+	Address       string `json:"Address" binding:"omitempty"`
+	Pincode       string `json:"Pincode" binding:"omitempty"`
+	CityID        int8   `json:"CityID" binding:"required"`
+	StateID       int8   `json:"StateID" binding:"required"`
+	IsActive      *bool  `json:"IsActive" binding:"omitempty"`
+	CreatedBy     int64  `json:"CreatedBy" binding:"omitempty"`
+	LastUpdatedBy int64  `json:"LastUpdatedBy" binding:"omitempty"`
+}
+
+func (r ClientLocationRequest) ToDomain(clientID int64) domain.ClientLocation {
+	isActive := true
+	if r.IsActive != nil {
+		isActive = *r.IsActive
+	}
+	return domain.ClientLocation{
+		ClientID:      clientID,
+		Address:       r.Address,
+		Pincode:       r.Pincode,
+		CityID:        r.CityID,
+		StateID:       r.StateID,
+		IsActive:      isActive,
+		CreatedBy:     r.CreatedBy,
+		LastUpdatedBy: r.LastUpdatedBy,
+	}
+}
+
 func (r ClientRequest) ToDomain() domain.Client {
 	var createdOn time.Time
 	if r.CreatedOn != nil {

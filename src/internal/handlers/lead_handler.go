@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 
+	"b2b-diagnostic-aggregator/apis/internal/apperrors"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
 	"b2b-diagnostic-aggregator/apis/internal/middleware"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
@@ -112,9 +114,47 @@ func (h *LeadHandler) BulkUpdateStatus(c *gin.Context) {
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
-	if err := h.svc.BulkUpdateLeadStatus(req.LeadIDs, req.LeadStatusID, req.LastUpdatedBy); err != nil {
+	count, err := h.svc.BulkUpdateLeadStatus(req.LeadIDs, req.LeadStatusID, req.LastUpdatedBy)
+	if err != nil {
 		respondError(c, err)
 		return
 	}
-	respondMessage(c, http.StatusOK, "Lead statuses updated successfully")
+	respondData(c, http.StatusOK, gin.H{"updatedCount": count}, "Lead statuses updated successfully", nil)
+}
+
+func (h *LeadHandler) BulkImportCsv(c *gin.Context) {
+	file, err := c.FormFile("file")
+	if err != nil || file == nil {
+		respondError(c, apperrors.NewBadRequest("CSV file is required", err))
+		return
+	}
+	clientIDStr := c.PostForm("ClientID")
+	packageIDStr := c.PostForm("PackageID")
+	if clientIDStr == "" || packageIDStr == "" {
+		respondError(c, apperrors.NewBadRequest("ClientID and PackageID are required in the request body", nil))
+		return
+	}
+	clientID, err1 := strconv.ParseInt(clientIDStr, 10, 64)
+	packageID, err2 := strconv.Atoi(packageIDStr)
+	if err1 != nil || err2 != nil || clientID <= 0 || packageID <= 0 {
+		respondError(c, apperrors.NewBadRequest("ClientID and PackageID must be positive integers", nil))
+		return
+	}
+
+	f, err := file.Open()
+	if err != nil {
+		respondError(c, apperrors.NewBadRequest("Failed to read file", err))
+		return
+	}
+	defer f.Close()
+	buf := make([]byte, file.Size+1)
+	n, _ := f.Read(buf)
+	buf = buf[:n]
+
+	inserted, err := h.svc.BulkImportFromCSV(buf, clientID, packageID)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	respondData(c, http.StatusCreated, gin.H{"insertedCount": inserted}, "Leads imported successfully", nil)
 }

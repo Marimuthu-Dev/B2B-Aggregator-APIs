@@ -21,6 +21,34 @@ type CreatePackageWithTestsRequest struct {
 	TestIDs []int `json:"testIds" binding:"required"`
 }
 
+type PackageStatusUpdateRequest struct {
+	IsActive      bool  `json:"IsActive" binding:"required"`
+	LastUpdatedBy int64 `json:"LastUpdatedBy" binding:"required"`
+}
+
+type PackageClientMappingRequest struct {
+	PackageID       int     `json:"PackageID" binding:"required"`
+	ClientID        int64   `json:"ClientID" binding:"required"`
+	Price           float64 `json:"Price" binding:"required,min=0"`
+	IsActive        *bool   `json:"IsActive"`
+	CreatedBy       int64   `json:"CreatedBy" binding:"required"`
+	LastUpdatedBy   int64   `json:"LastUpdatedBy" binding:"required"`
+}
+
+type PackageLabMappingRequest struct {
+	PackageID       int     `json:"PackageID" binding:"required"`
+	LabID           int64   `json:"LabID" binding:"required"`
+	Price           float64 `json:"Price" binding:"required,min=0"`
+	IsActive        *bool   `json:"IsActive"`
+	CreatedBy       int64   `json:"CreatedBy" binding:"required"`
+	LastUpdatedBy   int64   `json:"LastUpdatedBy" binding:"required"`
+}
+
+type PackageMappingStatusUpdateRequest struct {
+	IsActive      bool  `json:"IsActive" binding:"required"`
+	LastUpdatedBy int64 `json:"LastUpdatedBy" binding:"required"`
+}
+
 func (r PackageRequest) ToDomain() domain.Package {
 	var createdOn time.Time
 	if r.CreatedOn != nil {

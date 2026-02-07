@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"fmt"
+
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 
@@ -123,12 +125,15 @@ func (r *labRepository) FindAllActive() ([]domain.Lab, error) {
 }
 
 func (r *labRepository) FindByContactNumber(contactNumber string) (*domain.Lab, error) {
+	fmt.Printf("[LOGIN] Repository.Lab.FindByContactNumber: entry contactNumber=%s\n", contactNumber)
 	var l persistencemodels.Lab
 	err := r.db.Where("ContactPerson1Number = ? OR ContactPerson1Number1 = ?", contactNumber, contactNumber).First(&l).Error
 	if err != nil {
+		fmt.Printf("[LOGIN] Repository.Lab.FindByContactNumber: not found err=%v\n", err)
 		return nil, err
 	}
 	domainLab := mapLabToDomain(l)
+	fmt.Printf("[LOGIN] Repository.Lab.FindByContactNumber: found LabID=%d\n", domainLab.LabID)
 	return &domainLab, nil
 }
 

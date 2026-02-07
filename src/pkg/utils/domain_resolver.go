@@ -1,5 +1,7 @@
 package utils
 
+import "fmt"
+
 // UserType constants matching Node.js (1=employee, 2=client, 3=lab)
 const (
 	UserTypeEmployee = 1
@@ -7,18 +9,22 @@ const (
 	UserTypeLab      = 3
 )
 
-// GetUserTypeFromDomain returns userType (1=employee, 2=client, 3=lab) from domain string
+// GetUserTypeFromDomain returns userType (1=employee, 2=client, 3=lab) from domain string.
+// Returns 0 for invalid/unknown domain (matches Node.js getUserTypeFromDomain).
 func GetUserTypeFromDomain(domain string) int {
+	var userType int
 	switch domain {
 	case "employee":
-		return UserTypeEmployee
+		userType = UserTypeEmployee
 	case "client":
-		return UserTypeClient
+		userType = UserTypeClient
 	case "lab":
-		return UserTypeLab
+		userType = UserTypeLab
 	default:
-		return 0
+		userType = 0 // invalid domain, same as Node.js
 	}
+	fmt.Printf("[LOGIN] Utils.GetUserTypeFromDomain: domain=%q -> userType=%d\n", domain, userType)
+	return userType
 }
 
 // UserTypeToString returns the domain string for a userType

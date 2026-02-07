@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 
 	"b2b-diagnostic-aggregator/apis/internal/dto"
 	"b2b-diagnostic-aggregator/apis/internal/middleware"
@@ -95,10 +96,160 @@ func (h *PackageHandler) CreateWithTests(c *gin.Context) {
 	}
 
 	pkg := req.PackageRequest.ToDomain()
-	if err := h.svc.CreatePackageWithTests(&pkg, req.TestIDs); err != nil {
+	result, err := h.svc.CreatePackageWithTests(&pkg, req.TestIDs)
+	if err != nil {
 		respondError(c, err)
 		return
 	}
 
-	respondData(c, http.StatusCreated, pkg, "Package created successfully with test mappings", nil)
+	if result.RetVal == 2 {
+		data := gin.H{
+			"PackageID": result.Package.PackageID,
+			"PackageName": result.Package.PackageName,
+			"Description": result.Package.Description,
+			"IsActive": result.Package.IsActive,
+			"CreatedBy": result.Package.CreatedBy,
+			"CreatedOn": result.Package.CreatedOn,
+			"LastUpdatedBy": result.Package.LastUpdatedBy,
+			"LastUpdatedOn": result.Package.LastUpdatedOn,
+			"TestCount": len(result.TestIDs),
+			"TestIDs": result.TestIDs,
+		}
+		respondData(c, http.StatusOK, data, result.Message, nil)
+		return
+	}
+	data := gin.H{
+		"PackageID": result.Package.PackageID,
+		"PackageName": result.Package.PackageName,
+		"Description": result.Package.Description,
+		"IsActive": result.Package.IsActive,
+		"CreatedBy": result.Package.CreatedBy,
+		"CreatedOn": result.Package.CreatedOn,
+		"LastUpdatedBy": result.Package.LastUpdatedBy,
+		"LastUpdatedOn": result.Package.LastUpdatedOn,
+		"TestCount": len(result.TestIDs),
+		"TestIDs": result.TestIDs,
+	}
+	respondData(c, http.StatusCreated, data, result.Message, nil)
+}
+
+func (h *PackageHandler) GetAllWithTestsDetails(c *gin.Context) {
+	data, err := h.svc.GetAllPackagesWithTestsDetails()
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	respondData(c, http.StatusOK, data, "Packages retrieved successfully with test details", gin.H{"count": len(data)})
+}
+
+func (h *PackageHandler) UpdatePackageStatus(c *gin.Context) {
+	var params dto.PackageIDParam
+	if !middleware.BindUri(c, &params) {
+		return
+	}
+	var req dto.PackageStatusUpdateRequest
+	if !middleware.BindJSON(c, &req) {
+		return
+	}
+	result, err := h.svc.UpdatePackageStatus(params.ID, req.IsActive, req.LastUpdatedBy)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	msg := "Package status updated successfully. " +
+		formatInt(result.UpdatedTestMappingsCount) + " test mapping(s), " +
+		formatInt(result.UpdatedClientMappingsCount) + " client mapping(s), " +
+		formatInt(result.UpdatedLabMappingsCount) + " lab mapping(s) also updated. " +
+		"Total: " + formatInt(result.TotalMappingsUpdated) + " mapping(s)."
+	respondData(c, http.StatusOK, result.Package, msg, nil)
+}
+
+func formatInt(n int) string {
+	return strconv.Itoa(n)
+}
+
+func (h *PackageHandler) CreatePackageClientMapping(c *gin.Context) {
+	var req dto.PackageClientMappingRequest
+	if !middleware.BindJSON(c, &req) {
+		return
+	}
+	result, err := h.svc.CreatePackageClientMapping(req.PackageID, req.ClientID, req.Price, req.CreatedBy, req.LastUpdatedBy)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	if result.RetVal == 2 {
+		respondData(c, http.StatusOK, result.Mapping, result.Message, nil)
+		return
+	}
+	respondData(c, http.StatusCreated, result.Mapping, result.Message, nil)
+}
+
+func (h *PackageHandler) GetAllPackageClientMappings(c *gin.Context) {
+	data, err := h.svc.GetAllPackageClientMappings()
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	respondData(c, http.StatusOK, data, "Package-Client mappings retrieved successfully", gin.H{"count": len(data)})
+}
+
+func (h *PackageHandler) UpdatePackageClientMappingStatus(c *gin.Context) {
+	var params dto.PackageMappingIDParam
+	if !middleware.BindUri(c, &params) {
+		return
+	}
+	var req dto.PackageMappingStatusUpdateRequest
+	if !middleware.BindJSON(c, &req) {
+		return
+	}
+	result, err := h.svc.UpdatePackageClientMappingStatus(params.ID, req.IsActive, req.LastUpdatedBy)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	respondData(c, http.StatusOK, result.Mapping, result.Message, nil)
+}
+
+func (h *PackageHandler) CreatePackageLabMapping(c *gin.Context) {
+	var req dto.PackageLabMappingRequest
+	if !middleware.BindJSON(c, &req) {
+		return
+	}
+	result, err := h.svc.CreatePackageLabMapping(req.PackageID, req.LabID, req.Price, req.CreatedBy, req.LastUpdatedBy)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	if result.RetVal == 2 {
+		respondData(c, http.StatusOK, result.Mapping, result.Message, nil)
+		return
+	}
+	respondData(c, http.StatusCreated, result.Mapping, result.Message, nil)
+}
+
+func (h *PackageHandler) GetAllPackageLabMappings(c *gin.Context) {
+	data, err := h.svc.GetAllPackageLabMappings()
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	respondData(c, http.StatusOK, data, "Package-Lab mappings retrieved successfully", gin.H{"count": len(data)})
+}
+
+func (h *PackageHandler) UpdatePackageLabMappingStatus(c *gin.Context) {
+	var params dto.PackageMappingIDParam
+	if !middleware.BindUri(c, &params) {
+		return
+	}
+	var req dto.PackageMappingStatusUpdateRequest
+	if !middleware.BindJSON(c, &req) {
+		return
+	}
+	result, err := h.svc.UpdatePackageLabMappingStatus(params.ID, req.IsActive, req.LastUpdatedBy)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	respondData(c, http.StatusOK, result.Mapping, result.Message, nil)
 }

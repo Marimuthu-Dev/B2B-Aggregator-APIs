@@ -41,26 +41,37 @@ func Run() error {
 
 	// Initialize Repositories
 	packageRepo := repository.NewPackageRepository(db)
+	packageClientMapRepo := repository.NewPackageClientMappingRepository(db)
+	packageLabMapRepo := repository.NewPackageLabMappingRepository(db)
 	loginRepo := repository.NewLoginRepository(db)
 	forgotPasswordRepo := repository.NewForgotPasswordRepository(db)
 	clientRepo := repository.NewClientRepository(db)
+	clientLocationRepo := repository.NewClientLocationRepository(db)
+	employeeRepo := repository.NewEmployeeRepository(db)
 	labRepo := repository.NewLabRepository(db)
 	leadRepo := repository.NewLeadRepository(db)
 	leadUow := repository.NewLeadUnitOfWork(db)
+	testRepo := repository.NewTestRepository(db)
 
 	// Initialize Services
-	packageSvc := service.NewPackageService(packageRepo)
-	loginSvc := service.NewLoginService(loginRepo, forgotPasswordRepo, clientRepo, labRepo, cfg.JWT)
+	packageSvc := service.NewPackageService(packageRepo, testRepo, packageClientMapRepo, packageLabMapRepo, clientRepo, labRepo)
+	loginSvc := service.NewLoginService(loginRepo, forgotPasswordRepo, clientRepo, employeeRepo, labRepo, cfg.JWT)
 	clientSvc := service.NewClientService(clientRepo)
+	clientLocationSvc := service.NewClientLocationService(clientLocationRepo)
+	employeeSvc := service.NewEmployeeService(employeeRepo)
 	labSvc := service.NewLabService(labRepo)
-	leadSvc := service.NewLeadService(leadRepo, leadUow)
+	leadSvc := service.NewLeadService(leadRepo, leadUow, clientRepo, packageRepo)
+	testSvc := service.NewTestService(testRepo)
 
 	// Initialize Handlers
 	packageHandler := handlers.NewPackageHandler(packageSvc)
 	loginHandler := handlers.NewLoginHandler(loginSvc)
 	clientHandler := handlers.NewClientHandler(clientSvc)
+	clientLocationHandler := handlers.NewClientLocationHandler(clientLocationSvc)
+	employeeHandler := handlers.NewEmployeeHandler(employeeSvc)
 	labHandler := handlers.NewLabHandler(labSvc)
 	leadHandler := handlers.NewLeadHandler(leadSvc)
+	testHandler := handlers.NewTestHandler(testSvc)
 
 	// Initialize Gin
 	r := gin.Default()
@@ -69,9 +80,12 @@ func Run() error {
 	registerRoutes(r, cfg.JWT.Secret, routeDeps{
 		packageHandler: packageHandler,
 		loginHandler:   loginHandler,
-		clientHandler:  clientHandler,
-		labHandler:     labHandler,
+		clientHandler:         clientHandler,
+		clientLocationHandler: clientLocationHandler,
+		employeeHandler:       employeeHandler,
+		labHandler:            labHandler,
 		leadHandler:    leadHandler,
+		testHandler:   testHandler,
 	})
 
 	port := cfg.Port

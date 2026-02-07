@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -22,6 +23,7 @@ func NewLoginHandler(svc service.LoginService) *LoginHandler {
 
 // Login accepts domain + mobileNumber + Password (X-Domain header) or legacy userId + Password
 func (h *LoginHandler) Login(c *gin.Context) {
+	fmt.Println("[LOGIN] Handler.Login: entry")
 	domain := middleware.GetDomain(c)
 	if domain == "" {
 		raw := c.GetHeader("X-Domain")
@@ -30,34 +32,42 @@ func (h *LoginHandler) Login(c *gin.Context) {
 		}
 		domain = strings.TrimSpace(strings.ToLower(raw))
 	}
+	fmt.Printf("[LOGIN] Handler.Login: X-Domain=%q\n", domain)
 	if domain != "" {
 		c.Set("domain", domain)
 	}
 
 	var req dto.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		fmt.Printf("[LOGIN] Handler.Login: bind JSON failed: %v\n", err)
 		c.Error(err).SetType(gin.ErrorTypeBind)
 		c.Abort()
 		return
 	}
 	req.Domain = domain
 	req.MobileNumber = strings.TrimSpace(req.MobileNumber)
+	fmt.Printf("[LOGIN] Handler.Login: bound request domain=%q mobileNumber=%q userId=%d\n", req.Domain, req.MobileNumber, req.UserID)
 
 	if req.Domain != "" && req.MobileNumber == "" {
+		fmt.Println("[LOGIN] Handler.Login: validation failed - mobileNumber required when X-Domain present")
 		respondError(c, apperrors.NewBadRequest("mobileNumber is required when using X-Domain", nil))
 		return
 	}
 	if req.Domain == "" && req.UserID == 0 {
+		fmt.Println("[LOGIN] Handler.Login: validation failed - need X-Domain+mobileNumber or userId")
 		respondError(c, apperrors.NewBadRequest("either X-Domain + mobileNumber or userId is required", nil))
 		return
 	}
 
+	fmt.Println("[LOGIN] Handler.Login: calling LoginService.Login")
 	resp, err := h.svc.Login(req)
 	if err != nil {
+		fmt.Printf("[LOGIN] Handler.Login: service error: %v\n", err)
 		respondError(c, err)
 		return
 	}
 
+	fmt.Println("[LOGIN] Handler.Login: success, responding OK")
 	respondData(c, http.StatusOK, resp, "Authenticated", nil)
 }
 

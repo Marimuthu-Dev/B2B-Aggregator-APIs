@@ -36,11 +36,14 @@ func registerRoutes(r *gin.Engine, jwtSecret string, deps routeDeps) {
 }
 
 type routeDeps struct {
-	packageHandler *handlers.PackageHandler
-	loginHandler   *handlers.LoginHandler
-	clientHandler  *handlers.ClientHandler
-	labHandler     *handlers.LabHandler
-	leadHandler    *handlers.LeadHandler
+	packageHandler        *handlers.PackageHandler
+	loginHandler          *handlers.LoginHandler
+	clientHandler         *handlers.ClientHandler
+	clientLocationHandler *handlers.ClientLocationHandler
+	employeeHandler       *handlers.EmployeeHandler
+	labHandler            *handlers.LabHandler
+	leadHandler           *handlers.LeadHandler
+	testHandler           *handlers.TestHandler
 }
 
 func registerPublicRoutes(r *gin.Engine, deps routeDeps) {
@@ -66,8 +69,11 @@ func registerProtectedRoutes(r *gin.Engine, jwtSecret string, deps routeDeps) {
 	{
 		registerPackageRoutes(api, deps.packageHandler)
 		registerClientRoutes(api, deps.clientHandler)
+		registerClientLocationRoutes(api, deps.clientLocationHandler)
+		registerEmployeeRoutes(api, deps.employeeHandler)
 		registerLabRoutes(api, deps.labHandler)
 		registerLeadRoutes(api, deps.leadHandler)
+		registerTestRoutes(api, deps.testHandler)
 	}
 }
 
@@ -75,10 +81,18 @@ func registerPackageRoutes(api *gin.RouterGroup, handler *handlers.PackageHandle
 	packages := api.Group("/packages")
 	{
 		packages.GET("/", handler.GetAll)
+		packages.GET("/with-tests-details", handler.GetAllWithTestsDetails)
 		packages.GET("/:id", handler.GetByID)
 		packages.POST("/", handler.Create)
 		packages.POST("/with-tests", handler.CreateWithTests)
+		packages.PUT("/:id", handler.UpdatePackageStatus)
 		packages.DELETE("/:id", handler.Delete)
+		packages.POST("/client-mapping", handler.CreatePackageClientMapping)
+		packages.GET("/client-mapping", handler.GetAllPackageClientMappings)
+		packages.PUT("/client-mapping/:id", handler.UpdatePackageClientMappingStatus)
+		packages.POST("/lab-mapping", handler.CreatePackageLabMapping)
+		packages.GET("/lab-mapping", handler.GetAllPackageLabMappings)
+		packages.PUT("/lab-mapping/:id", handler.UpdatePackageLabMappingStatus)
 	}
 }
 
@@ -91,6 +105,29 @@ func registerClientRoutes(api *gin.RouterGroup, handler *handlers.ClientHandler)
 		clients.POST("/", handler.Create)
 		clients.PUT("/:id", handler.Update)
 		clients.DELETE("/:id", handler.Delete)
+	}
+}
+
+func registerClientLocationRoutes(api *gin.RouterGroup, handler *handlers.ClientLocationHandler) {
+	loc := api.Group("/client/:client_id/locations")
+	{
+		loc.GET("/", handler.GetAllByClientID)
+		loc.GET("/:id", handler.GetByID)
+		loc.POST("/", handler.Create)
+		loc.PUT("/:id", handler.Update)
+		loc.DELETE("/:id", handler.Delete)
+	}
+}
+
+func registerEmployeeRoutes(api *gin.RouterGroup, handler *handlers.EmployeeHandler) {
+	employees := api.Group("/employees")
+	{
+		employees.GET("/", handler.GetAll)
+		employees.GET("/search", handler.GetByContactNumber)
+		employees.GET("/:id", handler.GetByID)
+		employees.POST("/", handler.Create)
+		employees.PUT("/:id", handler.Update)
+		employees.DELETE("/:id", handler.Delete)
 	}
 }
 
@@ -115,5 +152,15 @@ func registerLeadRoutes(api *gin.RouterGroup, handler *handlers.LeadHandler) {
 		leads.PUT("/:id", handler.Update)
 		leads.DELETE("/:id", handler.Delete)
 		leads.POST("/bulk-status", handler.BulkUpdateStatus)
+		leads.POST("/bulk-csv", handler.BulkImportCsv)
+	}
+}
+
+func registerTestRoutes(api *gin.RouterGroup, handler *handlers.TestHandler) {
+	tests := api.Group("/tests")
+	{
+		tests.GET("/", handler.GetAll)
+		tests.GET("/active", handler.GetActive)
+		tests.GET("/:id", handler.GetByID)
 	}
 }

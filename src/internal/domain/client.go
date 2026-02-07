@@ -30,3 +30,17 @@ type Client struct {
 	LastUpdatedBy             int64
 	LastUpdatedOn             time.Time
 }
+
+type ClientLocation struct {
+	ClientLocationID int64
+	ClientID         int64
+	Address          string
+	Pincode          string
+	CityID           int8
+	StateID          int8
+	IsActive         bool
+	CreatedBy        int64
+	CreatedOn        time.Time
+	LastUpdatedBy    int64
+	LastUpdatedOn    time.Time
+}
