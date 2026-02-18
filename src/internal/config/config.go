@@ -55,18 +55,18 @@ func LoadConfig() *Config {
 
 	return &Config{
 		Environment: getEnv("ENVIRONMENT", "development"),
-		Port:        getEnvAsInt("PORT", 5000),
+		Port:        getEnvAsInt("PORT", 8080),
 		Domain:      getEnv("DOMAIN", ""),
 		DB: DBConfig{
-			Server:                 getEnv("DB_SERVER", ""),
-			User:                   getEnv("DB_USER", ""),
+			Server:                 getEnv("DB_SERVER", "um-staging-server-database.database.windows.net:1433"),
+			User:                   getEnv("DB_USER", "dev_admin"),
 			Password:               getEnv("DB_PASSWORD", ""),
-			Database:               getEnv("DB_DATABASE_NAME", ""),
+			Database:               getEnv("DB_DATABASE_NAME", "um-staging-DB"),
 			PoolMax:                getEnvAsInt("DB_POOL_MAX", 10),
 			PoolMin:                getEnvAsInt("DB_POOL_MIN", 0),
 			IdleTimeout:            getEnvAsInt("DB_IDLE_TIMEOUT", 30000),
-			Encrypt:                getEnvAsBool("DB_ENCRYPT", false),
-			TrustServerCertificate: getEnvAsBool("DB_TRUST_SERVER_CERT", true),
+			Encrypt:                getEnvAsBool("DB_ENCRYPT", true),
+			TrustServerCertificate: getEnvAsBool("DB_TRUST_SERVER_CERT", false),
 		},
 		JWT: JWTConfig{
 			Secret:           getEnv("JWT_SECRET", "aggreator@123456@"),

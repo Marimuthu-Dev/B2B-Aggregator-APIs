@@ -1,0 +1,21 @@
+# Git and IDE
+.git
+.gitignore
+.cursor
+.vscode
+*.md
+
+# Local env and secrets (use App Service config for production)
+.env
+.env.*
+!.env.example
+
+# Build artifacts and logs
+src/logs
+src/*.exe
+src/cmd/api/api
+
+# Test and coverage
+**/*_test.go
+coverage.out
+**/tmp

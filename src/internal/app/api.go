@@ -1,7 +1,6 @@
 package app
 
 import (
-	"fmt"
 	"log"
 	"os"
 
@@ -88,11 +87,12 @@ func Run() error {
 		testHandler:   testHandler,
 	})
 
-	port := cfg.Port
-	if port == 0 {
-		port = 5000
+	// Azure App Service and cloud platforms set PORT env; default 8080
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
 	}
 
-	log.Printf("🚀 Server is running on port %d", port)
-	return r.Run(fmt.Sprintf(":%d", port))
+	log.Printf("Server running on port %s", port)
+	return r.Run(":" + port)
 }

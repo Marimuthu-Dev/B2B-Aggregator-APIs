@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"time"
 
 	"gorm.io/driver/sqlserver"
@@ -10,10 +11,10 @@ import (
 )
 
 func ConnectDatabase(c DBConfig) (*gorm.DB, error) {
-
-	// dsn := "sqlserver://user:password@server:port?database=dbname"
-	dsn := fmt.Sprintf("sqlserver://%s:%s@%s?database=%s&encrypt=%t&trustServerCertificate=%t",
-		c.User, c.Password, c.Server, c.Database, c.Encrypt, c.TrustServerCertificate)
+	// URL-encode user and password so special characters (e.g. @ in password) don't break the DSN
+	userInfo := url.UserPassword(c.User, c.Password)
+	dsn := fmt.Sprintf("sqlserver://%s@%s?database=%s&encrypt=%t&trustServerCertificate=%t",
+		userInfo.String(), c.Server, c.Database, c.Encrypt, c.TrustServerCertificate)
 
 	db, err := gorm.Open(sqlserver.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),
