@@ -26,7 +26,7 @@ func (h *LeadHandler) GetAll(c *gin.Context) {
 	if !middleware.BindQuery(c, &query) {
 		return
 	}
-	page := query.PaginationQuery.Normalize("createdOn")
+	page := query.PaginationQuery.Normalize("createdOn", 0)
 	filter := repository.LeadListFilter{
 		Page:      page.Page,
 		PageSize:  page.PageSize,

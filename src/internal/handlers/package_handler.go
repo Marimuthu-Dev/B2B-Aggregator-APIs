@@ -25,7 +25,7 @@ func (h *PackageHandler) GetAll(c *gin.Context) {
 	if !middleware.BindQuery(c, &query) {
 		return
 	}
-	page := query.PaginationQuery.Normalize("createdOn")
+	page := query.PaginationQuery.Normalize("createdOn", 0)
 	filter := repository.PackageListFilter{
 		Page:      page.Page,
 		PageSize:  page.PageSize,

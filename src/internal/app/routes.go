@@ -10,6 +10,7 @@ import (
 )
 
 func registerMiddleware(r *gin.Engine, dbReady bool) {
+	r.Use(middleware.CORSMiddleware(middleware.DefaultCORSConfig()))
 	r.Use(middleware.RecoveryMiddleware())
 	r.Use(middleware.ContextMiddleware())
 	r.Use(middleware.LoggingMiddleware())
@@ -57,9 +58,7 @@ func registerPublicRoutes(r *gin.Engine, deps routeDeps) {
 		login.POST("/change-password", deps.loginHandler.ChangePassword)
 		login.GET("/profile", deps.loginHandler.GetProfile) // public with X-Domain + userId or mobileNumber
 	}
-	r.GET("/ping", func(c *gin.Context) {
-		c.JSON(200, gin.H{"message": "pong"})
-	})
+	r.GET("/ping", handlers.Ping)
 }
 
 func registerProtectedRoutes(r *gin.Engine, jwtSecret string, deps routeDeps) {

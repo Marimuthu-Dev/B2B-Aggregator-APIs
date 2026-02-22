@@ -24,7 +24,7 @@ func (h *LabHandler) GetAll(c *gin.Context) {
 	if !middleware.BindQuery(c, &query) {
 		return
 	}
-	page := query.PaginationQuery.Normalize("createdOn")
+	page := query.PaginationQuery.Normalize("createdOn", 500) // default 500 so GET without params returns all labs
 	filter := repository.LabListFilter{
 		Page:      page.Page,
 		PageSize:  page.PageSize,

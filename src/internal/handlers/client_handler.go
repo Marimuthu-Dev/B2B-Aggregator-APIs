@@ -24,7 +24,7 @@ func (h *ClientHandler) GetAll(c *gin.Context) {
 	if !middleware.BindQuery(c, &query) {
 		return
 	}
-	page := query.PaginationQuery.Normalize("createdOn")
+	page := query.PaginationQuery.Normalize("createdOn", 500) // default 500 so GET without params returns all clients
 	filter := repository.ClientListFilter{
 		Page:      page.Page,
 		PageSize:  page.PageSize,

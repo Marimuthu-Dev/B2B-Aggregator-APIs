@@ -270,7 +270,11 @@ In the Azure Portal, application settings are under **Configuration** (the label
 | `JWT_SECRET` | *A strong secret string* | **Yes** |
 | `JWT_EXPIRES_IN` | `24h` | Optional |
 | `JWT_REFRESH_EXPIRES_IN` | `7d` | Optional |
-| `ENVIRONMENT` | `STG` or `production` | Optional |
+| `ENVIRONMENT` | `prod`, `STG`, or `dev` | Optional – shown in `/ping` (default `dev`) |
+| `LAST_BUILD_PUSHED` | e.g. `03-12-2025 14:45:00` | Optional – dev sets at build/deploy; shown in `/ping` |
+| `LATEST_COMMIT` | e.g. `feat: updated ping controller` | Optional – dev sets at build/deploy; shown in `/ping` |
+| `LOGIN_ENC_KEY` | *A secret key string* | **Yes** for login – used to encrypt passwords (must match the key used when passwords were stored). |
+| `LOGIN_ENC_SALT` | *A secret salt string* | **Yes** for login – used with LOGIN_ENC_KEY for password encryption. |
 
 4. Click **OK** for each setting.
 5. Click **Save** at the top of the Configuration blade, then **Continue** when prompted to restart the app.
@@ -401,6 +405,34 @@ If DB is down, the API may return `503 Database unavailable`.
 
 ## Troubleshooting
 
+### 503 – Database unavailable
+
+If the API returns **503** with `"message": "Database unavailable"` (e.g. on `POST /api/v1/login` or any non-ping request), the app is running but **cannot connect to the database** from Azure. This is a backend/configuration issue, not a frontend bug.
+
+**Checklist for backend/DevOps:**
+
+1. **Application settings**  
+   In Azure Portal → **App Service** (e.g. **um-staging-api**) → **Configuration** → **Application settings**, ensure these exist and are correct (no typos, no extra spaces):
+   - `DB_SERVER` (e.g. `um-staging-server-database.database.windows.net:1433`)
+   - `DB_DATABASE_NAME` (e.g. `um-staging-DB`)
+   - `DB_USER` (e.g. `dev_admin`)
+   - `DB_PASSWORD` (correct password)
+   - `DB_ENCRYPT` = `true`
+   - `DB_TRUST_SERVER_CERT` = `false` (or as required)
+
+2. **Azure SQL firewall**  
+   In Azure Portal → **Azure SQL server** (e.g. **um-staging-server-database**) → **Networking** (or **Firewalls and virtual networks**):
+   - Enable **“Allow Azure services and resources to access this server”**, or  
+   - Add the App Service **outbound IP(s)** as a firewall rule.  
+   Then **restart** the App Service.
+
+3. **See the actual error**  
+   App Service → **Log stream**. Restart the app and watch startup logs for the real connection error (e.g. login failed, firewall, timeout).
+
+**For frontend developers:** No code change needed. Ask backend/DevOps to fix DB configuration and SQL firewall; after that, login and other APIs should work.
+
+---
+
 | Issue | What to do |
 |-------|------------|
 | `az: command not found` after install | Log out and back into WSL, or run `source ~/.bashrc`. Try `/usr/bin/az --version`. |
@@ -411,7 +443,8 @@ If DB is down, the API may return `503 Database unavailable`.
 | Wrong subscription | Run `az account set --subscription "Your Subscription Name"`. |
 | Image pull fails (App Service) | Check ACR → Access keys (Admin user enabled). In App Service → Container settings, check registry URL, image name, tag, and admin username/password. |
 | App keeps restarting | Check **Log stream**. Often missing `DB_PASSWORD` or wrong `DB_*` settings. Add or fix in **Configuration** → **Application settings**. |
-| 503 / "Database unavailable" | Verify `DB_SERVER`, `DB_USER`, `DB_PASSWORD`, and that the database firewall allows the App Service outbound IP (or VNet). |
+| 500 "Error validating credentials" | **1)** Add **LOGIN_ENC_KEY** and **LOGIN_ENC_SALT** in App Service → **Configuration** → **Application settings** (required for password encryption; if missing, login returns 500). **2)** Or check **Log stream** for the real error (e.g. DB error during Authenticate). |
+| 503 / "Database unavailable" | **1)** In App Service → **Configuration** → **Application settings**, ensure `DB_PASSWORD`, `DB_SERVER`, `DB_USER`, `DB_DATABASE_NAME` are set and correct (no typos). **2)** In **Azure SQL** → **Networking** (or **Firewalls and virtual networks**), allow Azure services and/or add the App Service outbound IPs. Then **restart** the App Service. |
 | Docker build fails (Go version) | Ensure `src/go.mod` has a Go version that matches the Dockerfile (e.g. Go 1.25 in both). Build from the folder that contains `Dockerfile` and `src/`. |
 | Binary: "This app can't run on your PC" | Binary built for wrong architecture; rebuild with correct GOOS/GOARCH. |
 | Binary: Permission denied | Run `chmod +x b2b-aggregator`. |
@@ -449,6 +482,6 @@ For those who have already run through the full guide once:
 3. **Run:** `./scripts/deploy-container.sh`
 4. **If "enable admin first":** `az acr update -n umstagingacr --resource-group um-staging-rg-appservice --admin-enabled true` then re-run script.
 5. **Portal:** **um-staging-api** → **Configuration (preview)** → **Application settings** – add `DB_PASSWORD`, `JWT_SECRET`, `PORT`, and other `DB_*` / `JWT_*` as in [Part 6](#part-6-configure-application-settings-in-azure-portal).
-6. **Verify:** `https://um-staging-api.azurewebsites.net/ping` → `{"message":"pong"}`.
+6. **Verify:** `https://um-staging-api.azurewebsites.net/ping` → returns JSON with Environment, Current TimeStamp, IST TimeStamp, Last Build Pushed, Latest commit.
 
 For full steps and troubleshooting, use the sections above in this document.
