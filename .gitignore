@@ -1,4 +1,6 @@
+# Local env with secrets (use .env.example as template)
+.env
+src/.env
 
-
-#Ignore cursor AI rules
-.cursor\rules\codacy.mdc
+# Ignore cursor AI rules
+.cursor/rules/codacy.mdc

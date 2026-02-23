@@ -29,9 +29,13 @@ func ConnectDatabase(c DBConfig) (*gorm.DB, error) {
 		return nil, err
 	}
 
-	sqlDB.SetMaxIdleConns(c.PoolMin)
+	// Connection pool: reuse connections and bound resource usage
 	sqlDB.SetMaxOpenConns(c.PoolMax)
-	sqlDB.SetConnMaxLifetime(time.Duration(c.IdleTimeout) * time.Millisecond)
+	sqlDB.SetMaxIdleConns(c.PoolMin)
+	sqlDB.SetConnMaxIdleTime(time.Duration(c.IdleTimeout) * time.Millisecond)
+	if c.ConnMaxLifetime > 0 {
+		sqlDB.SetConnMaxLifetime(time.Duration(c.ConnMaxLifetime) * time.Millisecond)
+	}
 
 	return db, nil
 }

@@ -22,9 +22,10 @@ type DBConfig struct {
 	User                   string
 	Password               string
 	Database               string
-	PoolMax                int
-	PoolMin                int
-	IdleTimeout            int
+	PoolMax                int   // max open connections to the database
+	PoolMin                int   // max idle connections kept in the pool (reuse)
+	IdleTimeout            int   // max time a connection can be idle before closed (ms)
+	ConnMaxLifetime        int   // max time a connection may be reused (ms); 0 = no limit
 	Encrypt                bool
 	TrustServerCertificate bool
 }
@@ -58,18 +59,19 @@ func LoadConfig() *Config {
 		Port:        getEnvAsInt("PORT", 8080),
 		Domain:      getEnv("DOMAIN", ""),
 		DB: DBConfig{
-			Server:                 getEnv("DB_SERVER", "um-staging-server-database.database.windows.net:1433"),
-			User:                   getEnv("DB_USER", "dev_admin"),
+			Server:                 getEnv("DB_SERVER", ""),
+			User:                   getEnv("DB_USER", ""),
 			Password:               getEnv("DB_PASSWORD", ""),
-			Database:               getEnv("DB_DATABASE_NAME", "um-staging-DB"),
-			PoolMax:                getEnvAsInt("DB_POOL_MAX", 10),
-			PoolMin:                getEnvAsInt("DB_POOL_MIN", 0),
+			Database:               getEnv("DB_DATABASE_NAME", ""),
+			PoolMax:                getEnvAsInt("DB_POOL_MAX", 25),
+			PoolMin:                getEnvAsInt("DB_POOL_MIN", 5),
 			IdleTimeout:            getEnvAsInt("DB_IDLE_TIMEOUT", 30000),
+			ConnMaxLifetime:        getEnvAsInt("DB_CONN_MAX_LIFETIME_MS", 3600000),
 			Encrypt:                getEnvAsBool("DB_ENCRYPT", true),
 			TrustServerCertificate: getEnvAsBool("DB_TRUST_SERVER_CERT", false),
 		},
 		JWT: JWTConfig{
-			Secret:           getEnv("JWT_SECRET", "aggreator@123456@"),
+			Secret:           getEnv("JWT_SECRET", ""),
 			ExpiresIn:        getEnv("JWT_EXPIRES_IN", "24h"),
 			RefreshExpiresIn: getEnv("JWT_REFRESH_EXPIRES_IN", "7d"),
 		},
