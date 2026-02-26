@@ -135,11 +135,12 @@ func (s *loginService) Login(req dto.LoginRequest) (*dto.LoginResponse, error) {
 		userID = login.UserID
 		userTypeStr = login.UserType
 		userType = 0
-		if login.UserType == "1" || login.UserType == "employee" {
+		switch login.UserType {
+		case "1", "employee", "um-staging-ops-web.azurewebsites.net":
 			userType = utils.UserTypeEmployee
-		} else if login.UserType == "2" || login.UserType == "client" {
+		case "2", "client", "um-staging-client-web.azurewebsites.net":
 			userType = utils.UserTypeClient
-		} else if login.UserType == "3" || login.UserType == "lab" {
+		case "3", "lab", "um-staging-lab-web.azurewebsites.net":
 			userType = utils.UserTypeLab
 		}
 		userData = login
