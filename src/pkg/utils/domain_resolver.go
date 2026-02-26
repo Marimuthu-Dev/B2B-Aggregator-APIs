@@ -10,15 +10,16 @@ const (
 )
 
 // GetUserTypeFromDomain returns userType (1=employee, 2=client, 3=lab) from domain string.
+// Accepts short names (employee, client, lab), numeric ("1","2","3"), or staging URLs.
 // Returns 0 for invalid/unknown domain (matches Node.js getUserTypeFromDomain).
 func GetUserTypeFromDomain(domain string) int {
 	var userType int
 	switch domain {
-	case "employee":
+	case "1", "employee", "um-staging-ops-web.azurewebsites.net":
 		userType = UserTypeEmployee
-	case "client":
+	case "2", "client", "um-staging-client-web.azurewebsites.net":
 		userType = UserTypeClient
-	case "lab":
+	case "3", "lab", "um-staging-lab-web.azurewebsites.net":
 		userType = UserTypeLab
 	default:
 		userType = 0 // invalid domain, same as Node.js
