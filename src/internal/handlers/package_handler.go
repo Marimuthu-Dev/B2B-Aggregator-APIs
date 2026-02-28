@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"b2b-diagnostic-aggregator/apis/internal/apperrors"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
 	"b2b-diagnostic-aggregator/apis/internal/middleware"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
@@ -63,13 +64,17 @@ func (h *PackageHandler) GetByID(c *gin.Context) {
 }
 
 func (h *PackageHandler) Create(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+		return
+	}
 	var req dto.PackageRequest
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
 	pkg := req.ToDomain()
-
-	if err := h.svc.CreatePackage(&pkg); err != nil {
+	if err := h.svc.CreatePackage(&pkg, userID); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -90,13 +95,17 @@ func (h *PackageHandler) Delete(c *gin.Context) {
 }
 
 func (h *PackageHandler) CreateWithTests(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+		return
+	}
 	var req dto.CreatePackageWithTestsRequest
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
-
 	pkg := req.PackageRequest.ToDomain()
-	result, err := h.svc.CreatePackageWithTests(&pkg, req.TestIDs)
+	result, err := h.svc.CreatePackageWithTests(&pkg, req.TestIDs, userID)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -143,15 +152,23 @@ func (h *PackageHandler) GetAllWithTestsDetails(c *gin.Context) {
 }
 
 func (h *PackageHandler) UpdatePackageStatus(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+		return
+	}
 	var params dto.PackageIDParam
 	if !middleware.BindUri(c, &params) {
+		return
+	}
+	if !middleware.RequirePositiveID(c, int64(params.ID)) {
 		return
 	}
 	var req dto.PackageStatusUpdateRequest
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
-	result, err := h.svc.UpdatePackageStatus(params.ID, req.IsActive, req.LastUpdatedBy)
+	result, err := h.svc.UpdatePackageStatus(params.ID, req.IsActive, userID)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -169,11 +186,16 @@ func formatInt(n int) string {
 }
 
 func (h *PackageHandler) CreatePackageClientMapping(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+		return
+	}
 	var req dto.PackageClientMappingRequest
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
-	result, err := h.svc.CreatePackageClientMapping(req.PackageID, req.ClientID, req.Price, req.CreatedBy, req.LastUpdatedBy)
+	result, err := h.svc.CreatePackageClientMapping(req.PackageID, req.ClientID, req.Price, userID, userID)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -195,15 +217,23 @@ func (h *PackageHandler) GetAllPackageClientMappings(c *gin.Context) {
 }
 
 func (h *PackageHandler) UpdatePackageClientMappingStatus(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+		return
+	}
 	var params dto.PackageMappingIDParam
 	if !middleware.BindUri(c, &params) {
+		return
+	}
+	if !middleware.RequirePositiveID(c, int64(params.ID)) {
 		return
 	}
 	var req dto.PackageMappingStatusUpdateRequest
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
-	result, err := h.svc.UpdatePackageClientMappingStatus(params.ID, req.IsActive, req.LastUpdatedBy)
+	result, err := h.svc.UpdatePackageClientMappingStatus(params.ID, req.IsActive, userID)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -212,11 +242,16 @@ func (h *PackageHandler) UpdatePackageClientMappingStatus(c *gin.Context) {
 }
 
 func (h *PackageHandler) CreatePackageLabMapping(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+		return
+	}
 	var req dto.PackageLabMappingRequest
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
-	result, err := h.svc.CreatePackageLabMapping(req.PackageID, req.LabID, req.Price, req.CreatedBy, req.LastUpdatedBy)
+	result, err := h.svc.CreatePackageLabMapping(req.PackageID, req.LabID, req.Price, userID, userID)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -238,15 +273,23 @@ func (h *PackageHandler) GetAllPackageLabMappings(c *gin.Context) {
 }
 
 func (h *PackageHandler) UpdatePackageLabMappingStatus(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+		return
+	}
 	var params dto.PackageMappingIDParam
 	if !middleware.BindUri(c, &params) {
+		return
+	}
+	if !middleware.RequirePositiveID(c, int64(params.ID)) {
 		return
 	}
 	var req dto.PackageMappingStatusUpdateRequest
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
-	result, err := h.svc.UpdatePackageLabMappingStatus(params.ID, req.IsActive, req.LastUpdatedBy)
+	result, err := h.svc.UpdatePackageLabMappingStatus(params.ID, req.IsActive, userID)
 	if err != nil {
 		respondError(c, err)
 		return

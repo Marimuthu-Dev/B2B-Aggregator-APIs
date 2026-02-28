@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"b2b-diagnostic-aggregator/apis/internal/apperrors"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
 	"b2b-diagnostic-aggregator/apis/internal/middleware"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
@@ -75,12 +76,17 @@ func (h *ClientHandler) GetByContactNumber(c *gin.Context) {
 }
 
 func (h *ClientHandler) Create(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+		return
+	}
 	var req dto.ClientRequest
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
 	client := req.ToDomain()
-	if err := h.svc.CreateClient(&client); err != nil {
+	if err := h.svc.CreateClient(&client, userID); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -88,16 +94,28 @@ func (h *ClientHandler) Create(c *gin.Context) {
 }
 
 func (h *ClientHandler) Update(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+		return
+	}
 	var params dto.IDParam
 	if !middleware.BindUri(c, &params) {
 		return
 	}
-	var req dto.ClientRequest
+	if !middleware.RequirePositiveID(c, params.ID) {
+		return
+	}
+	var req dto.ClientUpdateRequest
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
-	client := req.ToDomain()
-	if err := h.svc.UpdateClient(params.ID, &client); err != nil {
+	if !req.HasAtLeastOneField() {
+		respondError(c, apperrors.NewBadRequest("At least one field is required in the payload to update", nil))
+		return
+	}
+	client, err := h.svc.UpdateClient(params.ID, &req, userID)
+	if err != nil {
 		respondError(c, err)
 		return
 	}
@@ -107,6 +125,9 @@ func (h *ClientHandler) Update(c *gin.Context) {
 func (h *ClientHandler) Delete(c *gin.Context) {
 	var params dto.IDParam
 	if !middleware.BindUri(c, &params) {
+		return
+	}
+	if !middleware.RequirePositiveID(c, params.ID) {
 		return
 	}
 	if err := h.svc.DeleteClient(params.ID); err != nil {

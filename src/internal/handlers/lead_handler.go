@@ -64,12 +64,17 @@ func (h *LeadHandler) GetByID(c *gin.Context) {
 }
 
 func (h *LeadHandler) Create(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+		return
+	}
 	var req dto.LeadRequest
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
 	lead := req.ToDomain()
-	if err := h.svc.CreateLead(&lead); err != nil {
+	if err := h.svc.CreateLead(&lead, userID); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -77,16 +82,28 @@ func (h *LeadHandler) Create(c *gin.Context) {
 }
 
 func (h *LeadHandler) Update(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+		return
+	}
 	var params dto.IDParam
 	if !middleware.BindUri(c, &params) {
 		return
 	}
-	var req dto.LeadRequest
+	if !middleware.RequirePositiveID(c, params.ID) {
+		return
+	}
+	var req dto.LeadUpdateRequest
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
-	lead := req.ToDomain()
-	if err := h.svc.UpdateLead(params.ID, &lead); err != nil {
+	if !req.HasAtLeastOneField() {
+		respondError(c, apperrors.NewBadRequest("At least one field is required in the payload to update", nil))
+		return
+	}
+	lead, err := h.svc.UpdateLead(params.ID, &req, userID)
+	if err != nil {
 		respondError(c, err)
 		return
 	}
@@ -98,10 +115,13 @@ func (h *LeadHandler) Delete(c *gin.Context) {
 	if !middleware.BindUri(c, &params) {
 		return
 	}
-	// In Go version, we should probably get actorID from context (set by AuthMiddleware)
-	actorIDInterface, _ := c.Get("userId")
-	actorID, _ := actorIDInterface.(int64)
-
+	if !middleware.RequirePositiveID(c, params.ID) {
+		return
+	}
+	actorID, _ := middleware.GetUserID(c)
+	if actorID == 0 {
+		actorID = 1
+	}
 	if err := h.svc.DeleteLead(params.ID, actorID); err != nil {
 		respondError(c, err)
 		return
@@ -110,11 +130,16 @@ func (h *LeadHandler) Delete(c *gin.Context) {
 }
 
 func (h *LeadHandler) BulkUpdateStatus(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+		return
+	}
 	var req dto.BulkUpdateLeadStatusRequest
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
-	count, err := h.svc.BulkUpdateLeadStatus(req.LeadIDs, req.LeadStatusID, req.LastUpdatedBy)
+	count, err := h.svc.BulkUpdateLeadStatus(req.LeadIDs, req.LeadStatusID, userID)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -151,7 +176,11 @@ func (h *LeadHandler) BulkImportCsv(c *gin.Context) {
 	n, _ := f.Read(buf)
 	buf = buf[:n]
 
-	inserted, err := h.svc.BulkImportFromCSV(buf, clientID, packageID)
+	userID, _ := middleware.GetUserID(c)
+	if userID == 0 {
+		userID = 1
+	}
+	inserted, err := h.svc.BulkImportFromCSV(buf, clientID, packageID, userID)
 	if err != nil {
 		respondError(c, err)
 		return

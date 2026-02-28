@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"b2b-diagnostic-aggregator/apis/internal/apperrors"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
 	"b2b-diagnostic-aggregator/apis/internal/middleware"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
@@ -75,12 +76,17 @@ func (h *LabHandler) GetByContactNumber(c *gin.Context) {
 }
 
 func (h *LabHandler) Create(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+		return
+	}
 	var req dto.LabRequest
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
 	lab := req.ToDomain()
-	if err := h.svc.CreateLab(&lab); err != nil {
+	if err := h.svc.CreateLab(&lab, userID); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -88,16 +94,28 @@ func (h *LabHandler) Create(c *gin.Context) {
 }
 
 func (h *LabHandler) Update(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+		return
+	}
 	var params dto.IDParam
 	if !middleware.BindUri(c, &params) {
 		return
 	}
-	var req dto.LabRequest
+	if !middleware.RequirePositiveID(c, params.ID) {
+		return
+	}
+	var req dto.LabUpdateRequest
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
-	lab := req.ToDomain()
-	if err := h.svc.UpdateLab(params.ID, &lab); err != nil {
+	if !req.HasAtLeastOneField() {
+		respondError(c, apperrors.NewBadRequest("At least one field is required in the payload to update", nil))
+		return
+	}
+	lab, err := h.svc.UpdateLab(params.ID, &req, userID)
+	if err != nil {
 		respondError(c, err)
 		return
 	}
@@ -107,6 +125,9 @@ func (h *LabHandler) Update(c *gin.Context) {
 func (h *LabHandler) Delete(c *gin.Context) {
 	var params dto.IDParam
 	if !middleware.BindUri(c, &params) {
+		return
+	}
+	if !middleware.RequirePositiveID(c, params.ID) {
 		return
 	}
 	if err := h.svc.DeleteLab(params.ID); err != nil {

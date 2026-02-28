@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"time"
 
 	"b2b-diagnostic-aggregator/apis/internal/apperrors"
 	"b2b-diagnostic-aggregator/apis/internal/domain"
@@ -14,11 +15,11 @@ import (
 type PackageService interface {
 	ListPackages(filter repository.PackageListFilter) ([]domain.Package, int64, error)
 	GetPackageByID(id int) (*domain.Package, error)
-	CreatePackage(p *domain.Package) error
-	UpdatePackage(p *domain.Package) error
+	CreatePackage(p *domain.Package, createdBy int64) error
+	UpdatePackage(p *domain.Package, lastUpdatedBy int64) error
 	DeletePackage(id int) error
 	GetActivePackages() ([]domain.Package, error)
-	CreatePackageWithTests(p *domain.Package, testIDs []int) (*CreatePackageWithTestsResult, error)
+	CreatePackageWithTests(p *domain.Package, testIDs []int, createdBy int64) (*CreatePackageWithTestsResult, error)
 	GetAllPackagesWithTestsDetails() ([]domain.PackageWithTestsDetail, error)
 	UpdatePackageStatus(packageID int, isActive bool, lastUpdatedBy int64) (*UpdatePackageStatusResult, error)
 	CreatePackageClientMapping(packageID int, clientID int64, price float64, createdBy, lastUpdatedBy int64) (*PackageClientMappingResult, error)
@@ -107,18 +108,27 @@ func (s *packageService) GetPackageByID(id int) (*domain.Package, error) {
 	return pkg, err
 }
 
-func (s *packageService) CreatePackage(p *domain.Package) error {
+func (s *packageService) CreatePackage(p *domain.Package, createdBy int64) error {
+	now := time.Now()
+	p.CreatedBy = createdBy
+	p.CreatedOn = now
+	p.LastUpdatedBy = createdBy
+	p.LastUpdatedOn = now
 	return s.repo.Create(p)
 }
 
-func (s *packageService) UpdatePackage(p *domain.Package) error {
-	exists, err := s.repo.ExistsByID(p.PackageID)
+func (s *packageService) UpdatePackage(p *domain.Package, lastUpdatedBy int64) error {
+	existing, err := s.repo.FindByID(p.PackageID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return apperrors.NewNotFound("Package not found", err)
+		}
 		return err
 	}
-	if !exists {
-		return apperrors.NewNotFound("Package not found", gorm.ErrRecordNotFound)
-	}
+	p.CreatedBy = existing.CreatedBy
+	p.CreatedOn = existing.CreatedOn
+	p.LastUpdatedBy = lastUpdatedBy
+	p.LastUpdatedOn = time.Now()
 	return s.repo.Update(p)
 }
 
@@ -137,7 +147,7 @@ func (s *packageService) GetActivePackages() ([]domain.Package, error) {
 	return s.repo.FindAllActive()
 }
 
-func (s *packageService) CreatePackageWithTests(p *domain.Package, testIDs []int) (*CreatePackageWithTestsResult, error) {
+func (s *packageService) CreatePackageWithTests(p *domain.Package, testIDs []int, createdBy int64) (*CreatePackageWithTestsResult, error) {
 	if len(testIDs) == 0 {
 		return nil, apperrors.NewBadRequest("TestIDs is required and must be a non-empty array", nil)
 	}
@@ -166,6 +176,11 @@ func (s *packageService) CreatePackageWithTests(p *domain.Package, testIDs []int
 			}, nil
 		}
 	}
+	now := time.Now()
+	p.CreatedBy = createdBy
+	p.CreatedOn = now
+	p.LastUpdatedBy = createdBy
+	p.LastUpdatedOn = now
 	if err := s.repo.CreateWithTests(p, unique); err != nil {
 		return nil, err
 	}

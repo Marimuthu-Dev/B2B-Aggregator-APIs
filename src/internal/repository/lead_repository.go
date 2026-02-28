@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"time"
+
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 
@@ -121,8 +123,9 @@ func (r *leadRepository) Delete(id int64) error {
 
 func (r *leadRepository) UpdateStatusForIDs(leadIDs []int64, statusID int8, lastUpdatedBy int64) (int64, error) {
 	result := r.db.Model(&persistencemodels.Lead{}).Where("LeadID IN ?", leadIDs).Updates(map[string]interface{}{
-		"LeadStatusID":  statusID,
-		"LastUpdatedBy": lastUpdatedBy,
+		"LeadStatusID":   statusID,
+		"LastUpdatedBy":  lastUpdatedBy,
+		"LastUpdatedOn":  time.Now(),
 	})
 	return result.RowsAffected, result.Error
 }

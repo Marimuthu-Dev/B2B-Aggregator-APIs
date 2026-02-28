@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"b2b-diagnostic-aggregator/apis/internal/apperrors"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
 	"b2b-diagnostic-aggregator/apis/internal/middleware"
 	"b2b-diagnostic-aggregator/apis/internal/service"
@@ -45,6 +46,11 @@ func (h *ClientLocationHandler) GetByID(c *gin.Context) {
 }
 
 func (h *ClientLocationHandler) Create(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+		return
+	}
 	var pathParams dto.ClientIDPathParam
 	if !middleware.BindUri(c, &pathParams) {
 		return
@@ -54,7 +60,7 @@ func (h *ClientLocationHandler) Create(c *gin.Context) {
 		return
 	}
 	loc := req.ToDomain(pathParams.ClientID)
-	if err := h.svc.Create(&loc); err != nil {
+	if err := h.svc.Create(&loc, userID); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -62,22 +68,28 @@ func (h *ClientLocationHandler) Create(c *gin.Context) {
 }
 
 func (h *ClientLocationHandler) Update(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+		return
+	}
 	var params dto.IDParam
 	if !middleware.BindUri(c, &params) {
 		return
 	}
-	existing, err := h.svc.GetByID(params.ID)
-	if err != nil {
-		respondError(c, err)
+	if !middleware.RequirePositiveID(c, params.ID) {
 		return
 	}
-	var req dto.ClientLocationRequest
+	var req dto.ClientLocationUpdateRequest
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
-	loc := req.ToDomain(existing.ClientID)
-	loc.ClientLocationID = params.ID
-	if err := h.svc.Update(params.ID, &loc); err != nil {
+	if !req.HasAtLeastOneField() {
+		respondError(c, apperrors.NewBadRequest("At least one field is required in the payload to update", nil))
+		return
+	}
+	loc, err := h.svc.Update(params.ID, &req, userID)
+	if err != nil {
 		respondError(c, err)
 		return
 	}
@@ -87,6 +99,9 @@ func (h *ClientLocationHandler) Update(c *gin.Context) {
 func (h *ClientLocationHandler) Delete(c *gin.Context) {
 	var params dto.IDParam
 	if !middleware.BindUri(c, &params) {
+		return
+	}
+	if !middleware.RequirePositiveID(c, params.ID) {
 		return
 	}
 	if err := h.svc.Delete(params.ID); err != nil {

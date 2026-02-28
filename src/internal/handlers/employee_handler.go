@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"b2b-diagnostic-aggregator/apis/internal/apperrors"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
 	"b2b-diagnostic-aggregator/apis/internal/middleware"
 	"b2b-diagnostic-aggregator/apis/internal/service"
@@ -54,12 +55,17 @@ func (h *EmployeeHandler) GetByContactNumber(c *gin.Context) {
 }
 
 func (h *EmployeeHandler) Create(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+		return
+	}
 	var req dto.EmployeeRequest
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
 	emp := req.ToDomain()
-	if err := h.svc.Create(&emp); err != nil {
+	if err := h.svc.Create(&emp, userID); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -67,16 +73,28 @@ func (h *EmployeeHandler) Create(c *gin.Context) {
 }
 
 func (h *EmployeeHandler) Update(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+		return
+	}
 	var params dto.IDParam
 	if !middleware.BindUri(c, &params) {
 		return
 	}
-	var req dto.EmployeeRequest
+	if !middleware.RequirePositiveID(c, params.ID) {
+		return
+	}
+	var req dto.EmployeeUpdateRequest
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
-	emp := req.ToDomain()
-	if err := h.svc.Update(params.ID, &emp); err != nil {
+	if !req.HasAtLeastOneField() {
+		respondError(c, apperrors.NewBadRequest("At least one field is required in the payload to update", nil))
+		return
+	}
+	emp, err := h.svc.Update(params.ID, &req, userID)
+	if err != nil {
 		respondError(c, err)
 		return
 	}
@@ -86,6 +104,9 @@ func (h *EmployeeHandler) Update(c *gin.Context) {
 func (h *EmployeeHandler) Delete(c *gin.Context) {
 	var params dto.IDParam
 	if !middleware.BindUri(c, &params) {
+		return
+	}
+	if !middleware.RequirePositiveID(c, params.ID) {
 		return
 	}
 	if err := h.svc.Delete(params.ID); err != nil {

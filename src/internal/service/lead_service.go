@@ -10,6 +10,7 @@ import (
 
 	"b2b-diagnostic-aggregator/apis/internal/apperrors"
 	"b2b-diagnostic-aggregator/apis/internal/domain"
+	"b2b-diagnostic-aggregator/apis/internal/dto"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 
 	"gorm.io/gorm"
@@ -18,11 +19,11 @@ import (
 type LeadService interface {
 	ListLeads(filter repository.LeadListFilter) ([]domain.Lead, int64, error)
 	GetLeadByID(id int64) (*domain.LeadDetail, error)
-	CreateLead(l *domain.Lead) error
-	UpdateLead(id int64, l *domain.Lead) error
+	CreateLead(l *domain.Lead, createdBy int64) error
+	UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUpdatedBy int64) (*domain.Lead, error)
 	DeleteLead(id int64, actorID int64) error
 	BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastUpdatedBy int64) (int64, error)
-	BulkImportFromCSV(csvContent []byte, clientID int64, packageID int) (int, error)
+	BulkImportFromCSV(csvContent []byte, clientID int64, packageID int, createdBy int64) (int, error)
 }
 
 type leadService struct {
@@ -62,7 +63,12 @@ func (s *leadService) GetLeadByID(id int64) (*domain.LeadDetail, error) {
 	return detail, nil
 }
 
-func (s *leadService) CreateLead(l *domain.Lead) error {
+func (s *leadService) CreateLead(l *domain.Lead, createdBy int64) error {
+	now := time.Now()
+	l.CreatedBy = createdBy
+	l.CreatedOn = now
+	l.LastUpdatedBy = createdBy
+	l.LastUpdatedOn = now
 	l.PatientID = s.GeneratePatientID(l.PatientName, l.ContactNumber)
 
 	return s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
@@ -73,7 +79,7 @@ func (s *leadService) CreateLead(l *domain.Lead) error {
 		history := &domain.LeadHistory{
 			LeadID:    l.LeadID,
 			Action:    domain.LeadActionCreate,
-			CreatedBy: l.CreatedBy,
+			CreatedBy: createdBy,
 		}
 
 		if err := historyRepo.LogAction(history); err != nil {
@@ -84,42 +90,68 @@ func (s *leadService) CreateLead(l *domain.Lead) error {
 	})
 }
 
-func (s *leadService) UpdateLead(id int64, l *domain.Lead) error {
+func (s *leadService) UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUpdatedBy int64) (*domain.Lead, error) {
 	existing, err := s.repo.FindByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return apperrors.NewNotFound("Lead not found", err)
+			return nil, apperrors.NewNotFound("Lead not found", err)
 		}
-		return err
+		return nil, err
 	}
 
-	if l.PatientName != "" || l.ContactNumber != "" {
-		nameToUse := l.PatientName
-		if nameToUse == "" {
-			nameToUse = existing.PatientName
-		}
-		contactToUse := l.ContactNumber
-		if contactToUse == "" {
-			contactToUse = existing.ContactNumber
-		}
-		l.PatientID = s.GeneratePatientID(nameToUse, contactToUse)
+	// Merge: only overwrite when payload field is provided (ISNULL(input, existing))
+	l := *existing
+	if update.ClientID != nil {
+		l.ClientID = *update.ClientID
+	}
+	if update.PatientName != nil {
+		l.PatientName = *update.PatientName
+	}
+	if update.Age != nil {
+		l.Age = *update.Age
+	}
+	if update.Gender != nil {
+		l.Gender = *update.Gender
+	}
+	if update.PackageID != nil {
+		l.PackageID = *update.PackageID
+	}
+	if update.ContactNumber != nil {
+		l.ContactNumber = *update.ContactNumber
+	}
+	if update.Emailid != nil {
+		l.Emailid = *update.Emailid
+	}
+	if update.Address != nil {
+		l.Address = *update.Address
+	}
+	if update.CityID != nil {
+		l.CityID = *update.CityID
+	}
+	if update.StateID != nil {
+		l.StateID = *update.StateID
+	}
+	if update.Pincode != nil {
+		l.Pincode = *update.Pincode
+	}
+	if update.LeadStatusID != nil {
+		l.LeadStatusID = *update.LeadStatusID
 	}
 
 	l.LeadID = id
-	return s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
-		if err := leadRepo.Update(l); err != nil {
-			return err
-		}
+	l.LastUpdatedBy = lastUpdatedBy
+	l.LastUpdatedOn = time.Now()
+	l.PatientID = s.GeneratePatientID(l.PatientName, l.ContactNumber)
 
-		actor := l.LastUpdatedBy
-		if actor == 0 {
-			actor = l.CreatedBy
+	err = s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
+		if err := leadRepo.Update(&l); err != nil {
+			return err
 		}
 
 		history := &domain.LeadHistory{
 			LeadID:    l.LeadID,
 			Action:    domain.LeadActionUpdate,
-			CreatedBy: actor,
+			CreatedBy: lastUpdatedBy,
 		}
 
 		if err := historyRepo.LogAction(history); err != nil {
@@ -128,6 +160,10 @@ func (s *leadService) UpdateLead(id int64, l *domain.Lead) error {
 
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	return &l, nil
 }
 
 func (s *leadService) DeleteLead(id int64, actorID int64) error {
@@ -195,9 +231,12 @@ func (s *leadService) GeneratePatientID(patientName, contactNumber string) strin
 	return fmt.Sprintf("%s%s", initials.String(), contactNumber)
 }
 
-func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packageID int) (int, error) {
+func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packageID int, createdBy int64) (int, error) {
 	if len(csvContent) == 0 {
 		return 0, apperrors.NewBadRequest("CSV file is required", nil)
+	}
+	if createdBy == 0 {
+		createdBy = 1
 	}
 	if clientID == 0 || packageID == 0 {
 		return 0, apperrors.NewBadRequest("ClientID and PackageID are required", nil)
@@ -236,14 +275,6 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 		n, _ := strconv.ParseInt(s, 10, 8)
 		return int8(n)
 	}
-	atInt64 := func(row []string, name string) int64 {
-		s := at(row, name)
-		if s == "" {
-			return 0
-		}
-		n, _ := strconv.ParseInt(s, 10, 64)
-		return n
-	}
 
 	requiredCols := []string{"PatientName", "ContactNumber", "Age", "Gender", "Emailid", "Address", "CityID", "StateID", "Pincode"}
 	for _, name := range requiredCols {
@@ -264,6 +295,7 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 			return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: PatientName and ContactNumber are required", rowIdx+1), nil)
 		}
 
+		now := time.Now()
 		lead := &domain.Lead{
 			ClientID:      clientID,
 			PatientID:     s.GeneratePatientID(patientName, contactNumber),
@@ -278,28 +310,20 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 			StateID:       atInt8(row, "StateID"),
 			Pincode:       at(row, "Pincode"),
 			LeadStatusID:  atInt8(row, "LeadStatusID"),
-			CreatedOn:     time.Now(),
-			LastUpdatedOn: time.Now(),
-		}
-		createdBy := atInt64(row, "CreatedBy")
-		if createdBy == 0 {
-			createdBy = 1
-		}
-		lead.CreatedBy = createdBy
-		lead.LastUpdatedBy = atInt64(row, "LastUpdatedBy")
-		if lead.LastUpdatedBy == 0 {
-			lead.LastUpdatedBy = 1
+			CreatedBy:     createdBy,
+			CreatedOn:     now,
+			LastUpdatedBy: createdBy,
+			LastUpdatedOn: now,
 		}
 
 		err := s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
 			if err := leadRepo.Create(lead); err != nil {
 				return err
 			}
-			actor := lead.CreatedBy
 			return historyRepo.LogAction(&domain.LeadHistory{
 				LeadID:    lead.LeadID,
 				Action:    domain.LeadActionCsvImport,
-				CreatedBy: actor,
+				CreatedBy: createdBy,
 			})
 		})
 		if err != nil {

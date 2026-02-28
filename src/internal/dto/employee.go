@@ -12,10 +12,26 @@ type EmployeeRequest struct {
 	Pincode        string `json:"Pincode" binding:"required"`
 	MobileNumber   string `json:"MobileNumber" binding:"required"`
 	CompanyEmailID string `json:"CompanyEmailID" binding:"required"`
-	Designation    string `json:"Designation" binding:"required"`
-	Department     string `json:"Department" binding:"required"`
-	CreatedBy      int64  `json:"CreatedBy" binding:"required"`
-	LastUpdatedBy  int64  `json:"LastUpdatedBy" binding:"required"`
+	Designation  string `json:"Designation" binding:"required"`
+	Department   string `json:"Department" binding:"required"`
+}
+
+// EmployeeUpdateRequest is for PUT; all fields optional. At least one must be set.
+type EmployeeUpdateRequest struct {
+	FullName       *string `json:"FullName"`
+	Address        *string `json:"Address"`
+	CityID         *int8   `json:"CityID"`
+	StateID        *int8   `json:"StateID"`
+	Pincode        *string `json:"Pincode"`
+	MobileNumber   *string `json:"MobileNumber"`
+	CompanyEmailID *string `json:"CompanyEmailID"`
+	Designation    *string `json:"Designation"`
+	Department     *string `json:"Department"`
+}
+
+func (r EmployeeUpdateRequest) HasAtLeastOneField() bool {
+	return r.FullName != nil || r.Address != nil || r.CityID != nil || r.StateID != nil || r.Pincode != nil ||
+		r.MobileNumber != nil || r.CompanyEmailID != nil || r.Designation != nil || r.Department != nil
 }
 
 func (r EmployeeRequest) ToDomain() domain.Employee {
@@ -29,7 +45,5 @@ func (r EmployeeRequest) ToDomain() domain.Employee {
 		CompanyEmailID: r.CompanyEmailID,
 		Designation:    r.Designation,
 		Department:     r.Department,
-		CreatedBy:      r.CreatedBy,
-		LastUpdatedBy:  r.LastUpdatedBy,
 	}
 }

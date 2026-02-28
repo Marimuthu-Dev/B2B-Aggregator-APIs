@@ -30,14 +30,11 @@ func Ping(c *gin.Context) {
 	}
 	istTS := now.In(istLoc).Format(pingTimeLayout)
 
-	lastBuildPushed := os.Getenv("LAST_BUILD_PUSHED")
-	latestCommit := os.Getenv("LATEST_COMMIT")
-
 	c.JSON(http.StatusOK, gin.H{
-		"Environment":         env,
-		"Current TimeStamp":   currentTS,
-		"IST TimeStamp":       istTS,
-		"Last Build Pushed":  lastBuildPushed,
-		"Latest commit":      latestCommit,
+		"Environment":       env,
+		"Current TimeStamp": currentTS,
+		"IST TimeStamp":     istTS,
+		"Last Build Pushed": "01-Mar-2026 01:00:00",
+		"Latest commit":     "Post and Put apis payload changes done.",
 	})
 }

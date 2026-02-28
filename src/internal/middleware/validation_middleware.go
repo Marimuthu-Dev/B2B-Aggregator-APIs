@@ -38,6 +38,21 @@ func BindUri(c *gin.Context, obj interface{}) bool {
 	return true
 }
 
+// RequirePositiveID checks that id is present and positive (for PUT/DELETE with :id).
+// If id <= 0, responds with 400 and returns false; otherwise returns true.
+func RequirePositiveID(c *gin.Context, id int64) bool {
+	if id <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success":   false,
+			"message":   "id is required and must be a positive integer",
+			"timestamp": time.Now().UTC().Format(time.RFC3339),
+		})
+		c.Abort()
+		return false
+	}
+	return true
+}
+
 func ValidationErrorMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()

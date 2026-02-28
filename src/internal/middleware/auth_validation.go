@@ -38,3 +38,20 @@ func GetDomain(c *gin.Context) string {
 	}
 	return ""
 }
+
+// GetUserID returns the authenticated user ID from context (set by AuthMiddleware from JWT).
+// Use for setting CreatedBy / LastUpdatedBy in POST/PUT; returns (0, false) if not found or invalid.
+func GetUserID(c *gin.Context) (int64, bool) {
+	v, ok := c.Get("userId")
+	if !ok {
+		return 0, false
+	}
+	switch id := v.(type) {
+	case int64:
+		return id, true
+	case int:
+		return int64(id), true
+	default:
+		return 0, false
+	}
+}
