@@ -74,6 +74,7 @@ func Run() error {
 
 	// Initialize Gin
 	r := gin.Default()
+	r.RedirectTrailingSlash = false // allow both /path and /path/ without 301 redirect (e.g. for FE clients that use trailing slash)
 	registerMiddleware(r, dbReady)
 
 	registerRoutes(r, cfg.JWT.Secret, routeDeps{

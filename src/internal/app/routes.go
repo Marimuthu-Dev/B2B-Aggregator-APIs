@@ -79,9 +79,11 @@ func registerProtectedRoutes(r *gin.Engine, jwtSecret string, deps routeDeps) {
 func registerPackageRoutes(api *gin.RouterGroup, handler *handlers.PackageHandler) {
 	packages := api.Group("/packages")
 	{
+		packages.GET("", handler.GetAll)
 		packages.GET("/", handler.GetAll)
 		packages.GET("/with-tests-details", handler.GetAllWithTestsDetails)
 		packages.GET("/:id", handler.GetByID)
+		packages.POST("", handler.Create)
 		packages.POST("/", handler.Create)
 		packages.POST("/with-tests", handler.CreateWithTests)
 		packages.PUT("/:id", handler.UpdatePackageStatus)
@@ -98,9 +100,11 @@ func registerPackageRoutes(api *gin.RouterGroup, handler *handlers.PackageHandle
 func registerClientRoutes(api *gin.RouterGroup, handler *handlers.ClientHandler) {
 	clients := api.Group("/clients")
 	{
+		clients.GET("", handler.GetAll)
 		clients.GET("/", handler.GetAll)
 		clients.GET("/:id", handler.GetByID)
 		clients.GET("/contact", handler.GetByContactNumber)
+		clients.POST("", handler.Create)
 		clients.POST("/", handler.Create)
 		clients.PUT("/:id", handler.Update)
 		clients.DELETE("/:id", handler.Delete)
@@ -110,8 +114,10 @@ func registerClientRoutes(api *gin.RouterGroup, handler *handlers.ClientHandler)
 func registerClientLocationRoutes(api *gin.RouterGroup, handler *handlers.ClientLocationHandler) {
 	loc := api.Group("/client/:client_id/locations")
 	{
+		loc.GET("", handler.GetAllByClientID)
 		loc.GET("/", handler.GetAllByClientID)
 		loc.GET("/:id", handler.GetByID)
+		loc.POST("", handler.Create)
 		loc.POST("/", handler.Create)
 		loc.PUT("/:id", handler.Update)
 		loc.DELETE("/:id", handler.Delete)
@@ -121,9 +127,11 @@ func registerClientLocationRoutes(api *gin.RouterGroup, handler *handlers.Client
 func registerEmployeeRoutes(api *gin.RouterGroup, handler *handlers.EmployeeHandler) {
 	employees := api.Group("/employees")
 	{
+		employees.GET("", handler.GetAll)
 		employees.GET("/", handler.GetAll)
 		employees.GET("/search", handler.GetByContactNumber)
 		employees.GET("/:id", handler.GetByID)
+		employees.POST("", handler.Create)
 		employees.POST("/", handler.Create)
 		employees.PUT("/:id", handler.Update)
 		employees.DELETE("/:id", handler.Delete)
@@ -133,9 +141,11 @@ func registerEmployeeRoutes(api *gin.RouterGroup, handler *handlers.EmployeeHand
 func registerLabRoutes(api *gin.RouterGroup, handler *handlers.LabHandler) {
 	labs := api.Group("/labs")
 	{
+		labs.GET("", handler.GetAll)
 		labs.GET("/", handler.GetAll)
 		labs.GET("/:id", handler.GetByID)
 		labs.GET("/contact", handler.GetByContactNumber)
+		labs.POST("", handler.Create)
 		labs.POST("/", handler.Create)
 		labs.PUT("/:id", handler.Update)
 		labs.DELETE("/:id", handler.Delete)
@@ -145,8 +155,10 @@ func registerLabRoutes(api *gin.RouterGroup, handler *handlers.LabHandler) {
 func registerLeadRoutes(api *gin.RouterGroup, handler *handlers.LeadHandler) {
 	leads := api.Group("/leads")
 	{
+		leads.GET("", handler.GetAll)
 		leads.GET("/", handler.GetAll)
 		leads.GET("/:id", handler.GetByID)
+		leads.POST("", handler.Create)
 		leads.POST("/", handler.Create)
 		leads.PUT("/:id", handler.Update)
 		leads.DELETE("/:id", handler.Delete)
@@ -158,6 +170,7 @@ func registerLeadRoutes(api *gin.RouterGroup, handler *handlers.LeadHandler) {
 func registerTestRoutes(api *gin.RouterGroup, handler *handlers.TestHandler) {
 	tests := api.Group("/tests")
 	{
+		tests.GET("", handler.GetAll)
 		tests.GET("/", handler.GetAll)
 		tests.GET("/active", handler.GetActive)
 		tests.GET("/:id", handler.GetByID)
