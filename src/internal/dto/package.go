@@ -35,7 +35,7 @@ type PackageLabMappingRequest struct {
 }
 
 type PackageMappingStatusUpdateRequest struct {
-	IsActive bool `json:"IsActive" binding:"required"`
+	IsActive *bool `json:"IsActive" binding:"required"` // pointer so required allows false (validator treats value-type required as "non-zero")
 }
 
 func (r PackageRequest) ToDomain() domain.Package {

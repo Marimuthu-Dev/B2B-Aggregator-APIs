@@ -118,23 +118,23 @@ func (s *labService) UpdateLab(id int64, update *dto.LabUpdateRequest, lastUpdat
 	if update.PANNumber != nil {
 		l.PANNumber = update.PANNumber
 	}
-	if update.MOUStartDate != nil {
-		l.MOUStartDate = update.MOUStartDate
+	if t := update.GetMOUStartDate(); t != nil {
+		l.MOUStartDate = t
 	}
-	if update.MOUEndDate != nil {
-		l.MOUEndDate = update.MOUEndDate
+	if t := update.GetMOUEndDate(); t != nil {
+		l.MOUEndDate = t
 	}
 	if update.AccreditationID != nil {
 		l.AccreditationID = update.AccreditationID
 	}
-	if update.CollectionTypes != nil {
-		l.CollectionTypes = update.CollectionTypes
+	if s := update.GetCollectionTypes(); s != nil {
+		l.CollectionTypes = s
 	}
-	if update.ServicesID != nil {
-		l.ServicesID = update.ServicesID
+	if s := update.GetServicesID(); s != nil {
+		l.ServicesID = s
 	}
-	if update.CollectionPincodes != nil {
-		l.CollectionPincodes = update.CollectionPincodes
+	if s := update.GetCollectionPincodes(); s != nil {
+		l.CollectionPincodes = s
 	}
 	if update.IsActive != nil {
 		l.IsActive = update.IsActive

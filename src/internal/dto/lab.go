@@ -1,8 +1,9 @@
 package dto
 
 import (
-	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"time"
+
+	"b2b-diagnostic-aggregator/apis/internal/domain"
 )
 
 type LabRequest struct {
@@ -23,13 +24,13 @@ type LabRequest struct {
 	CategoryID                 *int8      `binding:"omitempty"`
 	GSTIN_UIN                  *string    `binding:"omitempty"`
 	PANNumber                  *string    `binding:"omitempty"`
-	MOUStartDate               *time.Time `binding:"omitempty"`
-	MOUEndDate                 *time.Time `binding:"omitempty"`
-	AccreditationID            *int8      `binding:"omitempty"`
-	CollectionTypes            *string    `binding:"omitempty"`
-	ServicesID                 *string    `binding:"omitempty"`
-	CollectionPincodes *string `binding:"omitempty"`
-	IsActive *bool `binding:"omitempty"`
+	MOUStartDate               *FlexDate       `json:"MOUStartDate" binding:"omitempty"`   // accepts "YYYY-MM-DD" or RFC3339; nil when not sent
+	MOUEndDate                 *FlexDate       `json:"MOUEndDate" binding:"omitempty"`
+	AccreditationID            *int8           `binding:"omitempty"`
+	CollectionTypes            *FlexArrayString `json:"CollectionTypes" binding:"omitempty"`    // accepts string or array e.g. [1,2]
+	ServicesID                 *FlexArrayString `json:"ServicesID" binding:"omitempty"`
+	CollectionPincodes         *FlexArrayString `json:"CollectionPincodes" binding:"omitempty"`
+	IsActive                   *bool            `binding:"omitempty"`
 }
 
 // LabUpdateRequest is for PUT; all fields optional. At least one must be set.
@@ -50,13 +51,13 @@ type LabUpdateRequest struct {
 	CategoryID                 *int8     `json:"CategoryID"`
 	GSTIN_UIN                  *string   `json:"GSTIN_UIN"`
 	PANNumber                  *string   `json:"PANNumber"`
-	MOUStartDate               *time.Time `json:"MOUStartDate"`
-	MOUEndDate                 *time.Time `json:"MOUEndDate"`
-	AccreditationID            *int8     `json:"AccreditationID"`
-	CollectionTypes            *string   `json:"CollectionTypes"`
-	ServicesID                 *string   `json:"ServicesID"`
-	CollectionPincodes         *string   `json:"CollectionPincodes"`
-	IsActive                   *bool     `json:"IsActive"`
+	MOUStartDate               *FlexDate        `json:"MOUStartDate"`
+	MOUEndDate                 *FlexDate       `json:"MOUEndDate"`
+	AccreditationID            *int8           `json:"AccreditationID"`
+	CollectionTypes            *FlexArrayString `json:"CollectionTypes"`
+	ServicesID                 *FlexArrayString `json:"ServicesID"`
+	CollectionPincodes         *FlexArrayString `json:"CollectionPincodes"`
+	IsActive                   *bool           `json:"IsActive"`
 }
 
 func (r LabUpdateRequest) HasAtLeastOneField() bool {
@@ -67,6 +68,13 @@ func (r LabUpdateRequest) HasAtLeastOneField() bool {
 		r.AccreditationID != nil || r.CollectionTypes != nil || r.ServicesID != nil || r.CollectionPincodes != nil || r.IsActive != nil
 }
 
+// Getters for FlexDate/FlexArrayString so service receives *time.Time and *string without depending on flex types.
+func (r LabUpdateRequest) GetMOUStartDate() *time.Time     { return r.MOUStartDate.ToTimePtr() }
+func (r LabUpdateRequest) GetMOUEndDate() *time.Time       { return r.MOUEndDate.ToTimePtr() }
+func (r LabUpdateRequest) GetCollectionTypes() *string    { return r.CollectionTypes.ToStringPtr() }
+func (r LabUpdateRequest) GetServicesID() *string          { return r.ServicesID.ToStringPtr() }
+func (r LabUpdateRequest) GetCollectionPincodes() *string   { return r.CollectionPincodes.ToStringPtr() }
+
 func (r LabRequest) ToDomain() domain.Lab {
 	return domain.Lab{
 		LabID:                      r.LabID,
@@ -76,22 +84,22 @@ func (r LabRequest) ToDomain() domain.Lab {
 		StateID:                    r.StateID,
 		Pincode:                    r.Pincode,
 		ContactPerson1Name:         r.ContactPerson1Name,
-		ContactPerson1Number:      r.ContactPerson1Number,
-		ContactPerson1EmailID:     r.ContactPerson1EmailID,
+		ContactPerson1Number:       r.ContactPerson1Number,
+		ContactPerson1EmailID:      r.ContactPerson1EmailID,
 		ContactPerson1Designation:  r.ContactPerson1Designation,
 		ContactPerson1Name1:        r.ContactPerson1Name1,
-		ContactPerson1Number1:     r.ContactPerson1Number1,
-		ContactPerson1EmailID1:    r.ContactPerson1EmailID1,
-		ContactPerson1Designation1: r.ContactPerson1Designation1,
+		ContactPerson1Number1:      r.ContactPerson1Number1,
+		ContactPerson1EmailID1:     r.ContactPerson1EmailID1,
+		ContactPerson1Designation1:  r.ContactPerson1Designation1,
 		CategoryID:                 r.CategoryID,
 		GSTIN_UIN:                  r.GSTIN_UIN,
 		PANNumber:                  r.PANNumber,
-		MOUStartDate:               r.MOUStartDate,
-		MOUEndDate:                 r.MOUEndDate,
+		MOUStartDate:               r.MOUStartDate.ToTimePtr(),
+		MOUEndDate:                 r.MOUEndDate.ToTimePtr(),
 		AccreditationID:            r.AccreditationID,
-		CollectionTypes:            r.CollectionTypes,
-		ServicesID:                 r.ServicesID,
-		CollectionPincodes:         r.CollectionPincodes,
+		CollectionTypes:            r.CollectionTypes.ToStringPtr(),
+		ServicesID:                 r.ServicesID.ToStringPtr(),
+		CollectionPincodes:         r.CollectionPincodes.ToStringPtr(),
 		IsActive:                   r.IsActive,
 	}
 }

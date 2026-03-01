@@ -233,7 +233,11 @@ func (h *PackageHandler) UpdatePackageClientMappingStatus(c *gin.Context) {
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
-	result, err := h.svc.UpdatePackageClientMappingStatus(params.ID, req.IsActive, userID)
+	if req.IsActive == nil {
+		respondError(c, apperrors.NewBadRequest("IsActive is required", nil))
+		return
+	}
+	result, err := h.svc.UpdatePackageClientMappingStatus(params.ID, *req.IsActive, userID)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -289,7 +293,11 @@ func (h *PackageHandler) UpdatePackageLabMappingStatus(c *gin.Context) {
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
-	result, err := h.svc.UpdatePackageLabMappingStatus(params.ID, req.IsActive, userID)
+	if req.IsActive == nil {
+		respondError(c, apperrors.NewBadRequest("IsActive is required", nil))
+		return
+	}
+	result, err := h.svc.UpdatePackageLabMappingStatus(params.ID, *req.IsActive, userID)
 	if err != nil {
 		respondError(c, err)
 		return
