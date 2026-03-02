@@ -11,7 +11,7 @@ type Lead struct {
 	Gender        string    `gorm:"column:Gender;type:varchar(1);not null"`
 	PackageID     int       `gorm:"column:PackageID;not null"`
 	ContactNumber string    `gorm:"column:ContactNumber;type:varchar(10);not null"`
-	Emailid       string    `gorm:"column:Emailid;type:varchar(75);not null"`
+	Emailid       string    `gorm:"column:EmailID;type:varchar(75);not null"`
 	Address       string    `gorm:"column:Address;type:varchar(150);not null"`
 	CityID        int8      `gorm:"column:CityID;not null"`
 	StateID       int8      `gorm:"column:StateID;not null"`

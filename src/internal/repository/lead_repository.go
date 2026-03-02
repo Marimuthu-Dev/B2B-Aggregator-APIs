@@ -166,6 +166,6 @@ func (r *leadRepository) FindByContactNumber(contactNumber string) ([]domain.Lea
 
 func (r *leadRepository) FindByEmail(email string) ([]domain.Lead, error) {
 	var leads []persistencemodels.Lead
-	err := r.db.Where("Emailid = ?", email).Find(&leads).Error
+	err := r.db.Where("EmailID = ?", email).Find(&leads).Error
 	return mapLeadsToDomain(leads), err
 }
