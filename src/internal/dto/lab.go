@@ -27,6 +27,7 @@ type LabRequest struct {
 	MOUStartDate               *FlexDate       `json:"MOUStartDate" binding:"omitempty"`   // accepts "YYYY-MM-DD" or RFC3339; nil when not sent
 	MOUEndDate                 *FlexDate       `json:"MOUEndDate" binding:"omitempty"`
 	AccreditationID            *int8           `binding:"omitempty"`
+	AccreditationExpirationDate *FlexDate      `json:"AccreditationExpirationDate" binding:"omitempty"`
 	CollectionTypes            *FlexArrayString `json:"CollectionTypes" binding:"omitempty"`    // accepts string or array e.g. [1,2]
 	ServicesID                 *FlexArrayString `json:"ServicesID" binding:"omitempty"`
 	CollectionPincodes         *FlexArrayString `json:"CollectionPincodes" binding:"omitempty"`
@@ -53,7 +54,8 @@ type LabUpdateRequest struct {
 	PANNumber                  *string   `json:"PANNumber"`
 	MOUStartDate               *FlexDate        `json:"MOUStartDate"`
 	MOUEndDate                 *FlexDate       `json:"MOUEndDate"`
-	AccreditationID            *int8           `json:"AccreditationID"`
+	AccreditationID             *int8           `json:"AccreditationID"`
+	AccreditationExpirationDate *FlexDate       `json:"AccreditationExpirationDate"`
 	CollectionTypes            *FlexArrayString `json:"CollectionTypes"`
 	ServicesID                 *FlexArrayString `json:"ServicesID"`
 	CollectionPincodes         *FlexArrayString `json:"CollectionPincodes"`
@@ -65,13 +67,14 @@ func (r LabUpdateRequest) HasAtLeastOneField() bool {
 		r.ContactPerson1Name != nil || r.ContactPerson1Number != nil || r.ContactPerson1EmailID != nil || r.ContactPerson1Designation != nil ||
 		r.ContactPerson1Name1 != nil || r.ContactPerson1Number1 != nil || r.ContactPerson1EmailID1 != nil || r.ContactPerson1Designation1 != nil ||
 		r.CategoryID != nil || r.GSTIN_UIN != nil || r.PANNumber != nil || r.MOUStartDate != nil || r.MOUEndDate != nil ||
-		r.AccreditationID != nil || r.CollectionTypes != nil || r.ServicesID != nil || r.CollectionPincodes != nil || r.IsActive != nil
+		r.AccreditationID != nil || r.AccreditationExpirationDate != nil || r.CollectionTypes != nil || r.ServicesID != nil || r.CollectionPincodes != nil || r.IsActive != nil
 }
 
 // Getters for FlexDate/FlexArrayString so service receives *time.Time and *string without depending on flex types.
-func (r LabUpdateRequest) GetMOUStartDate() *time.Time     { return r.MOUStartDate.ToTimePtr() }
-func (r LabUpdateRequest) GetMOUEndDate() *time.Time       { return r.MOUEndDate.ToTimePtr() }
-func (r LabUpdateRequest) GetCollectionTypes() *string    { return r.CollectionTypes.ToStringPtr() }
+func (r LabUpdateRequest) GetMOUStartDate() *time.Time               { return r.MOUStartDate.ToTimePtr() }
+func (r LabUpdateRequest) GetMOUEndDate() *time.Time                  { return r.MOUEndDate.ToTimePtr() }
+func (r LabUpdateRequest) GetAccreditationExpirationDate() *time.Time  { return r.AccreditationExpirationDate.ToTimePtr() }
+func (r LabUpdateRequest) GetCollectionTypes() *string                  { return r.CollectionTypes.ToStringPtr() }
 func (r LabUpdateRequest) GetServicesID() *string          { return r.ServicesID.ToStringPtr() }
 func (r LabUpdateRequest) GetCollectionPincodes() *string   { return r.CollectionPincodes.ToStringPtr() }
 
@@ -96,8 +99,9 @@ func (r LabRequest) ToDomain() domain.Lab {
 		PANNumber:                  r.PANNumber,
 		MOUStartDate:               r.MOUStartDate.ToTimePtr(),
 		MOUEndDate:                 r.MOUEndDate.ToTimePtr(),
-		AccreditationID:            r.AccreditationID,
-		CollectionTypes:            r.CollectionTypes.ToStringPtr(),
+		AccreditationID:             r.AccreditationID,
+		AccreditationExpirationDate: r.AccreditationExpirationDate.ToTimePtr(),
+		CollectionTypes:             r.CollectionTypes.ToStringPtr(),
 		ServicesID:                 r.ServicesID.ToStringPtr(),
 		CollectionPincodes:         r.CollectionPincodes.ToStringPtr(),
 		IsActive:                   r.IsActive,

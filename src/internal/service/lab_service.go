@@ -127,6 +127,9 @@ func (s *labService) UpdateLab(id int64, update *dto.LabUpdateRequest, lastUpdat
 	if update.AccreditationID != nil {
 		l.AccreditationID = update.AccreditationID
 	}
+	if t := update.GetAccreditationExpirationDate(); t != nil {
+		l.AccreditationExpirationDate = t
+	}
 	if s := update.GetCollectionTypes(); s != nil {
 		l.CollectionTypes = s
 	}

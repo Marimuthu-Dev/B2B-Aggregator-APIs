@@ -23,6 +23,7 @@ type Lab struct {
 	MOUStartDate               *time.Time
 	MOUEndDate                 *time.Time
 	AccreditationID            *int8
+	AccreditationExpirationDate *time.Time
 	CollectionTypes            *string
 	ServicesID                 *string
 	CollectionPincodes         *string
