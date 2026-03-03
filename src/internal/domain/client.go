@@ -26,6 +26,8 @@ type Client struct {
 	BillingPincode            *string
 	ClientTypeID              *int8
 	IsAcitve                  bool
+	MOUStartDate              *timeutil.ISTTime
+	MOUEndDate                *timeutil.ISTTime
 	CreatedBy                 int64
 	CreatedOn                 timeutil.ISTTime
 	LastUpdatedBy             int64

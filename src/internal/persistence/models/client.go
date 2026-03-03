@@ -26,6 +26,8 @@ type Client struct {
 	BillingPincode            *string   `gorm:"column:BillingPincode;type:varchar(6)"`
 	ClientTypeID              *int8     `gorm:"column:ClientTypeID"`
 	IsAcitve                  bool      `gorm:"column:IsAcitve;not null"` // Note: typo in DB (IsAcitve)
+	MOUStartDate              *time.Time `gorm:"column:MOUStartDate;type:date"`
+	MOUEndDate                *time.Time `gorm:"column:MOUEndDate;type:date"`
 	CreatedBy                 int64     `gorm:"column:CreatedBy;not null"`
 	CreatedOn                 time.Time `gorm:"column:CreatedOn;not null;default:GETDATE()"`
 	LastUpdatedBy             int64     `gorm:"column:LastUpdatedBy;not null"`

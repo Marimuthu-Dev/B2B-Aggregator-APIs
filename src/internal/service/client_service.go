@@ -138,6 +138,12 @@ func (s *clientService) UpdateClient(id int64, update *dto.ClientUpdateRequest, 
 	if update.IsAcitve != nil {
 		c.IsAcitve = *update.IsAcitve
 	}
+	if update.MOUStartDate != nil {
+		c.MOUStartDate = timeutil.FromTimePtr(update.MOUStartDate)
+	}
+	if update.MOUEndDate != nil {
+		c.MOUEndDate = timeutil.FromTimePtr(update.MOUEndDate)
+	}
 
 	c.ClientID = id
 	c.LastUpdatedBy = lastUpdatedBy
