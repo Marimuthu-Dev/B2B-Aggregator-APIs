@@ -12,6 +12,7 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
+	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 	"b2b-diagnostic-aggregator/apis/pkg/utils"
 
 	"gorm.io/gorm"
@@ -209,8 +210,8 @@ func (s *loginService) CreateForgotPasswordRecord(domainName, mobileNumber strin
 		UserID:            userID,
 		UserType:          strconv.Itoa(userType),
 		ForgetPasswordKey: resetKey,
-		CreatedOn:         now,
-		ExpiryTimestamp:   expiry,
+		CreatedOn:         timeutil.FromTime(now),
+		ExpiryTimestamp:   timeutil.FromTime(expiry),
 		IsPasswordChanged: false,
 	}
 	if err := s.forgotRepo.Create(rec); err != nil {
@@ -235,7 +236,7 @@ func (s *loginService) GetLatestForgotPasswordKey(domainName, mobileNumber strin
 
 	return &dto.ForgotPasswordKeyResponse{
 		ForgetPasswordKey: rec.ForgetPasswordKey,
-		Expiry:            rec.ExpiryTimestamp.Format(time.RFC3339),
+		Expiry:            rec.ExpiryTimestamp.ToTime().In(timeutil.ISTLocation()).Format(time.RFC3339),
 	}, nil
 }
 

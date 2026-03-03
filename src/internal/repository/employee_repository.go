@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"b2b-diagnostic-aggregator/apis/internal/domain"
+	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 
 	"gorm.io/gorm"
@@ -53,7 +54,7 @@ func (r *employeeRepository) FindByMobileNumber(mobileNumber string) (*domain.Em
 
 	// Console log: print DB record details (excluding mobile number)
 	fmt.Printf("Employee DB record: UID=%d FullName=%s Address=%s CityID=%d StateID=%d Pincode=%s CompanyEmailID=%s Designation=%s Department=%s CreatedBy=%d CreatedOn=%v LastUpdatedBy=%d LastUpdatedOn=%v\n",
-		d.UID, d.FullName, d.Address, d.CityID, d.StateID, d.Pincode, d.CompanyEmailID, d.Designation, d.Department, d.CreatedBy, d.CreatedOn, d.LastUpdatedBy, d.LastUpdatedOn)
+		d.UID, d.FullName, d.Address, d.CityID, d.StateID, d.Pincode, d.CompanyEmailID, d.Designation, d.Department, d.CreatedBy, d.CreatedOn.ToTime(), d.LastUpdatedBy, d.LastUpdatedOn.ToTime())
 
 	return &d, nil
 }
@@ -101,9 +102,9 @@ func mapEmployeeToDomain(p persistencemodels.Employee) domain.Employee {
 		Designation:    p.Designation,
 		Department:     p.Department,
 		CreatedBy:      p.CreatedBy,
-		CreatedOn:      p.CreatedOn,
+		CreatedOn:      timeutil.FromTime(p.CreatedOn),
 		LastUpdatedBy:  p.LastUpdatedBy,
-		LastUpdatedOn:  p.LastUpdatedOn,
+		LastUpdatedOn:  timeutil.FromTime(p.LastUpdatedOn),
 	}
 }
 
@@ -120,9 +121,9 @@ func mapEmployeeToPersistence(d domain.Employee) persistencemodels.Employee {
 		Designation:    d.Designation,
 		Department:     d.Department,
 		CreatedBy:      d.CreatedBy,
-		CreatedOn:      d.CreatedOn,
+		CreatedOn:      d.CreatedOn.ToTime(),
 		LastUpdatedBy:  d.LastUpdatedBy,
-		LastUpdatedOn:  d.LastUpdatedOn,
+		LastUpdatedOn:  d.LastUpdatedOn.ToTime(),
 	}
 }
 

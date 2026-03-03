@@ -1,6 +1,6 @@
 package domain
 
-import "time"
+import "b2b-diagnostic-aggregator/apis/internal/timeutil"
 
 type Client struct {
 	ClientID                  int64
@@ -26,9 +26,9 @@ type Client struct {
 	BillingPincode            *string
 	IsAcitve                  bool
 	CreatedBy                 int64
-	CreatedOn                 time.Time
+	CreatedOn                 timeutil.ISTTime
 	LastUpdatedBy             int64
-	LastUpdatedOn             time.Time
+	LastUpdatedOn             timeutil.ISTTime
 }
 
 type ClientLocation struct {
@@ -40,7 +40,7 @@ type ClientLocation struct {
 	StateID          int8
 	IsActive         bool
 	CreatedBy        int64
-	CreatedOn        time.Time
+	CreatedOn        timeutil.ISTTime
 	LastUpdatedBy    int64
-	LastUpdatedOn    time.Time
+	LastUpdatedOn    timeutil.ISTTime
 }

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"b2b-diagnostic-aggregator/apis/internal/domain"
+	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 )
 
@@ -30,9 +31,9 @@ func mapClientToDomain(p persistencemodels.Client) domain.Client {
 		BillingPincode:            p.BillingPincode,
 		IsAcitve:                  p.IsAcitve,
 		CreatedBy:                 p.CreatedBy,
-		CreatedOn:                 p.CreatedOn,
+		CreatedOn:                 timeutil.FromTime(p.CreatedOn),
 		LastUpdatedBy:             p.LastUpdatedBy,
-		LastUpdatedOn:             p.LastUpdatedOn,
+		LastUpdatedOn:             timeutil.FromTime(p.LastUpdatedOn),
 	}
 }
 
@@ -61,9 +62,9 @@ func mapClientToPersistence(d domain.Client) persistencemodels.Client {
 		BillingPincode:            d.BillingPincode,
 		IsAcitve:                  d.IsAcitve,
 		CreatedBy:                 d.CreatedBy,
-		CreatedOn:                 d.CreatedOn,
+		CreatedOn:                 d.CreatedOn.ToTime(),
 		LastUpdatedBy:             d.LastUpdatedBy,
-		LastUpdatedOn:             d.LastUpdatedOn,
+		LastUpdatedOn:             d.LastUpdatedOn.ToTime(),
 	}
 }
 

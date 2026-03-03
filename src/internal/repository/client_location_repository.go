@@ -2,6 +2,7 @@ package repository
 
 import (
 	"b2b-diagnostic-aggregator/apis/internal/domain"
+	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 
 	"gorm.io/gorm"
@@ -81,9 +82,9 @@ func mapClientLocationToDomain(p persistencemodels.ClientLocation) domain.Client
 		StateID:          p.StateID,
 		IsActive:         p.IsActive,
 		CreatedBy:        p.CreatedBy,
-		CreatedOn:        p.CreatedOn,
+		CreatedOn:        timeutil.FromTime(p.CreatedOn),
 		LastUpdatedBy:    p.LastUpdatedBy,
-		LastUpdatedOn:    p.LastUpdatedOn,
+		LastUpdatedOn:    timeutil.FromTime(p.LastUpdatedOn),
 	}
 }
 
@@ -97,9 +98,9 @@ func mapClientLocationToPersistence(d domain.ClientLocation) persistencemodels.C
 		StateID:          d.StateID,
 		IsActive:         d.IsActive,
 		CreatedBy:        d.CreatedBy,
-		CreatedOn:        d.CreatedOn,
+		CreatedOn:        d.CreatedOn.ToTime(),
 		LastUpdatedBy:    d.LastUpdatedBy,
-		LastUpdatedOn:    d.LastUpdatedOn,
+		LastUpdatedOn:    d.LastUpdatedOn.ToTime(),
 	}
 }
 

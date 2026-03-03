@@ -8,6 +8,7 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
+	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 
 	"gorm.io/gorm"
 )
@@ -43,9 +44,9 @@ func (s *clientLocationService) GetByID(id int64) (*domain.ClientLocation, error
 func (s *clientLocationService) Create(l *domain.ClientLocation, createdBy int64) error {
 	now := time.Now()
 	l.CreatedBy = createdBy
-	l.CreatedOn = now
+	l.CreatedOn = timeutil.FromTime(now)
 	l.LastUpdatedBy = createdBy
-	l.LastUpdatedOn = now
+	l.LastUpdatedOn = timeutil.FromTime(now)
 	return s.repo.Create(l)
 }
 
@@ -75,7 +76,7 @@ func (s *clientLocationService) Update(id int64, update *dto.ClientLocationUpdat
 	}
 	l.ClientLocationID = id
 	l.LastUpdatedBy = lastUpdatedBy
-	l.LastUpdatedOn = time.Now()
+	l.LastUpdatedOn = timeutil.FromTime(time.Now())
 	if err := s.repo.Update(&l); err != nil {
 		return nil, err
 	}

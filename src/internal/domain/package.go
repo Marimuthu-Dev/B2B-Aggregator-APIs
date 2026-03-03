@@ -1,6 +1,6 @@
 package domain
 
-import "time"
+import "b2b-diagnostic-aggregator/apis/internal/timeutil"
 
 type Package struct {
 	PackageID     int
@@ -8,9 +8,9 @@ type Package struct {
 	Description   string
 	IsActive      bool
 	CreatedBy     int64
-	CreatedOn     time.Time
+	CreatedOn     timeutil.ISTTime
 	LastUpdatedBy int64
-	LastUpdatedOn time.Time
+	LastUpdatedOn timeutil.ISTTime
 }
 
 // PackageWithTestsDetail is one item for GET /packages/with-tests-details response.
@@ -36,9 +36,9 @@ type PackageClientMappingView struct {
 	Price           float64   `json:"Price"`
 	IsActive        bool      `json:"IsActive"`
 	CreatedBy       int64     `json:"CreatedBy"`
-	CreatedOn       time.Time `json:"CreatedOn"`
-	LastUpdatedBy   int64     `json:"LastUpdatedBy"`
-	LastUpdatedOn   time.Time `json:"LastUpdatedOn"`
+	CreatedOn       timeutil.ISTTime `json:"CreatedOn"`
+	LastUpdatedBy   int64           `json:"LastUpdatedBy"`
+	LastUpdatedOn   timeutil.ISTTime `json:"LastUpdatedOn"`
 	PackageName     string    `json:"PackageName,omitempty"`
 	ClientName      string    `json:"ClientName,omitempty"`
 }
@@ -51,9 +51,9 @@ type PackageLabMappingView struct {
 	Price         float64   `json:"Price"`
 	IsActive      bool      `json:"IsActive"`
 	CreatedBy     int64     `json:"CreatedBy"`
-	CreatedOn     time.Time `json:"CreatedOn"`
-	LastUpdatedBy int64     `json:"LastUpdatedBy"`
-	LastUpdatedOn time.Time `json:"LastUpdatedOn"`
-	PackageName   string    `json:"PackageName,omitempty"`
-	LabName       string    `json:"LabName,omitempty"`
+	CreatedOn     timeutil.ISTTime `json:"CreatedOn"`
+	LastUpdatedBy int64           `json:"LastUpdatedBy"`
+	LastUpdatedOn timeutil.ISTTime `json:"LastUpdatedOn"`
+	PackageName   string          `json:"PackageName,omitempty"`
+	LabName       string          `json:"LabName,omitempty"`
 }

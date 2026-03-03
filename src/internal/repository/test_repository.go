@@ -2,6 +2,7 @@ package repository
 
 import (
 	"b2b-diagnostic-aggregator/apis/internal/domain"
+	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 
 	"gorm.io/gorm"
@@ -71,9 +72,9 @@ func mapTestToDomain(p persistencemodels.Test) domain.Test {
 		Category:      p.Category,
 		IsActive:      p.IsActive,
 		CreatedBy:     p.CreatedBy,
-		CreatedOn:     p.CreatedOn,
+		CreatedOn:     timeutil.FromTime(p.CreatedOn),
 		LastUpdatedBy: p.LastUpdatedBy,
-		LastUpdatedOn: p.LastUpdatedOn,
+		LastUpdatedOn: timeutil.FromTime(p.LastUpdatedOn),
 	}
 }
 

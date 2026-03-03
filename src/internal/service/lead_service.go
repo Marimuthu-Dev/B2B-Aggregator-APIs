@@ -12,6 +12,7 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
+	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 
 	"gorm.io/gorm"
 )
@@ -66,9 +67,9 @@ func (s *leadService) GetLeadByID(id int64) (*domain.LeadDetail, error) {
 func (s *leadService) CreateLead(l *domain.Lead, createdBy int64) error {
 	now := time.Now()
 	l.CreatedBy = createdBy
-	l.CreatedOn = now
+	l.CreatedOn = timeutil.FromTime(now)
 	l.LastUpdatedBy = createdBy
-	l.LastUpdatedOn = now
+	l.LastUpdatedOn = timeutil.FromTime(now)
 	l.PatientID = s.GeneratePatientID(l.PatientName, l.ContactNumber)
 
 	return s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
@@ -140,7 +141,7 @@ func (s *leadService) UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUp
 
 	l.LeadID = id
 	l.LastUpdatedBy = lastUpdatedBy
-	l.LastUpdatedOn = time.Now()
+	l.LastUpdatedOn = timeutil.FromTime(time.Now())
 	l.PatientID = s.GeneratePatientID(l.PatientName, l.ContactNumber)
 
 	err = s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
@@ -311,9 +312,9 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 			Pincode:       at(row, "Pincode"),
 			LeadStatusID:  atInt8(row, "LeadStatusID"),
 			CreatedBy:     createdBy,
-			CreatedOn:     now,
+			CreatedOn:     timeutil.FromTime(now),
 			LastUpdatedBy: createdBy,
-			LastUpdatedOn: now,
+			LastUpdatedOn: timeutil.FromTime(now),
 		}
 
 		err := s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {

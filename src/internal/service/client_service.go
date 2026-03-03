@@ -8,6 +8,7 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
+	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 
 	"gorm.io/gorm"
 )
@@ -55,9 +56,9 @@ func (s *clientService) GetClientByContactNumber(contactNumber string) (*domain.
 func (s *clientService) CreateClient(c *domain.Client, createdBy int64) error {
 	now := time.Now()
 	c.CreatedBy = createdBy
-	c.CreatedOn = now
+	c.CreatedOn = timeutil.FromTime(now)
 	c.LastUpdatedBy = createdBy
-	c.LastUpdatedOn = now
+	c.LastUpdatedOn = timeutil.FromTime(now)
 	return s.repo.Create(c)
 }
 
@@ -137,7 +138,7 @@ func (s *clientService) UpdateClient(id int64, update *dto.ClientUpdateRequest, 
 
 	c.ClientID = id
 	c.LastUpdatedBy = lastUpdatedBy
-	c.LastUpdatedOn = time.Now()
+	c.LastUpdatedOn = timeutil.FromTime(time.Now())
 	if err := s.repo.Update(&c); err != nil {
 		return nil, err
 	}

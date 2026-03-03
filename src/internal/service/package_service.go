@@ -7,6 +7,7 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/apperrors"
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
+	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 
 	"gorm.io/gorm"
@@ -111,9 +112,9 @@ func (s *packageService) GetPackageByID(id int) (*domain.Package, error) {
 func (s *packageService) CreatePackage(p *domain.Package, createdBy int64) error {
 	now := time.Now()
 	p.CreatedBy = createdBy
-	p.CreatedOn = now
+	p.CreatedOn = timeutil.FromTime(now)
 	p.LastUpdatedBy = createdBy
-	p.LastUpdatedOn = now
+	p.LastUpdatedOn = timeutil.FromTime(now)
 	return s.repo.Create(p)
 }
 
@@ -128,7 +129,7 @@ func (s *packageService) UpdatePackage(p *domain.Package, lastUpdatedBy int64) e
 	p.CreatedBy = existing.CreatedBy
 	p.CreatedOn = existing.CreatedOn
 	p.LastUpdatedBy = lastUpdatedBy
-	p.LastUpdatedOn = time.Now()
+	p.LastUpdatedOn = timeutil.FromTime(time.Now())
 	return s.repo.Update(p)
 }
 
@@ -178,9 +179,9 @@ func (s *packageService) CreatePackageWithTests(p *domain.Package, testIDs []int
 	}
 	now := time.Now()
 	p.CreatedBy = createdBy
-	p.CreatedOn = now
+	p.CreatedOn = timeutil.FromTime(now)
 	p.LastUpdatedBy = createdBy
-	p.LastUpdatedOn = now
+	p.LastUpdatedOn = timeutil.FromTime(now)
 	if err := s.repo.CreateWithTests(p, unique); err != nil {
 		return nil, err
 	}
@@ -322,9 +323,9 @@ func mappingToClientView(m *persistencemodels.PackageClientMapping, pkgName, cli
 		Price:           m.Price,
 		IsActive:        m.IsActive,
 		CreatedBy:       m.CreatedBy,
-		CreatedOn:       m.CreatedOn,
+		CreatedOn:       timeutil.FromTime(m.CreatedOn),
 		LastUpdatedBy:   m.LastUpdatedBy,
-		LastUpdatedOn:   m.LastUpdatedOn,
+		LastUpdatedOn:   timeutil.FromTime(m.LastUpdatedOn),
 		PackageName:     pkgName,
 		ClientName:      clientName,
 	}
@@ -448,9 +449,9 @@ func mappingToLabView(m *persistencemodels.PackageLabMapping, pkgName, labName s
 		Price:         m.Price,
 		IsActive:      m.IsActive,
 		CreatedBy:     m.CreatedBy,
-		CreatedOn:     m.CreatedOn,
+		CreatedOn:     timeutil.FromTime(m.CreatedOn),
 		LastUpdatedBy: m.LastUpdatedBy,
-		LastUpdatedOn: m.LastUpdatedOn,
+		LastUpdatedOn: timeutil.FromTime(m.LastUpdatedOn),
 		PackageName:   pkgName,
 		LabName:       labName,
 	}

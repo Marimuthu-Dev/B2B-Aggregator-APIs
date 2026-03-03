@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"b2b-diagnostic-aggregator/apis/internal/domain"
+	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 
 	"gorm.io/gorm"
@@ -72,25 +73,25 @@ func (r *forgotPasswordRepository) MarkAsUsed(record *domain.ForgotPassword) err
 
 func mapForgotPasswordToPersistence(d domain.ForgotPassword) persistencemodels.ForgotPassword {
 	return persistencemodels.ForgotPassword{
-		Uid:                 d.Uid,
-		UserID:              d.UserID,
-		UserType:            d.UserType,
-		ForgetPasswordKey:   d.ForgetPasswordKey,
-		CreatedOn:           d.CreatedOn,
-		ExpiryTimestamp:     d.ExpiryTimestamp,
-		IsPasswordChanged:   d.IsPasswordChanged,
-		IsPasswordUpdatedOn: d.IsPasswordUpdatedOn,
+		Uid:                  d.Uid,
+		UserID:               d.UserID,
+		UserType:             d.UserType,
+		ForgetPasswordKey:    d.ForgetPasswordKey,
+		CreatedOn:            d.CreatedOn.ToTime(),
+		ExpiryTimestamp:      d.ExpiryTimestamp.ToTime(),
+		IsPasswordChanged:    d.IsPasswordChanged,
+		IsPasswordUpdatedOn:  d.IsPasswordUpdatedOn,
 	}
 }
 
 func mapForgotPasswordToDomain(p persistencemodels.ForgotPassword) domain.ForgotPassword {
 	return domain.ForgotPassword{
-		Uid:                 p.Uid,
-		UserID:              p.UserID,
-		UserType:            p.UserType,
-		ForgetPasswordKey:   p.ForgetPasswordKey,
-		CreatedOn:           p.CreatedOn,
-		ExpiryTimestamp:     p.ExpiryTimestamp,
+		Uid:                  p.Uid,
+		UserID:               p.UserID,
+		UserType:             p.UserType,
+		ForgetPasswordKey:    p.ForgetPasswordKey,
+		CreatedOn:            timeutil.FromTime(p.CreatedOn),
+		ExpiryTimestamp:      timeutil.FromTime(p.ExpiryTimestamp),
 		IsPasswordChanged:   p.IsPasswordChanged,
 		IsPasswordUpdatedOn: p.IsPasswordUpdatedOn,
 	}

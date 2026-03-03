@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"b2b-diagnostic-aggregator/apis/internal/timeutil"
+	"time"
+)
 
 type Lab struct {
 	LabID                      int64
@@ -29,7 +32,7 @@ type Lab struct {
 	CollectionPincodes         *string
 	IsActive                   *bool
 	CreatedBy                  *int64
-	CreatedOn                  *time.Time
+	CreatedOn                  *timeutil.ISTTime
 	LastUpdatedBy              *int64
-	LastUpdatedOn              *time.Time
+	LastUpdatedOn              *timeutil.ISTTime
 }

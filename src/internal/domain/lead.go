@@ -1,6 +1,6 @@
 package domain
 
-import "time"
+import "b2b-diagnostic-aggregator/apis/internal/timeutil"
 
 type Lead struct {
 	LeadID        int64
@@ -18,9 +18,9 @@ type Lead struct {
 	Pincode       string
 	LeadStatusID  int8
 	CreatedBy     int64
-	CreatedOn     time.Time
+	CreatedOn     timeutil.ISTTime
 	LastUpdatedBy int64
-	LastUpdatedOn time.Time
+	LastUpdatedOn timeutil.ISTTime
 }
 
 // LeadDetail is lead with resolved ClientName and PackageName for API response.
@@ -35,7 +35,7 @@ type LeadHistory struct {
 	LeadID    int64
 	Action    string
 	CreatedBy int64
-	CreatedOn time.Time
+	CreatedOn timeutil.ISTTime
 }
 
 const (

@@ -1,6 +1,6 @@
 package domain
 
-import "time"
+import "b2b-diagnostic-aggregator/apis/internal/timeutil"
 
 type Employee struct {
 	UID            int64
@@ -14,7 +14,7 @@ type Employee struct {
 	Designation    string
 	Department     string
 	CreatedBy      int64
-	CreatedOn      time.Time
+	CreatedOn      timeutil.ISTTime
 	LastUpdatedBy  int64
-	LastUpdatedOn  time.Time
+	LastUpdatedOn  timeutil.ISTTime
 }

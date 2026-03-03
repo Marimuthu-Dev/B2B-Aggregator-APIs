@@ -2,6 +2,7 @@ package repository
 
 import (
 	"b2b-diagnostic-aggregator/apis/internal/domain"
+	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 )
 
@@ -33,9 +34,9 @@ func mapLabToDomain(p persistencemodels.Lab) domain.Lab {
 		CollectionPincodes:         p.CollectionPincodes,
 		IsActive:                   p.IsActive,
 		CreatedBy:                  p.CreatedBy,
-		CreatedOn:                  p.CreatedOn,
+		CreatedOn:                  timeutil.FromTimePtr(p.CreatedOn),
 		LastUpdatedBy:              p.LastUpdatedBy,
-		LastUpdatedOn:              p.LastUpdatedOn,
+		LastUpdatedOn:              timeutil.FromTimePtr(p.LastUpdatedOn),
 	}
 }
 
@@ -48,11 +49,11 @@ func mapLabToPersistence(d domain.Lab) persistencemodels.Lab {
 		StateID:                    d.StateID,
 		Pincode:                    d.Pincode,
 		ContactPerson1Name:         d.ContactPerson1Name,
-		ContactPerson1Number:       d.ContactPerson1Number,
+		ContactPerson1Number:      d.ContactPerson1Number,
 		ContactPerson1EmailID:      d.ContactPerson1EmailID,
 		ContactPerson1Designation:  d.ContactPerson1Designation,
-		ContactPerson1Name1:        d.ContactPerson1Name1,
-		ContactPerson1Number1:      d.ContactPerson1Number1,
+		ContactPerson1Name1:       d.ContactPerson1Name1,
+		ContactPerson1Number1:     d.ContactPerson1Number1,
 		ContactPerson1EmailID1:     d.ContactPerson1EmailID1,
 		ContactPerson1Designation1: d.ContactPerson1Designation1,
 		CategoryID:                 d.CategoryID,
@@ -60,16 +61,16 @@ func mapLabToPersistence(d domain.Lab) persistencemodels.Lab {
 		PANNumber:                  d.PANNumber,
 		MOUStartDate:               d.MOUStartDate,
 		MOUEndDate:                 d.MOUEndDate,
-		AccreditationID:             d.AccreditationID,
+		AccreditationID:            d.AccreditationID,
 		AccreditationExpirationDate: d.AccreditationExpirationDate,
-		CollectionTypes:             d.CollectionTypes,
+		CollectionTypes:            d.CollectionTypes,
 		ServicesID:                 d.ServicesID,
 		CollectionPincodes:         d.CollectionPincodes,
 		IsActive:                   d.IsActive,
 		CreatedBy:                  d.CreatedBy,
-		CreatedOn:                  d.CreatedOn,
+		CreatedOn:                  timeutil.ToTimePtr(d.CreatedOn),
 		LastUpdatedBy:              d.LastUpdatedBy,
-		LastUpdatedOn:              d.LastUpdatedOn,
+		LastUpdatedOn:              timeutil.ToTimePtr(d.LastUpdatedOn),
 	}
 }
 

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"b2b-diagnostic-aggregator/apis/internal/domain"
+	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 )
 
@@ -22,9 +23,9 @@ func mapLeadToDomain(p persistencemodels.Lead) domain.Lead {
 		Pincode:       p.Pincode,
 		LeadStatusID:  p.LeadStatusID,
 		CreatedBy:     p.CreatedBy,
-		CreatedOn:     p.CreatedOn,
+		CreatedOn:     timeutil.FromTime(p.CreatedOn),
 		LastUpdatedBy: p.LastUpdatedBy,
-		LastUpdatedOn: p.LastUpdatedOn,
+		LastUpdatedOn: timeutil.FromTime(p.LastUpdatedOn),
 	}
 }
 
@@ -45,9 +46,9 @@ func mapLeadToPersistence(d domain.Lead) persistencemodels.Lead {
 		Pincode:       d.Pincode,
 		LeadStatusID:  d.LeadStatusID,
 		CreatedBy:     d.CreatedBy,
-		CreatedOn:     d.CreatedOn,
+		CreatedOn:     d.CreatedOn.ToTime(),
 		LastUpdatedBy: d.LastUpdatedBy,
-		LastUpdatedOn: d.LastUpdatedOn,
+		LastUpdatedOn: d.LastUpdatedOn.ToTime(),
 	}
 }
 
@@ -68,7 +69,7 @@ func mapLeadHistoryToDomain(p persistencemodels.LeadHistory) domain.LeadHistory 
 		LeadID:    p.LeadID,
 		Action:    p.Action,
 		CreatedBy: p.CreatedBy,
-		CreatedOn: p.CreatedOn,
+		CreatedOn: timeutil.FromTime(p.CreatedOn),
 	}
 }
 
@@ -78,7 +79,7 @@ func mapLeadHistoryToPersistence(d domain.LeadHistory) persistencemodels.LeadHis
 		LeadID:    d.LeadID,
 		Action:    d.Action,
 		CreatedBy: d.CreatedBy,
-		CreatedOn: d.CreatedOn,
+		CreatedOn: d.CreatedOn.ToTime(),
 	}
 }
 
