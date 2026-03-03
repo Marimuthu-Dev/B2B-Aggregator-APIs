@@ -30,6 +30,7 @@ type Lab struct {
 	CollectionTypes            *string
 	ServicesID                 *string
 	CollectionPincodes         *string
+	LabGrade                   *string
 	IsActive                   *bool
 	CreatedBy                  *int64
 	CreatedOn                  *timeutil.ISTTime

@@ -140,6 +140,9 @@ func (s *labService) UpdateLab(id int64, update *dto.LabUpdateRequest, lastUpdat
 	if s := update.GetCollectionPincodes(); s != nil {
 		l.CollectionPincodes = s
 	}
+	if update.LabGrade != nil {
+		l.LabGrade = update.LabGrade
+	}
 	if update.IsActive != nil {
 		l.IsActive = update.IsActive
 	}

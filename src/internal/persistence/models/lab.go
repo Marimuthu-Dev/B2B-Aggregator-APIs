@@ -27,6 +27,7 @@ type Lab struct {
 	CollectionTypes            *string    `gorm:"column:CollectionTypes;type:varchar(10)"` // JSON string
 	ServicesID                 *string    `gorm:"column:ServicesID;type:varchar(10)"`      // JSON string
 	CollectionPincodes         *string    `gorm:"column:CollectionPincodes;type:text"`     // JSON string
+	LabGrade                   *string    `gorm:"column:LabGrade;type:varchar(20)"`
 	IsActive                   *bool      `gorm:"column:IsActive"`
 	CreatedBy                  *int64     `gorm:"column:CreatedBy"`
 	CreatedOn                  *time.Time `gorm:"column:CreatedOn;default:GETDATE()"`
