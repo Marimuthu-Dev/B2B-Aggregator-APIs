@@ -26,7 +26,8 @@ type ClientRequest struct {
 	BillingName               *string `binding:"omitempty"`
 	BillingAdderss            *string `binding:"omitempty"`
 	BillingPincode *string `binding:"omitempty"`
-	IsAcitve bool `binding:"omitempty"`
+	ClientTypeID   *int8   `json:"ClientTypeID" binding:"omitempty"`
+	IsAcitve       bool    `binding:"omitempty"`
 }
 
 // ClientUpdateRequest is for PUT; all fields optional. At least one must be set.
@@ -51,6 +52,7 @@ type ClientUpdateRequest struct {
 	BillingName               *string `json:"BillingName"`
 	BillingAdderss            *string `json:"BillingAdderss"`
 	BillingPincode            *string `json:"BillingPincode"`
+	ClientTypeID              *int8   `json:"ClientTypeID"`
 	IsAcitve                  *bool   `json:"IsAcitve"`
 }
 
@@ -59,7 +61,7 @@ func (r ClientUpdateRequest) HasAtLeastOneField() bool {
 		r.ContactPerson1Name != nil || r.ContactPerson1Number != nil || r.ContactPerson1EmailID != nil || r.ContactPerson1Designation != nil ||
 		r.ContactPerson2Name != nil || r.ContactPerson2Number != nil || r.ContactPerson2EmailID != nil || r.ContactPerson2Designation != nil ||
 		r.CategoryID != nil || r.GSTIN_UIN != nil || r.PANNumber != nil || r.BusinessVertical != nil ||
-		r.BillingName != nil || r.BillingAdderss != nil || r.BillingPincode != nil || r.IsAcitve != nil
+		r.BillingName != nil || r.BillingAdderss != nil || r.BillingPincode != nil || r.ClientTypeID != nil || r.IsAcitve != nil
 }
 
 type ClientLocationRequest struct {
@@ -121,6 +123,7 @@ func (r ClientRequest) ToDomain() domain.Client {
 		BillingName:               r.BillingName,
 		BillingAdderss:            r.BillingAdderss,
 		BillingPincode:            r.BillingPincode,
+		ClientTypeID:              r.ClientTypeID,
 		IsAcitve:                  r.IsAcitve,
 	}
 }

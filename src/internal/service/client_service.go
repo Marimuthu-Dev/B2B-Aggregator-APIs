@@ -132,6 +132,9 @@ func (s *clientService) UpdateClient(id int64, update *dto.ClientUpdateRequest, 
 	if update.BillingPincode != nil {
 		c.BillingPincode = update.BillingPincode
 	}
+	if update.ClientTypeID != nil {
+		c.ClientTypeID = update.ClientTypeID
+	}
 	if update.IsAcitve != nil {
 		c.IsAcitve = *update.IsAcitve
 	}
