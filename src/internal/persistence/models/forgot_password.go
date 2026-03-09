@@ -15,5 +15,5 @@ type ForgotPassword struct {
 }
 
 func (ForgotPassword) TableName() string {
-	return "MediAdmin.ForgotPassword"
+	return "MediAdmin.tbl_ForgotPassword"
 }
