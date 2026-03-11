@@ -26,6 +26,7 @@ type ClientRequest struct {
 	GSTIN_UIN                 *string `binding:"omitempty"`
 	PANNumber                 *string `binding:"omitempty"`
 	BusinessVertical          string  `binding:"required"`
+	NatureOfBusiness          *string `json:"NatureOfBusiness" binding:"omitempty"`
 	BillingName               *string `binding:"omitempty"`
 	BillingAdderss            *string `binding:"omitempty"`
 	BillingPincode *string `binding:"omitempty"`
@@ -54,6 +55,7 @@ type ClientUpdateRequest struct {
 	GSTIN_UIN                 *string `json:"GSTIN_UIN"`
 	PANNumber                 *string `json:"PANNumber"`
 	BusinessVertical          *string `json:"BusinessVertical"`
+	NatureOfBusiness          *string `json:"NatureOfBusiness"`
 	BillingName               *string `json:"BillingName"`
 	BillingAdderss            *string `json:"BillingAdderss"`
 	BillingPincode            *string `json:"BillingPincode"`
@@ -67,7 +69,7 @@ func (r ClientUpdateRequest) HasAtLeastOneField() bool {
 	return r.ClientName != nil || r.Address != nil || r.CityID != nil || r.StateID != nil || r.Pincode != nil ||
 		r.ContactPerson1Name != nil || r.ContactPerson1Number != nil || r.ContactPerson1EmailID != nil || r.ContactPerson1Designation != nil ||
 		r.ContactPerson2Name != nil || r.ContactPerson2Number != nil || r.ContactPerson2EmailID != nil || r.ContactPerson2Designation != nil ||
-		r.CategoryID != nil || r.GSTIN_UIN != nil || r.PANNumber != nil || r.BusinessVertical != nil ||
+		r.CategoryID != nil || r.GSTIN_UIN != nil || r.PANNumber != nil || r.BusinessVertical != nil || r.NatureOfBusiness != nil ||
 		r.BillingName != nil || r.BillingAdderss != nil || r.BillingPincode != nil || r.ClientTypeID != nil || r.IsAcitve != nil ||
 		r.MOUStartDate != nil || r.MOUEndDate != nil
 }
@@ -128,6 +130,7 @@ func (r ClientRequest) ToDomain() domain.Client {
 		GSTIN_UIN:                 r.GSTIN_UIN,
 		PANNumber:                 r.PANNumber,
 		BusinessVertical:          r.BusinessVertical,
+		NatureOfBusiness:          r.NatureOfBusiness,
 		BillingName:               r.BillingName,
 		BillingAdderss:            r.BillingAdderss,
 		BillingPincode:            r.BillingPincode,

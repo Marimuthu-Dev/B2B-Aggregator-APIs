@@ -21,6 +21,7 @@ type Client struct {
 	GSTIN_UIN                 *string
 	PANNumber                 *string
 	BusinessVertical          string
+	NatureOfBusiness          *string
 	BillingName               *string
 	BillingAdderss            *string
 	BillingPincode            *string

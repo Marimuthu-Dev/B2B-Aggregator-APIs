@@ -123,6 +123,9 @@ func (s *clientService) UpdateClient(id int64, update *dto.ClientUpdateRequest, 
 	if update.BusinessVertical != nil {
 		c.BusinessVertical = *update.BusinessVertical
 	}
+	if update.NatureOfBusiness != nil {
+		c.NatureOfBusiness = update.NatureOfBusiness
+	}
 	if update.BillingName != nil {
 		c.BillingName = update.BillingName
 	}
