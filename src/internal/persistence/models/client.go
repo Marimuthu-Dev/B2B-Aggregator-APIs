@@ -21,7 +21,6 @@ type Client struct {
 	GSTIN_UIN                 *string   `gorm:"column:GSTIN_UIN;type:varchar(20)"`
 	PANNumber                 *string   `gorm:"column:PANNumber;type:varchar(10)"`
 	BusinessVertical          string    `gorm:"column:BusinessVertical;type:varchar(15);not null"`
-	NatureOfBusiness          *string   `gorm:"column:NatureOfBusiness;type:varchar(20)"`
 	BillingName               *string   `gorm:"column:BillingName;type:varchar(75)"`
 	BillingAdderss            *string   `gorm:"column:BillingAdderss;type:varchar(150)"`
 	BillingPincode            *string   `gorm:"column:BillingPincode;type:varchar(6)"`

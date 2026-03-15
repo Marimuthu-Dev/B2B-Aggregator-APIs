@@ -20,8 +20,7 @@ type Client struct {
 	CategoryID                *int8
 	GSTIN_UIN                 *string
 	PANNumber                 *string
-	BusinessVertical          string
-	NatureOfBusiness          *string
+	BusinessVertical          string	
 	BillingName               *string
 	BillingAdderss            *string
 	BillingPincode            *string
