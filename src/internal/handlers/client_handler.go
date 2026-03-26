@@ -25,15 +25,27 @@ func (h *ClientHandler) GetAll(c *gin.Context) {
 	if !middleware.BindQuery(c, &query) {
 		return
 	}
+	mouStatuses, mouExpiryParsed, parseErr := dto.ParseMouListFilters(query.MouListQuery)
+	if parseErr != nil {
+		respondError(c, apperrors.NewBadRequest(parseErr.Error(), parseErr))
+		return
+	}
+	var mouExpiryRange *repository.MouExpiryDateRange
+	if mouExpiryParsed != nil {
+		mouExpiryRange = &repository.MouExpiryDateRange{From: mouExpiryParsed.From, To: mouExpiryParsed.To}
+	}
 	page := query.PaginationQuery.Normalize("createdOn", 500) // default 500 so GET without params returns all clients
 	filter := repository.ClientListFilter{
-		Page:      page.Page,
-		PageSize:  page.PageSize,
-		SortBy:    page.SortBy,
-		SortOrder: page.SortOrder,
-		CityID:    query.CityID,
-		StateID:   query.StateID,
-		IsActive:  query.IsActive,
+		Page:           page.Page,
+		PageSize:       page.PageSize,
+		SortBy:         page.SortBy,
+		SortOrder:      page.SortOrder,
+		CityID:         query.CityID,
+		StateID:        query.StateID,
+		IsActive:       query.IsActive,
+		MouStatuses:    mouStatuses,
+		MouExpiryRange: mouExpiryRange,
+		Search:         query.Search,
 	}
 
 	data, total, err := h.svc.ListClients(filter)

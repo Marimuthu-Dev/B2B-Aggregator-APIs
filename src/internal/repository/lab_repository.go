@@ -2,6 +2,7 @@ package repository
 
 import (
 	"fmt"
+	"strings"
 
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
@@ -47,6 +48,19 @@ func (r *labRepository) List(filter LabListFilter) ([]domain.Lab, int64, error) 
 	}
 	if filter.IsActive != nil {
 		query = query.Where("IsActive = ?", *filter.IsActive)
+	}
+	if filter.MouExpiryRange != nil {
+		query = query.Where("MOUEndDate IS NOT NULL AND MOUEndDate >= ? AND MOUEndDate <= ?",
+			filter.MouExpiryRange.From, filter.MouExpiryRange.To)
+	}
+	query = ApplyMouStatusOrFilter(query, filter.MouStatuses)
+	if trimmed := strings.TrimSpace(filter.Search); trimmed != "" {
+		term := "%" + trimmed + "%"
+		query = query.Where(
+			"(LabName LIKE ? OR ISNULL(ContactPerson1Name,'') LIKE ? OR ISNULL(ContactPerson1EmailID,'') LIKE ? OR ISNULL(ContactPerson1Number,'') LIKE ? OR "+
+				"ISNULL(ContactPerson1Name1,'') LIKE ? OR ISNULL(ContactPerson1EmailID1,'') LIKE ? OR ISNULL(ContactPerson1Number1,'') LIKE ?)",
+			term, term, term, term, term, term, term,
+		)
 	}
 
 	var total int64

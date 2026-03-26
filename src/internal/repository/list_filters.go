@@ -1,23 +1,37 @@
 package repository
 
+import "time"
+
+// MouExpiryDateRange filters MOUEndDate inclusive; use only when both bounds are set.
+type MouExpiryDateRange struct {
+	From time.Time
+	To   time.Time
+}
+
 type ClientListFilter struct {
-	Page      int
-	PageSize  int
-	SortBy    string
-	SortOrder string
-	CityID    *int8
-	StateID   *int8
-	IsActive  *bool
+	Page           int
+	PageSize       int
+	SortBy         string
+	SortOrder      string
+	CityID         *int8
+	StateID        *int8
+	IsActive       *bool
+	MouStatuses    []string // active, expired, expiringSoon — OR semantics
+	MouExpiryRange *MouExpiryDateRange
+	Search         string
 }
 
 type LabListFilter struct {
-	Page      int
-	PageSize  int
-	SortBy    string
-	SortOrder string
-	CityID    *int8
-	StateID   *int8
-	IsActive  *bool
+	Page           int
+	PageSize       int
+	SortBy         string
+	SortOrder      string
+	CityID         *int8
+	StateID        *int8
+	IsActive       *bool
+	MouStatuses    []string
+	MouExpiryRange *MouExpiryDateRange
+	Search         string
 }
 
 type LeadListFilter struct {

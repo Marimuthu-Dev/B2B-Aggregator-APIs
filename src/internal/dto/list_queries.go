@@ -1,10 +1,102 @@
 package dto
 
+import (
+	"fmt"
+	"strings"
+	"time"
+
+	"b2b-diagnostic-aggregator/apis/internal/timeutil"
+)
+
+// MouListQuery holds optional MOU filters shared by client and lab list endpoints.
+type MouListQuery struct {
+	MouStatus     string `form:"mouStatus" binding:"omitempty"`
+	MouExpiryFrom string `form:"mouExpiryFrom" binding:"omitempty"`
+	MouExpiryTo   string `form:"mouExpiryTo" binding:"omitempty"`
+}
+
 type ClientListQuery struct {
 	PaginationQuery
 	CityID   *int8 `form:"cityId" binding:"omitempty,min=1"`
 	StateID  *int8 `form:"stateId" binding:"omitempty,min=1"`
 	IsActive *bool `form:"isActive" binding:"omitempty"`
+	MouListQuery
+	Search string `form:"search" binding:"omitempty"`
+}
+
+// ParseMouListFilters parses mouStatus (pipe-separated) and validates coupled mouExpiryFrom/mouExpiryTo.
+// Returns expiry range only when both date params are present; otherwise nil range and no error.
+func ParseMouListFilters(q MouListQuery) (statuses []string, expiryRange *MouExpiryRangeParsed, err error) {
+	statuses, err = parseMouStatusPipeList(q.MouStatus)
+	if err != nil {
+		return nil, nil, err
+	}
+	fromStr := strings.TrimSpace(q.MouExpiryFrom)
+	toStr := strings.TrimSpace(q.MouExpiryTo)
+	if fromStr == "" && toStr == "" {
+		return statuses, nil, nil
+	}
+	if fromStr == "" || toStr == "" {
+		return nil, nil, fmt.Errorf("mouExpiryFrom and mouExpiryTo must both be set when filtering by MOU expiry date")
+	}
+	loc := timeutil.ISTLocation()
+	from, err := time.ParseInLocation("2006-01-02", fromStr, loc)
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid mouExpiryFrom: use YYYY-MM-DD")
+	}
+	to, err := time.ParseInLocation("2006-01-02", toStr, loc)
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid mouExpiryTo: use YYYY-MM-DD")
+	}
+	if from.After(to) {
+		return nil, nil, fmt.Errorf("mouExpiryFrom must be on or before mouExpiryTo")
+	}
+	return statuses, &MouExpiryRangeParsed{From: from, To: to}, nil
+}
+
+// MouExpiryRangeParsed holds inclusive MOU end-date bounds (IST calendar dates).
+type MouExpiryRangeParsed struct {
+	From time.Time
+	To   time.Time
+}
+
+func parseMouStatusPipeList(s string) ([]string, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil, nil
+	}
+	parts := strings.Split(s, "|")
+	seen := make(map[string]struct{})
+	var out []string
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		canonical, ok := normalizeMouStatusToken(p)
+		if !ok {
+			return nil, fmt.Errorf("invalid mouStatus value %q: use active, expired, or expiringSoon", p)
+		}
+		if _, dup := seen[canonical]; dup {
+			continue
+		}
+		seen[canonical] = struct{}{}
+		out = append(out, canonical)
+	}
+	return out, nil
+}
+
+func normalizeMouStatusToken(p string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(p)) {
+	case "active":
+		return "active", true
+	case "expired":
+		return "expired", true
+	case "expiringsoon":
+		return "expiringSoon", true
+	default:
+		return "", false
+	}
 }
 
 type LabListQuery struct {
@@ -12,6 +104,8 @@ type LabListQuery struct {
 	CityID   *int8 `form:"cityId" binding:"omitempty,min=1"`
 	StateID  *int8 `form:"stateId" binding:"omitempty,min=1"`
 	IsActive *bool `form:"isActive" binding:"omitempty"`
+	MouListQuery
+	Search string `form:"search" binding:"omitempty"`
 }
 
 type LeadListQuery struct {
