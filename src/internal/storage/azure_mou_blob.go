@@ -88,8 +88,12 @@ func (s *AzureMoUBlobService) EnsureContainer(ctx context.Context) error {
 	return fmt.Errorf("azure blob: ensure container: %w", err)
 }
 
-func mouBlobName(clientID int64) string {
+func mouBlobNameClient(clientID int64) string {
 	return fmt.Sprintf("client-%d-mou.pdf", clientID)
+}
+
+func mouBlobNameLab(labID int64) string {
+	return fmt.Sprintf("lab-%d-mou.pdf", labID)
 }
 
 // ValidatePDF checks extension, declared size, and file content (magic / MIME).
@@ -138,6 +142,15 @@ func (s *AzureMoUBlobService) ValidatePDF(fh *multipart.FileHeader) error {
 // UploadOrReplace uploads or overwrites client-{id}-mou.pdf with Content-Type application/pdf.
 // The caller must close the provided file after this returns.
 func (s *AzureMoUBlobService) UploadOrReplace(ctx context.Context, file multipart.File, clientID int64) (string, error) {
+	return s.uploadMoUBlob(ctx, file, mouBlobNameClient(clientID), "client", clientID)
+}
+
+// UploadOrReplaceLabMoU uploads or overwrites lab-{id}-mou.pdf with Content-Type application/pdf.
+func (s *AzureMoUBlobService) UploadOrReplaceLabMoU(ctx context.Context, file multipart.File, labID int64) (string, error) {
+	return s.uploadMoUBlob(ctx, file, mouBlobNameLab(labID), "lab", labID)
+}
+
+func (s *AzureMoUBlobService) uploadMoUBlob(ctx context.Context, file multipart.File, blobName, entity string, entityID int64) (string, error) {
 	if file == nil {
 		return "", errors.New("empty file reader")
 	}
@@ -151,7 +164,6 @@ func (s *AzureMoUBlobService) UploadOrReplace(ctx context.Context, file multipar
 		return "", err
 	}
 
-	blobName := mouBlobName(clientID)
 	uploadBase, cancel := context.WithTimeout(ctx, s.uploadTimeout)
 	defer cancel()
 
@@ -181,7 +193,7 @@ attempts:
 		})
 		if err == nil {
 			u := s.client.ServiceClient().NewContainerClient(s.container).NewBlobClient(blobName).URL()
-			s.log.Info("mou blob uploaded", slog.String("blob", blobName), slog.Int64("clientID", clientID))
+			s.log.Info("mou blob uploaded", slog.String("blob", blobName), slog.String("entity", entity), slog.Int64("entityID", entityID))
 			return u, nil
 		}
 		lastErr = err
@@ -192,7 +204,8 @@ attempts:
 	}
 	s.log.Error("mou blob upload failed",
 		slog.String("blob", blobName),
-		slog.Int64("clientID", clientID),
+		slog.String("entity", entity),
+		slog.Int64("entityID", entityID),
 		slog.String("container", s.container),
 		slog.Any("err", lastErr),
 		slog.String("azure_error", formatAzureError(lastErr)),
@@ -203,10 +216,19 @@ attempts:
 // MoUDownloadSASURL returns an HTTPS URL with read-only SAS query parameters for client-{clientID}-mou.pdf.
 func (s *AzureMoUBlobService) MoUDownloadSASURL(ctx context.Context, clientID int64) (string, time.Time, error) {
 	_ = ctx
+	return s.sasURLForBlob(mouBlobNameClient(clientID))
+}
+
+// LabMoUDownloadSASURL returns an HTTPS URL with read-only SAS query parameters for lab-{labID}-mou.pdf.
+func (s *AzureMoUBlobService) LabMoUDownloadSASURL(ctx context.Context, labID int64) (string, time.Time, error) {
+	_ = ctx
+	return s.sasURLForBlob(mouBlobNameLab(labID))
+}
+
+func (s *AzureMoUBlobService) sasURLForBlob(blobName string) (string, time.Time, error) {
 	if s.sharedKey == nil || s.accountName == "" {
 		return "", time.Time{}, errors.New("azure blob: SAS signing unavailable")
 	}
-	blobName := mouBlobName(clientID)
 	expires := time.Now().UTC().Add(s.sasTTL)
 	start := time.Now().UTC().Add(-2 * time.Minute)
 	qp, err := sas.BlobSignatureValues{

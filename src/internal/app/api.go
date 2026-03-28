@@ -71,7 +71,7 @@ func Run() error {
 	clientSvc := service.NewClientService(clientRepo, blobSvc)
 	clientLocationSvc := service.NewClientLocationService(clientLocationRepo)
 	employeeSvc := service.NewEmployeeService(employeeRepo)
-	labSvc := service.NewLabService(labRepo)
+	labSvc := service.NewLabService(labRepo, blobSvc)
 	leadSvc := service.NewLeadService(leadRepo, leadUow, clientRepo, packageRepo)
 	testSvc := service.NewTestService(testRepo)
 

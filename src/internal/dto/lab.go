@@ -80,6 +80,12 @@ func (r LabUpdateRequest) GetCollectionTypes() *string                  { return
 func (r LabUpdateRequest) GetServicesID() *string          { return r.ServicesID.ToStringPtr() }
 func (r LabUpdateRequest) GetCollectionPincodes() *string   { return r.CollectionPincodes.ToStringPtr() }
 
+// LabMoUDownloadURLResponse is returned by GET /api/v1/labs/:id/mou/download-url (SAS link for the MoU PDF).
+type LabMoUDownloadURLResponse struct {
+	URL       string    `json:"url"`
+	ExpiresAt time.Time `json:"expiresAt"`
+}
+
 func (r LabRequest) ToDomain() domain.Lab {
 	return domain.Lab{
 		LabID:                      r.LabID,

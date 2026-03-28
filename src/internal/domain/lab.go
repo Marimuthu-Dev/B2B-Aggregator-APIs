@@ -25,6 +25,7 @@ type Lab struct {
 	PANNumber                  *string
 	MOUStartDate               *time.Time
 	MOUEndDate                 *time.Time
+	MoUDocumentURL             *string
 	AccreditationID            *int8
 	AccreditationExpirationDate *time.Time
 	CollectionTypes            *string

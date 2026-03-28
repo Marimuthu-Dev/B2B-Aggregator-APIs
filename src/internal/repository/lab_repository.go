@@ -17,6 +17,7 @@ type LabRepository interface {
 	ExistsByID(id int64) (bool, error)
 	Create(l *domain.Lab) error
 	Update(l *domain.Lab) error
+	UpdateLabMoUURL(labID int64, url string) error
 	Delete(id int64) error
 	FindAllActive() ([]domain.Lab, error)
 	FindByContactNumber(contactNumber string) (*domain.Lab, error)
@@ -126,6 +127,12 @@ func (r *labRepository) Update(l *domain.Lab) error {
 	}
 	*l = mapLabToDomain(persist)
 	return nil
+}
+
+func (r *labRepository) UpdateLabMoUURL(labID int64, url string) error {
+	return r.db.Model(&persistencemodels.Lab{}).
+		Where("LabID = ?", labID).
+		Update("MoUDocumentURL", url).Error
 }
 
 func (r *labRepository) Delete(id int64) error {

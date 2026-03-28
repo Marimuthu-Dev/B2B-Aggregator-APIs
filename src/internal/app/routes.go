@@ -144,8 +144,9 @@ func registerLabRoutes(api *gin.RouterGroup, handler *handlers.LabHandler) {
 	{
 		labs.GET("", handler.GetAll)
 		labs.GET("/", handler.GetAll)
-		labs.GET("/:id", handler.GetByID)
 		labs.GET("/contact", handler.GetByContactNumber)
+		labs.GET("/:id/mou/download-url", handler.GetLabMoUDownloadURL)
+		labs.GET("/:id", handler.GetByID)
 		labs.POST("", handler.Create)
 		labs.POST("/", handler.Create)
 		labs.PUT("/:id", handler.Update)

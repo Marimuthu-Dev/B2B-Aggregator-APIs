@@ -3,7 +3,9 @@ package handlers
 import (
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"strings"
 
@@ -19,6 +21,7 @@ import (
 const (
 	labMultipartFormField          = "data"
 	labCollectionPincodesFileField = "file"
+	labMouDocumentField            = "mou_document"
 )
 
 // parsePincodesCSV reads a CSV with header "Pincodes". Supports:
@@ -136,6 +139,23 @@ func (h *LabHandler) GetByContactNumber(c *gin.Context) {
 	respondData(c, http.StatusOK, data, "Success", nil)
 }
 
+// GetLabMoUDownloadURL returns a short-lived SAS URL to view/download the lab MoU PDF.
+func (h *LabHandler) GetLabMoUDownloadURL(c *gin.Context) {
+	var params dto.IDParam
+	if !middleware.BindUri(c, &params) {
+		return
+	}
+	if !middleware.RequirePositiveID(c, params.ID) {
+		return
+	}
+	data, err := h.svc.GetLabMoUDownloadURL(c.Request.Context(), params.ID)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	respondData(c, http.StatusOK, data, "Success", nil)
+}
+
 func (h *LabHandler) Create(c *gin.Context) {
 	userID, ok := middleware.GetUserID(c)
 	if !ok {
@@ -175,10 +195,33 @@ func (h *LabHandler) Create(c *gin.Context) {
 			fas := dto.FlexArrayString(pincodesStr)
 			req.CollectionPincodes = &fas
 		}
-	} else {
-		if !middleware.BindJSON(c, &req) {
-			return
+		var mou *multipart.FileHeader
+		mouFh, mouErr := c.FormFile(labMouDocumentField)
+		if mouErr != nil {
+			if !errors.Is(mouErr, http.ErrMissingFile) {
+				respondError(c, apperrors.NewBadRequest("mou_document: "+mouErr.Error(), mouErr))
+				return
+			}
+		} else {
+			mou = mouFh
 		}
+		lab := req.ToDomain()
+		if mou != nil {
+			if err := h.svc.CreateLabWithMoU(c.Request.Context(), &lab, userID, mou); err != nil {
+				respondError(c, err)
+				return
+			}
+		} else {
+			if err := h.svc.CreateLab(&lab, userID); err != nil {
+				respondError(c, err)
+				return
+			}
+		}
+		respondData(c, http.StatusCreated, lab, "Lab created successfully", nil)
+		return
+	}
+	if !middleware.BindJSON(c, &req) {
+		return
 	}
 	lab := req.ToDomain()
 	if err := h.svc.CreateLab(&lab, userID); err != nil {
@@ -204,14 +247,22 @@ func (h *LabHandler) Update(c *gin.Context) {
 	var req dto.LabUpdateRequest
 	contentType := c.GetHeader("Content-Type")
 	if strings.Contains(contentType, "multipart/form-data") {
-		dataStr := c.PostForm(labMultipartFormField)
-		if dataStr == "" {
-			respondError(c, apperrors.NewBadRequest("multipart request must include 'data' field with JSON body", nil))
-			return
+		dataStr := strings.TrimSpace(c.PostForm(labMultipartFormField))
+		var mou *multipart.FileHeader
+		mouFh, mouErr := c.FormFile(labMouDocumentField)
+		if mouErr != nil {
+			if !errors.Is(mouErr, http.ErrMissingFile) {
+				respondError(c, apperrors.NewBadRequest("mou_document: "+mouErr.Error(), mouErr))
+				return
+			}
+		} else {
+			mou = mouFh
 		}
-		if err := json.Unmarshal([]byte(dataStr), &req); err != nil {
-			respondError(c, apperrors.NewBadRequest("Invalid JSON in data field: "+err.Error(), err))
-			return
+		if dataStr != "" {
+			if err := json.Unmarshal([]byte(dataStr), &req); err != nil {
+				respondError(c, apperrors.NewBadRequest("Invalid JSON in data field: "+err.Error(), err))
+				return
+			}
 		}
 		file, err := c.FormFile(labCollectionPincodesFileField)
 		if err == nil && file != nil {
@@ -234,10 +285,29 @@ func (h *LabHandler) Update(c *gin.Context) {
 			fas := dto.FlexArrayString(pincodesStr)
 			req.CollectionPincodes = &fas
 		}
-	} else {
-		if !middleware.BindJSON(c, &req) {
+		if !req.HasAtLeastOneField() && mou == nil {
+			respondError(c, apperrors.NewBadRequest("multipart request must include 'data' (JSON), CSV 'file' for pincodes, and/or 'mou_document'", nil))
 			return
 		}
+		if mou != nil {
+			lab, updErr := h.svc.UpdateLabWithMoU(c.Request.Context(), params.ID, &req, userID, mou)
+			if updErr != nil {
+				respondError(c, updErr)
+				return
+			}
+			respondData(c, http.StatusOK, lab, "Lab updated successfully", nil)
+			return
+		}
+		lab, updErr := h.svc.UpdateLab(params.ID, &req, userID)
+		if updErr != nil {
+			respondError(c, updErr)
+			return
+		}
+		respondData(c, http.StatusOK, lab, "Lab updated successfully", nil)
+		return
+	}
+	if !middleware.BindJSON(c, &req) {
+		return
 	}
 	if !req.HasAtLeastOneField() {
 		respondError(c, apperrors.NewBadRequest("At least one field is required in the payload to update", nil))

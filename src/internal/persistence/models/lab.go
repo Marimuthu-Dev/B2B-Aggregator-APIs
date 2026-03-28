@@ -22,6 +22,7 @@ type Lab struct {
 	PANNumber                  *string    `gorm:"column:PANNumber;type:varchar(10)"`
 	MOUStartDate               *time.Time `gorm:"column:MOUStartDate;type:date"`
 	MOUEndDate                 *time.Time `gorm:"column:MOUEndDate;type:date"`
+	MoUDocumentURL             *string    `gorm:"column:MoUDocumentURL;type:varchar(500)"`
 	AccreditationID            *int8      `gorm:"column:AccreditationID"`
 	AccreditationExpirationDate *time.Time `gorm:"column:AccreditationExpirationDate;type:date"`
 	CollectionTypes            *string    `gorm:"column:CollectionTypes;type:varchar(10)"` // JSON string

@@ -1,7 +1,11 @@
 package service
 
 import (
+	"context"
 	"errors"
+	"log/slog"
+	"mime/multipart"
+	"strings"
 	"time"
 
 	"b2b-diagnostic-aggregator/apis/internal/apperrors"
@@ -18,7 +22,10 @@ type LabService interface {
 	GetLabByID(id int64) (*domain.Lab, error)
 	GetLabByContactNumber(contactNumber string) (*domain.Lab, error)
 	CreateLab(l *domain.Lab, createdBy int64) error
+	CreateLabWithMoU(ctx context.Context, l *domain.Lab, createdBy int64, mou *multipart.FileHeader) error
 	UpdateLab(id int64, update *dto.LabUpdateRequest, lastUpdatedBy int64) (*domain.Lab, error)
+	UpdateLabWithMoU(ctx context.Context, id int64, update *dto.LabUpdateRequest, lastUpdatedBy int64, mou *multipart.FileHeader) (*domain.Lab, error)
+	GetLabMoUDownloadURL(ctx context.Context, labID int64) (*dto.LabMoUDownloadURLResponse, error)
 	DeleteLab(id int64) error
 	GetActiveLabs() ([]domain.Lab, error)
 	GetLabsByCity(cityID int8) ([]domain.Lab, error)
@@ -26,11 +33,12 @@ type LabService interface {
 }
 
 type labService struct {
-	repo repository.LabRepository
+	repo  repository.LabRepository
+	blobs BlobService
 }
 
-func NewLabService(repo repository.LabRepository) LabService {
-	return &labService{repo: repo}
+func NewLabService(repo repository.LabRepository, blobs BlobService) LabService {
+	return &labService{repo: repo, blobs: blobs}
 }
 
 func (s *labService) ListLabs(filter repository.LabListFilter) ([]domain.Lab, int64, error) {
@@ -62,15 +70,57 @@ func (s *labService) CreateLab(l *domain.Lab, createdBy int64) error {
 	return s.repo.Create(l)
 }
 
-func (s *labService) UpdateLab(id int64, update *dto.LabUpdateRequest, lastUpdatedBy int64) (*domain.Lab, error) {
-	existing, err := s.repo.FindByID(id)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, apperrors.NewNotFound("Lab not found", err)
+func (s *labService) CreateLabWithMoU(ctx context.Context, l *domain.Lab, createdBy int64, mou *multipart.FileHeader) error {
+	if mou != nil {
+		if s.blobs == nil {
+			return apperrors.NewInternal("MoU storage is not configured", nil)
 		}
-		return nil, err
+		if err := s.blobs.ValidatePDF(mou); err != nil {
+			return apperrors.NewBadRequest(err.Error(), err)
+		}
 	}
-	l := *existing
+	now := time.Now()
+	l.CreatedBy = &createdBy
+	l.CreatedOn = timeutil.FromTimePtr(&now)
+	l.LastUpdatedBy = &createdBy
+	l.LastUpdatedOn = timeutil.FromTimePtr(&now)
+	if err := s.repo.Create(l); err != nil {
+		return err
+	}
+	if mou == nil {
+		return nil
+	}
+	rc, err := mou.Open()
+	if err != nil {
+		s.rollbackLabAfterFailedMoU(l.LabID, "open MoU file")
+		return apperrors.NewInternal("Failed to read MoU upload", err)
+	}
+	defer func() { _ = rc.Close() }()
+	url, err := s.blobs.UploadOrReplaceLabMoU(ctx, rc, l.LabID)
+	if err != nil {
+		slog.Error("CreateLabWithMoU: blob upload failed", slog.Int64("labID", l.LabID), slog.Any("err", err))
+		s.rollbackLabAfterFailedMoU(l.LabID, "MoU upload")
+		return apperrors.NewInternal("Failed to upload MoU document", err)
+	}
+	if err := s.repo.UpdateLabMoUURL(l.LabID, url); err != nil {
+		slog.Error("CreateLabWithMoU: save MoU URL failed (lab and blob exist; fix URL or re-run update)",
+			slog.Int64("labID", l.LabID), slog.String("blobURL", url), slog.Any("err", err))
+		return apperrors.NewInternal("Failed to save MoU document URL", err)
+	}
+	l.MoUDocumentURL = &url
+	return nil
+}
+
+func (s *labService) rollbackLabAfterFailedMoU(labID int64, phase string) {
+	if err := s.repo.Delete(labID); err != nil {
+		slog.Error("CreateLabWithMoU: rollback delete failed — orphaned lab row may remain",
+			slog.Int64("labID", labID), slog.String("phase", phase), slog.Any("err", err))
+		return
+	}
+	slog.Info("CreateLabWithMoU: rolled back lab row after MoU failure", slog.Int64("labID", labID), slog.String("phase", phase))
+}
+
+func applyLabUpdatePatch(l *domain.Lab, update *dto.LabUpdateRequest) {
 	if update.LabName != nil {
 		l.LabName = *update.LabName
 	}
@@ -146,6 +196,18 @@ func (s *labService) UpdateLab(id int64, update *dto.LabUpdateRequest, lastUpdat
 	if update.IsActive != nil {
 		l.IsActive = update.IsActive
 	}
+}
+
+func (s *labService) UpdateLab(id int64, update *dto.LabUpdateRequest, lastUpdatedBy int64) (*domain.Lab, error) {
+	existing, err := s.repo.FindByID(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.NewNotFound("Lab not found", err)
+		}
+		return nil, err
+	}
+	l := *existing
+	applyLabUpdatePatch(&l, update)
 	l.LabID = id
 	l.LastUpdatedBy = &lastUpdatedBy
 	now := time.Now()
@@ -154,6 +216,124 @@ func (s *labService) UpdateLab(id int64, update *dto.LabUpdateRequest, lastUpdat
 		return nil, err
 	}
 	return &l, nil
+}
+
+func (s *labService) UpdateLabWithMoU(ctx context.Context, id int64, update *dto.LabUpdateRequest, lastUpdatedBy int64, mou *multipart.FileHeader) (*domain.Lab, error) {
+	hasFile := mou != nil
+	hasFields := update != nil && update.HasAtLeastOneField()
+	if !hasFile && !hasFields {
+		return nil, apperrors.NewBadRequest("At least one field in data or mou_document is required", nil)
+	}
+	if hasFile {
+		if s.blobs == nil {
+			return nil, apperrors.NewInternal("MoU storage is not configured", nil)
+		}
+		if err := s.blobs.ValidatePDF(mou); err != nil {
+			return nil, apperrors.NewBadRequest(err.Error(), err)
+		}
+	}
+
+	existing, err := s.repo.FindByID(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.NewNotFound("Lab not found", err)
+		}
+		return nil, err
+	}
+	snapshot := *existing
+
+	if hasFields && !hasFile {
+		l := *existing
+		applyLabUpdatePatch(&l, update)
+		l.LabID = id
+		l.LastUpdatedBy = &lastUpdatedBy
+		now := time.Now()
+		l.LastUpdatedOn = timeutil.FromTimePtr(&now)
+		if err := s.repo.Update(&l); err != nil {
+			return nil, err
+		}
+		return &l, nil
+	}
+
+	if hasFields {
+		l := *existing
+		applyLabUpdatePatch(&l, update)
+		l.LabID = id
+		l.LastUpdatedBy = &lastUpdatedBy
+		now := time.Now()
+		l.LastUpdatedOn = timeutil.FromTimePtr(&now)
+		if err := s.repo.Update(&l); err != nil {
+			return nil, err
+		}
+	}
+
+	rc, err := mou.Open()
+	if err != nil {
+		if hasFields {
+			s.rollbackLabUpdateAfterMoUFailure(id, &snapshot, "open MoU file")
+		}
+		return nil, apperrors.NewInternal("Failed to read MoU upload", err)
+	}
+	defer func() { _ = rc.Close() }()
+
+	url, err := s.blobs.UploadOrReplaceLabMoU(ctx, rc, id)
+	if err != nil {
+		slog.Error("UpdateLabWithMoU: blob upload failed", slog.Int64("labID", id), slog.Any("err", err))
+		if hasFields {
+			s.rollbackLabUpdateAfterMoUFailure(id, &snapshot, "MoU upload")
+		}
+		return nil, apperrors.NewInternal("Failed to upload MoU document", err)
+	}
+
+	latest, err := s.repo.FindByID(id)
+	if err != nil {
+		return nil, err
+	}
+	out := *latest
+	out.MoUDocumentURL = &url
+	out.LabID = id
+	out.LastUpdatedBy = &lastUpdatedBy
+	now := time.Now()
+	out.LastUpdatedOn = timeutil.FromTimePtr(&now)
+	if err := s.repo.Update(&out); err != nil {
+		slog.Error("UpdateLabWithMoU: save MoU URL failed after successful upload",
+			slog.Int64("labID", id), slog.String("blobURL", url), slog.Any("err", err))
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (s *labService) rollbackLabUpdateAfterMoUFailure(labID int64, snapshot *domain.Lab, phase string) {
+	restored := *snapshot
+	restored.LabID = labID
+	if err := s.repo.Update(&restored); err != nil {
+		slog.Error("UpdateLabWithMoU: rollback failed — lab row may still reflect partial update",
+			slog.Int64("labID", labID), slog.String("phase", phase), slog.Any("err", err))
+		return
+	}
+	slog.Info("UpdateLabWithMoU: rolled back lab row after MoU failure", slog.Int64("labID", labID), slog.String("phase", phase))
+}
+
+func (s *labService) GetLabMoUDownloadURL(ctx context.Context, labID int64) (*dto.LabMoUDownloadURLResponse, error) {
+	if s.blobs == nil {
+		return nil, apperrors.NewInternal("MoU storage is not configured", nil)
+	}
+	lab, err := s.repo.FindByID(labID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.NewNotFound("Lab not found", err)
+		}
+		return nil, err
+	}
+	if lab.MoUDocumentURL == nil || strings.TrimSpace(*lab.MoUDocumentURL) == "" {
+		return nil, apperrors.NewNotFound("No MoU document for this lab", nil)
+	}
+	urlStr, exp, err := s.blobs.LabMoUDownloadSASURL(ctx, labID)
+	if err != nil {
+		slog.Error("GetLabMoUDownloadURL: SAS signing failed", slog.Int64("labID", labID), slog.Any("err", err))
+		return nil, apperrors.NewInternal("Failed to generate download link", err)
+	}
+	return &dto.LabMoUDownloadURLResponse{URL: urlStr, ExpiresAt: exp}, nil
 }
 
 func (s *labService) DeleteLab(id int64) error {
