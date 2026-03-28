@@ -3,6 +3,8 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -15,6 +17,23 @@ type Config struct {
 	JWT         JWTConfig
 	Log         LogConfig
 	Domains     DomainURLs
+	AzureBlob   AzureBlobConfig
+}
+
+const defaultMoUMaxBytes = 5 * 1024 * 1024
+
+// AzureBlobConfig holds MoU PDF blob settings (from environment).
+//
+// Environment variables:
+//   - AZURE_STORAGE_CONNECTION_STRING — full Azure Storage connection string (optional; empty disables uploads)
+//   - AZURE_CONTAINER_NAME — blob container name (default: legal-documents)
+//   - MOU_MAX_UPLOAD_BYTES — max PDF size in bytes (default: 5242880 = 5 MiB)
+//   - MOU_UPLOAD_TIMEOUT_SECONDS — per-upload timeout toward Azure (default: 60)
+type AzureBlobConfig struct {
+	ConnectionString string
+	ContainerName    string
+	MoUMaxBytes      int64
+	UploadTimeout    time.Duration
 }
 
 type DBConfig struct {
@@ -48,11 +67,12 @@ type DomainURLs struct {
 }
 
 func LoadConfig() *Config {
-	// Try common .env locations (cwd, repo root, or parent).
-	if err := godotenv.Load(); err != nil {
-		_ = godotenv.Load("../.env")
-		_ = godotenv.Load("../../.env")
-	}
+	// Load .env from typical locations: cwd, src/.env when cwd is repo root, parents.
+	_ = godotenv.Load()
+	_ = godotenv.Load(".env")
+	_ = godotenv.Load("src/.env")
+	_ = godotenv.Load("../.env")
+	_ = godotenv.Load("../../.env")
 
 	return &Config{
 		Environment: getEnv("ENVIRONMENT", "development"),
@@ -84,7 +104,52 @@ func LoadConfig() *Config {
 			Employee: getEnv("EMPLOYEE_DOMAIN_URL", ""),
 			Lab:      getEnv("LAB_DOMAIN_URL", ""),
 		},
+		AzureBlob: loadAzureBlobConfig(),
 	}
+}
+
+func loadAzureBlobConfig() AzureBlobConfig {
+	maxBytes := getEnvAsInt64("MOU_MAX_UPLOAD_BYTES", defaultMoUMaxBytes)
+	if maxBytes <= 0 {
+		maxBytes = defaultMoUMaxBytes
+	}
+	timeoutSec := getEnvAsInt("MOU_UPLOAD_TIMEOUT_SECONDS", 60)
+	if timeoutSec <= 0 {
+		timeoutSec = 60
+	}
+	container := strings.TrimSpace(getEnv("AZURE_CONTAINER_NAME", "legal-documents"))
+	if container == "" {
+		container = "legal-documents"
+	}
+	return AzureBlobConfig{
+		ConnectionString: trimSurroundingQuotes(getEnv("AZURE_STORAGE_CONNECTION_STRING", "")),
+		ContainerName:    container,
+		MoUMaxBytes:      maxBytes,
+		UploadTimeout:    time.Duration(timeoutSec) * time.Second,
+	}
+}
+
+// trimSurroundingQuotes removes one pair of ASCII single or double quotes (common in .env files).
+func trimSurroundingQuotes(s string) string {
+	s = strings.TrimSpace(s)
+	if len(s) < 2 {
+		return s
+	}
+	if (s[0] == '"' && s[len(s)-1] == '"') || (s[0] == '\'' && s[len(s)-1] == '\'') {
+		return s[1 : len(s)-1]
+	}
+	return s
+}
+
+func getEnvAsInt64(key string, defaultValue int64) int64 {
+	valueStr := getEnv(key, "")
+	if valueStr == "" {
+		return defaultValue
+	}
+	if value, err := strconv.ParseInt(valueStr, 10, 64); err == nil {
+		return value
+	}
+	return defaultValue
 }
 
 func getEnv(key, defaultValue string) string {

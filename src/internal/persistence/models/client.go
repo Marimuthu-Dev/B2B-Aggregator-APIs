@@ -28,6 +28,7 @@ type Client struct {
 	IsAcitve                  bool      `gorm:"column:IsAcitve;not null"` // Note: typo in DB (IsAcitve)
 	MOUStartDate              *time.Time `gorm:"column:MOUStartDate;type:date"`
 	MOUEndDate                *time.Time `gorm:"column:MOUEndDate;type:date"`
+	MoUDocumentURL            *string   `gorm:"column:MoUDocumentURL;type:varchar(500)"`
 	CreatedBy                 int64     `gorm:"column:CreatedBy;not null"`
 	CreatedOn                 time.Time `gorm:"column:CreatedOn;not null;default:GETDATE()"`
 	LastUpdatedBy             int64     `gorm:"column:LastUpdatedBy;not null"`

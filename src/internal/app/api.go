@@ -2,13 +2,17 @@ package app
 
 import (
 	"log"
+	"log/slog"
 	"os"
+	"strings"
 
 	"b2b-diagnostic-aggregator/apis/internal/config"
+	"b2b-diagnostic-aggregator/apis/internal/dto"
 	"b2b-diagnostic-aggregator/apis/internal/handlers"
 	"b2b-diagnostic-aggregator/apis/internal/logging"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/service"
+	"b2b-diagnostic-aggregator/apis/internal/storage"
 
 	"github.com/gin-gonic/gin"
 )
@@ -55,7 +59,16 @@ func Run() error {
 	// Initialize Services
 	packageSvc := service.NewPackageService(packageRepo, testRepo, packageClientMapRepo, packageLabMapRepo, clientRepo, labRepo)
 	loginSvc := service.NewLoginService(loginRepo, forgotPasswordRepo, clientRepo, employeeRepo, labRepo, cfg.JWT)
-	clientSvc := service.NewClientService(clientRepo)
+	var blobSvc service.BlobService
+	if strings.TrimSpace(cfg.AzureBlob.ConnectionString) != "" {
+		bs, err := storage.NewAzureMoUBlobService(cfg.AzureBlob, slog.Default())
+		if err != nil {
+			log.Printf("MoU Azure Blob disabled (invalid config): %v", err)
+		} else {
+			blobSvc = bs
+		}
+	}
+	clientSvc := service.NewClientService(clientRepo, blobSvc)
 	clientLocationSvc := service.NewClientLocationService(clientLocationRepo)
 	employeeSvc := service.NewEmployeeService(employeeRepo)
 	labSvc := service.NewLabService(labRepo)
@@ -74,6 +87,7 @@ func Run() error {
 
 	// Initialize Gin
 	r := gin.Default()
+	r.MaxMultipartMemory = dto.MultipartFormMaxMemory
 	r.RedirectTrailingSlash = false // allow both /path and /path/ without 301 redirect (e.g. for FE clients that use trailing slash)
 	registerMiddleware(r, dbReady)
 

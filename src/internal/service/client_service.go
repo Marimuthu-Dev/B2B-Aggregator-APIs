@@ -1,7 +1,10 @@
 package service
 
 import (
+	"context"
 	"errors"
+	"log/slog"
+	"mime/multipart"
 	"time"
 
 	"b2b-diagnostic-aggregator/apis/internal/apperrors"
@@ -18,7 +21,9 @@ type ClientService interface {
 	GetClientByID(id int64) (*domain.Client, error)
 	GetClientByContactNumber(contactNumber string) (*domain.Client, error)
 	CreateClient(c *domain.Client, createdBy int64) error
+	CreateClientWithMoU(ctx context.Context, c *domain.Client, createdBy int64, mou *multipart.FileHeader) error
 	UpdateClient(id int64, update *dto.ClientUpdateRequest, lastUpdatedBy int64) (*domain.Client, error)
+	UpdateClientWithMoU(ctx context.Context, id int64, update *dto.ClientUpdateRequest, lastUpdatedBy int64, mou *multipart.FileHeader) (*domain.Client, error)
 	DeleteClient(id int64) error
 	GetActiveClients() ([]domain.Client, error)
 	GetClientsByCity(cityID int8) ([]domain.Client, error)
@@ -26,11 +31,12 @@ type ClientService interface {
 }
 
 type clientService struct {
-	repo repository.ClientRepository
+	repo  repository.ClientRepository
+	blobs BlobService
 }
 
-func NewClientService(repo repository.ClientRepository) ClientService {
-	return &clientService{repo: repo}
+func NewClientService(repo repository.ClientRepository, blobs BlobService) ClientService {
+	return &clientService{repo: repo, blobs: blobs}
 }
 
 func (s *clientService) ListClients(filter repository.ClientListFilter) ([]domain.Client, int64, error) {
@@ -62,16 +68,68 @@ func (s *clientService) CreateClient(c *domain.Client, createdBy int64) error {
 	return s.repo.Create(c)
 }
 
-func (s *clientService) UpdateClient(id int64, update *dto.ClientUpdateRequest, lastUpdatedBy int64) (*domain.Client, error) {
-	existing, err := s.repo.FindByID(id)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, apperrors.NewNotFound("Client not found", err)
+func (s *clientService) CreateClientWithMoU(ctx context.Context, c *domain.Client, createdBy int64, mou *multipart.FileHeader) error {
+	if mou != nil {
+		if s.blobs == nil {
+			return apperrors.NewInternal("MoU storage is not configured", nil)
 		}
-		return nil, err
+		if err := s.blobs.ValidatePDF(mou); err != nil {
+			return apperrors.NewBadRequest(err.Error(), err)
+		}
 	}
 
-	c := *existing
+	now := time.Now()
+	c.CreatedBy = createdBy
+	c.CreatedOn = timeutil.FromTime(now)
+	c.LastUpdatedBy = createdBy
+	c.LastUpdatedOn = timeutil.FromTime(now)
+	if err := s.repo.Create(c); err != nil {
+		return err
+	}
+	if mou == nil {
+		return nil
+	}
+
+	rc, err := mou.Open()
+	if err != nil {
+		s.rollbackClientAfterFailedMoU(c.ClientID, "open MoU file")
+		return apperrors.NewInternal("Failed to read MoU upload", err)
+	}
+	defer func() { _ = rc.Close() }()
+
+	url, err := s.blobs.UploadOrReplace(ctx, rc, c.ClientID)
+	if err != nil {
+		slog.Error("CreateClientWithMoU: blob upload failed", slog.Int64("clientID", c.ClientID), slog.Any("err", err))
+		s.rollbackClientAfterFailedMoU(c.ClientID, "MoU upload")
+		return apperrors.NewInternal("Failed to upload MoU document", err)
+	}
+	if err := s.repo.UpdateClientMoUURL(c.ClientID, url); err != nil {
+		slog.Error("CreateClientWithMoU: save MoU URL failed (client and blob exist; fix URL or re-run update)",
+			slog.Int64("clientID", c.ClientID), slog.String("blobURL", url), slog.Any("err", err))
+		return apperrors.NewInternal("Failed to save MoU document URL", err)
+	}
+	c.MoUDocumentURL = &url
+	return nil
+}
+
+// rollbackClientAfterFailedMoU deletes the client row so we do not keep a client without a stored MoU
+// when the create+MoU flow failed after insert (upload or URL persistence).
+func (s *clientService) rollbackClientAfterFailedMoU(clientID int64, phase string) {
+	if err := s.repo.Delete(clientID); err != nil {
+		slog.Error("CreateClientWithMoU: rollback delete failed — orphaned client row may remain",
+			slog.Int64("clientID", clientID),
+			slog.String("phase", phase),
+			slog.Any("err", err),
+		)
+		return
+	}
+	slog.Info("CreateClientWithMoU: rolled back client row after MoU failure",
+		slog.Int64("clientID", clientID),
+		slog.String("phase", phase),
+	)
+}
+
+func applyClientUpdatePatch(c *domain.Client, update *dto.ClientUpdateRequest) {
 	if update.ClientName != nil {
 		c.ClientName = *update.ClientName
 	}
@@ -122,7 +180,7 @@ func (s *clientService) UpdateClient(id int64, update *dto.ClientUpdateRequest, 
 	}
 	if update.BusinessVertical != nil {
 		c.BusinessVertical = *update.BusinessVertical
-	}	
+	}
 	if update.BillingName != nil {
 		c.BillingName = update.BillingName
 	}
@@ -143,6 +201,69 @@ func (s *clientService) UpdateClient(id int64, update *dto.ClientUpdateRequest, 
 	}
 	if update.MOUEndDate != nil {
 		c.MOUEndDate = timeutil.FromTimePtr(update.MOUEndDate)
+	}
+}
+
+func (s *clientService) UpdateClient(id int64, update *dto.ClientUpdateRequest, lastUpdatedBy int64) (*domain.Client, error) {
+	existing, err := s.repo.FindByID(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.NewNotFound("Client not found", err)
+		}
+		return nil, err
+	}
+
+	c := *existing
+	applyClientUpdatePatch(&c, update)
+	c.ClientID = id
+	c.LastUpdatedBy = lastUpdatedBy
+	c.LastUpdatedOn = timeutil.FromTime(time.Now())
+	if err := s.repo.Update(&c); err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
+func (s *clientService) UpdateClientWithMoU(ctx context.Context, id int64, update *dto.ClientUpdateRequest, lastUpdatedBy int64, mou *multipart.FileHeader) (*domain.Client, error) {
+	hasFile := mou != nil
+	hasFields := update != nil && update.HasAtLeastOneField()
+	if !hasFile && !hasFields {
+		return nil, apperrors.NewBadRequest("At least one field or mou_document is required", nil)
+	}
+	if hasFile {
+		if s.blobs == nil {
+			return nil, apperrors.NewInternal("MoU storage is not configured", nil)
+		}
+		if err := s.blobs.ValidatePDF(mou); err != nil {
+			return nil, apperrors.NewBadRequest(err.Error(), err)
+		}
+	}
+
+	existing, err := s.repo.FindByID(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.NewNotFound("Client not found", err)
+		}
+		return nil, err
+	}
+
+	c := *existing
+	if hasFields {
+		applyClientUpdatePatch(&c, update)
+	}
+
+	if hasFile {
+		rc, err := mou.Open()
+		if err != nil {
+			return nil, apperrors.NewInternal("Failed to read MoU upload", err)
+		}
+		defer func() { _ = rc.Close() }()
+		url, err := s.blobs.UploadOrReplace(ctx, rc, id)
+		if err != nil {
+			slog.Error("UpdateClientWithMoU: blob upload failed", slog.Int64("clientID", id), slog.Any("err", err))
+			return nil, apperrors.NewInternal("Failed to upload MoU document", err)
+		}
+		c.MoUDocumentURL = &url
 	}
 
 	c.ClientID = id

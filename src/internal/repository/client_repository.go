@@ -17,6 +17,7 @@ type ClientRepository interface {
 	ExistsByID(id int64) (bool, error)
 	Create(c *domain.Client) error
 	Update(c *domain.Client) error
+	UpdateClientMoUURL(clientID int64, url string) error
 	Delete(id int64) error
 	FindAllActive() ([]domain.Client, error)
 	FindByContactNumber(contactNumber string) (*domain.Client, error)
@@ -126,6 +127,12 @@ func (r *clientRepository) Update(c *domain.Client) error {
 	}
 	*c = mapClientToDomain(persist)
 	return nil
+}
+
+func (r *clientRepository) UpdateClientMoUURL(clientID int64, url string) error {
+	return r.db.Model(&persistencemodels.Client{}).
+		Where("ClientID = ?", clientID).
+		Update("MoUDocumentURL", url).Error
 }
 
 func (r *clientRepository) Delete(id int64) error {

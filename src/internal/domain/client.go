@@ -28,6 +28,7 @@ type Client struct {
 	IsAcitve                  bool
 	MOUStartDate              *timeutil.ISTTime
 	MOUEndDate                *timeutil.ISTTime
+	MoUDocumentURL            *string
 	CreatedBy                 int64
 	CreatedOn                 timeutil.ISTTime
 	LastUpdatedBy             int64

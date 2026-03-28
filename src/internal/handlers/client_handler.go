@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 
 	"b2b-diagnostic-aggregator/apis/internal/apperrors"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
@@ -93,6 +94,20 @@ func (h *ClientHandler) Create(c *gin.Context) {
 		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
 		return
 	}
+	if isMultipartForm(c) {
+		req, mou, err := dto.ParseClientMultipartCreate(c)
+		if err != nil {
+			respondError(c, apperrors.NewBadRequest(err.Error(), err))
+			return
+		}
+		client := req.ToDomain()
+		if err := h.svc.CreateClientWithMoU(c.Request.Context(), &client, userID, mou); err != nil {
+			respondError(c, err)
+			return
+		}
+		respondData(c, http.StatusCreated, client, "Client created successfully", nil)
+		return
+	}
 	var req dto.ClientRequest
 	if !middleware.BindJSON(c, &req) {
 		return
@@ -118,6 +133,26 @@ func (h *ClientHandler) Update(c *gin.Context) {
 	if !middleware.RequirePositiveID(c, params.ID) {
 		return
 	}
+	if isMultipartForm(c) {
+		update, mou, err := dto.ParseClientMultipartUpdate(c)
+		if err != nil {
+			respondError(c, apperrors.NewBadRequest(err.Error(), err))
+			return
+		}
+		hasFile := mou != nil
+		hasFields := update != nil && update.HasAtLeastOneField()
+		if !hasFile && !hasFields {
+			respondError(c, apperrors.NewBadRequest("At least one field or mou_document is required", nil))
+			return
+		}
+		client, err := h.svc.UpdateClientWithMoU(c.Request.Context(), params.ID, update, userID, mou)
+		if err != nil {
+			respondError(c, err)
+			return
+		}
+		respondData(c, http.StatusOK, client, "Client updated successfully", nil)
+		return
+	}
 	var req dto.ClientUpdateRequest
 	if !middleware.BindJSON(c, &req) {
 		return
@@ -132,6 +167,15 @@ func (h *ClientHandler) Update(c *gin.Context) {
 		return
 	}
 	respondData(c, http.StatusOK, client, "Client updated successfully", nil)
+}
+
+func isMultipartForm(c *gin.Context) bool {
+	ct := c.ContentType()
+	if ct == "" {
+		return false
+	}
+	base := strings.ToLower(strings.TrimSpace(strings.Split(ct, ";")[0]))
+	return base == "multipart/form-data"
 }
 
 func (h *ClientHandler) Delete(c *gin.Context) {

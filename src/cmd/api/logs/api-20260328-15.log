@@ -1,0 +1,4 @@
+{"timestamp":"2026-03-28T15:30:32Z","context_id":"45f20c72f52a3fcab92b3169ef5dfd69","level":"info","event":"http_request","method":"POST","path":"/api/v1/clients","status":400,"duration_ms":32,"request_id":"3141ba2c6f1c19fbaa9a7287e66d800a","trace_id":"3141ba2c6f1c19fbaa9a7287e66d800a"}
+Server running on port 5000
+{"timestamp":"2026-03-28T15:59:18Z","context_id":"1083424936034f8d77666f3933af0f5f","level":"info","event":"http_request","method":"POST","path":"/api/v1/clients","status":401,"duration_ms":0,"request_id":"2ece40894572e210c3defb509aff9878","trace_id":"2ece40894572e210c3defb509aff9878"}
+{"timestamp":"2026-03-28T15:59:49Z","context_id":"9e3b480b9c5b59ff3e1a42ba1a7b897a","level":"info","event":"http_request","method":"POST","path":"/api/v1/clients","status":500,"duration_ms":592,"request_id":"3d6e19e0003a555c9e494f374bb53b15","trace_id":"3d6e19e0003a555c9e494f374bb53b15"}
