@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"mime/multipart"
+	"strings"
 	"time"
 
 	"b2b-diagnostic-aggregator/apis/internal/apperrors"
@@ -28,6 +29,7 @@ type ClientService interface {
 	GetActiveClients() ([]domain.Client, error)
 	GetClientsByCity(cityID int8) ([]domain.Client, error)
 	GetClientsByState(stateID int8) ([]domain.Client, error)
+	GetClientMoUDownloadURL(ctx context.Context, clientID int64) (*dto.ClientMoUDownloadURLResponse, error)
 }
 
 type clientService struct {
@@ -296,4 +298,26 @@ func (s *clientService) GetClientsByCity(cityID int8) ([]domain.Client, error) {
 
 func (s *clientService) GetClientsByState(stateID int8) ([]domain.Client, error) {
 	return s.repo.FindByState(stateID)
+}
+
+func (s *clientService) GetClientMoUDownloadURL(ctx context.Context, clientID int64) (*dto.ClientMoUDownloadURLResponse, error) {
+	if s.blobs == nil {
+		return nil, apperrors.NewInternal("MoU storage is not configured", nil)
+	}
+	c, err := s.repo.FindByID(clientID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.NewNotFound("Client not found", err)
+		}
+		return nil, err
+	}
+	if c.MoUDocumentURL == nil || strings.TrimSpace(*c.MoUDocumentURL) == "" {
+		return nil, apperrors.NewNotFound("No MoU document for this client", nil)
+	}
+	urlStr, exp, err := s.blobs.MoUDownloadSASURL(ctx, clientID)
+	if err != nil {
+		slog.Error("GetClientMoUDownloadURL: SAS signing failed", slog.Int64("clientID", clientID), slog.Any("err", err))
+		return nil, apperrors.NewInternal("Failed to generate download link", err)
+	}
+	return &dto.ClientMoUDownloadURLResponse{URL: urlStr, ExpiresAt: exp}, nil
 }

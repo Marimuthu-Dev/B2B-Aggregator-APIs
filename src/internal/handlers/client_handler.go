@@ -75,6 +75,23 @@ func (h *ClientHandler) GetByID(c *gin.Context) {
 	respondData(c, http.StatusOK, data, "Success", nil)
 }
 
+// GetMoUDownloadURL returns a short-lived SAS URL to view/download the client's MoU PDF (requires auth).
+func (h *ClientHandler) GetMoUDownloadURL(c *gin.Context) {
+	var params dto.IDParam
+	if !middleware.BindUri(c, &params) {
+		return
+	}
+	if !middleware.RequirePositiveID(c, params.ID) {
+		return
+	}
+	data, err := h.svc.GetClientMoUDownloadURL(c.Request.Context(), params.ID)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	respondData(c, http.StatusOK, data, "Success", nil)
+}
+
 func (h *ClientHandler) GetByContactNumber(c *gin.Context) {
 	var query dto.ContactNumberQuery
 	if !middleware.BindQuery(c, &query) {

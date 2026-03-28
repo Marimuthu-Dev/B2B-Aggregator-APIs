@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"mime/multipart"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/sas"
 	"github.com/gabriel-vasile/mimetype"
 
 	"b2b-diagnostic-aggregator/apis/internal/config"
@@ -25,9 +27,12 @@ const pdfContentType = "application/pdf"
 // AzureMoUBlobService streams MoU PDFs to Azure Blob Storage using a fixed blob name per client.
 type AzureMoUBlobService struct {
 	client        *azblob.Client
+	sharedKey     *azblob.SharedKeyCredential
+	accountName   string
 	container     string
 	maxBytes      int64
 	uploadTimeout time.Duration
+	sasTTL        time.Duration
 	log           *slog.Logger
 }
 
@@ -43,14 +48,29 @@ func NewAzureMoUBlobService(cfg config.AzureBlobConfig, log *slog.Logger) (*Azur
 	if err != nil {
 		return nil, fmt.Errorf("azure blob: create client: %w", err)
 	}
+	acc, key, err := parseAzureConnectionString(cfg.ConnectionString)
+	if err != nil {
+		return nil, fmt.Errorf("azure blob: connection string: %w", err)
+	}
+	sk, err := azblob.NewSharedKeyCredential(acc, key)
+	if err != nil {
+		return nil, fmt.Errorf("azure blob: shared key credential: %w", err)
+	}
+	sasTTL := cfg.MoUSASTTL
+	if sasTTL <= 0 {
+		sasTTL = 15 * time.Minute
+	}
 	if log == nil {
 		log = slog.Default()
 	}
 	s := &AzureMoUBlobService{
 		client:        cli,
+		sharedKey:     sk,
+		accountName:   acc,
 		container:     cfg.ContainerName,
 		maxBytes:      cfg.MoUMaxBytes,
 		uploadTimeout: cfg.UploadTimeout,
+		sasTTL:        sasTTL,
 		log:           log,
 	}
 	return s, nil
@@ -178,6 +198,34 @@ attempts:
 		slog.String("azure_error", formatAzureError(lastErr)),
 	)
 	return "", fmt.Errorf("azure blob upload: %w", lastErr)
+}
+
+// MoUDownloadSASURL returns an HTTPS URL with read-only SAS query parameters for client-{clientID}-mou.pdf.
+func (s *AzureMoUBlobService) MoUDownloadSASURL(ctx context.Context, clientID int64) (string, time.Time, error) {
+	_ = ctx
+	if s.sharedKey == nil || s.accountName == "" {
+		return "", time.Time{}, errors.New("azure blob: SAS signing unavailable")
+	}
+	blobName := mouBlobName(clientID)
+	expires := time.Now().UTC().Add(s.sasTTL)
+	start := time.Now().UTC().Add(-2 * time.Minute)
+	qp, err := sas.BlobSignatureValues{
+		Protocol:      sas.ProtocolHTTPS,
+		StartTime:     start,
+		ExpiryTime:    expires,
+		Permissions:   (&sas.BlobPermissions{Read: true}).String(),
+		ContainerName: s.container,
+		BlobName:      blobName,
+	}.SignWithSharedKey(s.sharedKey)
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("azure blob: sign SAS: %w", err)
+	}
+	u := fmt.Sprintf("https://%s.blob.core.windows.net/%s/%s?%s",
+		s.accountName,
+		url.PathEscape(s.container),
+		url.PathEscape(blobName),
+		qp.Encode())
+	return u, expires, nil
 }
 
 func formatAzureError(err error) string {

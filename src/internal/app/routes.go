@@ -102,6 +102,7 @@ func registerClientRoutes(api *gin.RouterGroup, handler *handlers.ClientHandler)
 	{
 		clients.GET("", handler.GetAll)
 		clients.GET("/", handler.GetAll)
+		clients.GET("/:id/mou/download-url", handler.GetMoUDownloadURL)
 		clients.GET("/:id", handler.GetByID)
 		clients.GET("/contact", handler.GetByContactNumber)
 		clients.POST("", handler.Create)
