@@ -249,32 +249,82 @@ func (s *clientService) UpdateClientWithMoU(ctx context.Context, id int64, updat
 		return nil, err
 	}
 
-	c := *existing
-	if hasFields {
+	snapshot := *existing
+
+	// Multipart/JSON: fields only, no file — single update (same as UpdateClient).
+	if hasFields && !hasFile {
+		c := *existing
 		applyClientUpdatePatch(&c, update)
+		c.ClientID = id
+		c.LastUpdatedBy = lastUpdatedBy
+		c.LastUpdatedOn = timeutil.FromTime(time.Now())
+		if err := s.repo.Update(&c); err != nil {
+			return nil, err
+		}
+		return &c, nil
 	}
 
-	if hasFile {
-		rc, err := mou.Open()
-		if err != nil {
-			return nil, apperrors.NewInternal("Failed to read MoU upload", err)
+	// hasFile == true from here.
+
+	// If both field changes and MoU upload: persist fields first, then upload; on upload/open failure revert row to snapshot.
+	if hasFields {
+		c := *existing
+		applyClientUpdatePatch(&c, update)
+		c.ClientID = id
+		c.LastUpdatedBy = lastUpdatedBy
+		c.LastUpdatedOn = timeutil.FromTime(time.Now())
+		if err := s.repo.Update(&c); err != nil {
+			return nil, err
 		}
-		defer func() { _ = rc.Close() }()
-		url, err := s.blobs.UploadOrReplace(ctx, rc, id)
-		if err != nil {
-			slog.Error("UpdateClientWithMoU: blob upload failed", slog.Int64("clientID", id), slog.Any("err", err))
-			return nil, apperrors.NewInternal("Failed to upload MoU document", err)
-		}
-		c.MoUDocumentURL = &url
 	}
 
-	c.ClientID = id
-	c.LastUpdatedBy = lastUpdatedBy
-	c.LastUpdatedOn = timeutil.FromTime(time.Now())
-	if err := s.repo.Update(&c); err != nil {
+	rc, err := mou.Open()
+	if err != nil {
+		if hasFields {
+			s.rollbackClientUpdateAfterMoUFailure(id, &snapshot, "open MoU file")
+		}
+		return nil, apperrors.NewInternal("Failed to read MoU upload", err)
+	}
+	defer func() { _ = rc.Close() }()
+
+	url, err := s.blobs.UploadOrReplace(ctx, rc, id)
+	if err != nil {
+		slog.Error("UpdateClientWithMoU: blob upload failed", slog.Int64("clientID", id), slog.Any("err", err))
+		if hasFields {
+			s.rollbackClientUpdateAfterMoUFailure(id, &snapshot, "MoU upload")
+		}
+		return nil, apperrors.NewInternal("Failed to upload MoU document", err)
+	}
+
+	latest, err := s.repo.FindByID(id)
+	if err != nil {
 		return nil, err
 	}
-	return &c, nil
+	out := *latest
+	out.MoUDocumentURL = &url
+	out.ClientID = id
+	out.LastUpdatedBy = lastUpdatedBy
+	out.LastUpdatedOn = timeutil.FromTime(time.Now())
+	if err := s.repo.Update(&out); err != nil {
+		slog.Error("UpdateClientWithMoU: save MoU URL failed after successful upload",
+			slog.Int64("clientID", id), slog.String("blobURL", url), slog.Any("err", err))
+		return nil, err
+	}
+	return &out, nil
+}
+
+// rollbackClientUpdateAfterMoUFailure restores the client row to snapshot (state before this PUT’s field update)
+// when MoU open/upload failed after fields were already saved.
+func (s *clientService) rollbackClientUpdateAfterMoUFailure(clientID int64, snapshot *domain.Client, phase string) {
+	restored := *snapshot
+	restored.ClientID = clientID
+	if err := s.repo.Update(&restored); err != nil {
+		slog.Error("UpdateClientWithMoU: rollback failed — client row may still reflect partial update",
+			slog.Int64("clientID", clientID), slog.String("phase", phase), slog.Any("err", err))
+		return
+	}
+	slog.Info("UpdateClientWithMoU: rolled back client row after MoU failure",
+		slog.Int64("clientID", clientID), slog.String("phase", phase))
 }
 
 func (s *clientService) DeleteClient(id int64) error {
