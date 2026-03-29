@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"b2b-diagnostic-aggregator/apis/internal/apperrors"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
@@ -145,6 +146,53 @@ func (h *LeadHandler) BulkUpdateStatus(c *gin.Context) {
 		return
 	}
 	respondData(c, http.StatusOK, gin.H{"updatedCount": count}, "Lead statuses updated successfully", nil)
+}
+
+func (h *LeadHandler) UploadReport(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+		return
+	}
+	var params dto.IDParam
+	if !middleware.BindUri(c, &params) {
+		return
+	}
+	if !middleware.RequirePositiveID(c, params.ID) {
+		return
+	}
+	fh, err := c.FormFile("file")
+	if err != nil || fh == nil {
+		respondError(c, apperrors.NewBadRequest("PDF file is required", err))
+		return
+	}
+
+	reportURL, err := h.svc.UploadBloodTestReport(c.Request.Context(), params.ID, userID, fh)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	respondData(c, http.StatusOK, gin.H{"reportUrl": reportURL}, "Report uploaded successfully", nil)
+}
+
+// GetReportDownloadURL returns a short-lived SAS URL to view/download the lead's blood test report PDF.
+func (h *LeadHandler) GetReportDownloadURL(c *gin.Context) {
+	var params dto.IDParam
+	if !middleware.BindUri(c, &params) {
+		return
+	}
+	if !middleware.RequirePositiveID(c, params.ID) {
+		return
+	}
+	downloadURL, expiresAt, err := h.svc.GetLeadReportDownloadURL(c.Request.Context(), params.ID)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	respondData(c, http.StatusOK, gin.H{
+		"downloadUrl": downloadURL,
+		"expiresAt":   expiresAt.UTC().Format(time.RFC3339),
+	}, "Success", nil)
 }
 
 func (h *LeadHandler) BulkImportCsv(c *gin.Context) {

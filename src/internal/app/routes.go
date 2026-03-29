@@ -166,6 +166,8 @@ func registerLeadRoutes(api *gin.RouterGroup, handler *handlers.LeadHandler) {
 		leads.DELETE("/:id", handler.Delete)
 		leads.POST("/bulk-status", handler.BulkUpdateStatus)
 		leads.POST("/bulk-csv", handler.BulkImportCsv)
+		leads.POST("/:id/upload-report", handler.UploadReport)
+		leads.GET("/:id/report/download-url", handler.GetReportDownloadURL)
 	}
 }
 

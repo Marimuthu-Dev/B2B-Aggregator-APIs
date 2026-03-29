@@ -17,6 +17,7 @@ type Lead struct {
 	StateID       int8      `gorm:"column:StateID;not null"`
 	Pincode       string    `gorm:"column:Pincode;type:varchar(6);not null"`
 	LeadStatusID  int8      `gorm:"column:LeadStatusID;not null"`
+	ReportURL     *string   `gorm:"column:ReportURL;type:varchar(500)"`
 	CreatedBy     int64     `gorm:"column:CreatedBy;not null"`
 	CreatedOn     time.Time `gorm:"column:CreatedOn;not null;default:GETDATE()"`
 	LastUpdatedBy int64     `gorm:"column:LastUpdatedBy;not null"`

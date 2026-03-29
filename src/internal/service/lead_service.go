@@ -1,9 +1,12 @@
 package service
 
 import (
+	"context"
 	"encoding/csv"
 	"errors"
 	"fmt"
+	"log/slog"
+	"mime/multipart"
 	"strconv"
 	"strings"
 	"time"
@@ -25,6 +28,10 @@ type LeadService interface {
 	DeleteLead(id int64, actorID int64) error
 	BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastUpdatedBy int64) (int64, error)
 	BulkImportFromCSV(csvContent []byte, clientID int64, packageID int, createdBy int64) (int, error)
+	// UploadBloodTestReport validates a PDF, uploads to blob storage, then updates lead + history in one DB transaction.
+	UploadBloodTestReport(ctx context.Context, leadID int64, uploadedBy int64, fh *multipart.FileHeader) (reportURL string, err error)
+	// GetLeadReportDownloadURL returns a time-limited SAS URL for the lead's stored ReportURL blob.
+	GetLeadReportDownloadURL(ctx context.Context, leadID int64) (downloadURL string, expiresAt time.Time, err error)
 }
 
 type leadService struct {
@@ -32,10 +39,11 @@ type leadService struct {
 	uow         repository.LeadUnitOfWork
 	clientRepo  repository.ClientRepository
 	packageRepo repository.PackageRepository
+	blobs       BlobService
 }
 
-func NewLeadService(repo repository.LeadRepository, uow repository.LeadUnitOfWork, clientRepo repository.ClientRepository, packageRepo repository.PackageRepository) LeadService {
-	return &leadService{repo: repo, uow: uow, clientRepo: clientRepo, packageRepo: packageRepo}
+func NewLeadService(repo repository.LeadRepository, uow repository.LeadUnitOfWork, clientRepo repository.ClientRepository, packageRepo repository.PackageRepository, blobs BlobService) LeadService {
+	return &leadService{repo: repo, uow: uow, clientRepo: clientRepo, packageRepo: packageRepo, blobs: blobs}
 }
 
 func (s *leadService) ListLeads(filter repository.LeadListFilter) ([]domain.Lead, int64, error) {
@@ -334,4 +342,93 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 	}
 
 	return inserted, nil
+}
+
+func (s *leadService) UploadBloodTestReport(ctx context.Context, leadID int64, uploadedBy int64, fh *multipart.FileHeader) (string, error) {
+	if fh == nil {
+		return "", apperrors.NewBadRequest("PDF file is required", nil)
+	}
+	if s.blobs == nil {
+		return "", apperrors.NewInternal("Report storage is not configured", nil)
+	}
+	if err := s.blobs.ValidateDiagnosticReportPDF(fh); err != nil {
+		return "", apperrors.NewBadRequest(err.Error(), err)
+	}
+
+	lead, err := s.repo.FindByID(leadID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", apperrors.NewNotFound("Lead not found", err)
+		}
+		return "", err
+	}
+	if strings.TrimSpace(lead.ReportURL) != "" {
+		return "", apperrors.NewConflict("A report is already uploaded for this lead", nil)
+	}
+
+	rc, err := fh.Open()
+	if err != nil {
+		return "", apperrors.NewBadRequest("Failed to read file", err)
+	}
+	defer func() { _ = rc.Close() }()
+
+	reportURL, err := s.blobs.UploadDiagnosticReportPDF(ctx, rc, leadID, fh.Filename)
+	if err != nil {
+		slog.Error("UploadBloodTestReport: blob upload failed", slog.Int64("leadID", leadID), slog.Any("err", err))
+		return "", apperrors.NewInternal("Failed to upload report", err)
+	}
+	if len(reportURL) > 500 {
+		slog.Error("UploadBloodTestReport: report URL exceeds column length", slog.Int64("leadID", leadID), slog.Int("len", len(reportURL)))
+		return "", apperrors.NewInternal("Report URL is too long", nil)
+	}
+
+	err = s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
+		// Resolve status at commit time — never hardcode LeadStatusID.
+		statusID, err := leadRepo.FindActiveLeadStatusIDByName(domain.LeadActionReportUploaded)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return apperrors.NewInternal("Lead status '"+domain.LeadActionReportUploaded+"' is not configured", err)
+			}
+			return err
+		}
+		if err := leadRepo.UpdateLeadReportURLAndStatus(leadID, reportURL, statusID, uploadedBy); err != nil {
+			return err
+		}
+		return historyRepo.LogAction(&domain.LeadHistory{
+			LeadID:    leadID,
+			Action:    domain.LeadActionReportUploaded,
+			CreatedBy: uploadedBy,
+		})
+	})
+	if err != nil {
+		slog.Error("UploadBloodTestReport: DB failed after successful blob upload; blob may be orphaned",
+			slog.Int64("leadID", leadID),
+			slog.String("reportURL", reportURL),
+			slog.Any("err", err),
+		)
+		return "", err
+	}
+	return reportURL, nil
+}
+
+func (s *leadService) GetLeadReportDownloadURL(ctx context.Context, leadID int64) (string, time.Time, error) {
+	if s.blobs == nil {
+		return "", time.Time{}, apperrors.NewInternal("Report storage is not configured", nil)
+	}
+	lead, err := s.repo.FindByID(leadID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", time.Time{}, apperrors.NewNotFound("Lead not found", err)
+		}
+		return "", time.Time{}, err
+	}
+	raw := strings.TrimSpace(lead.ReportURL)
+	if raw == "" {
+		return "", time.Time{}, apperrors.NewNotFound("No report uploaded for this lead", gorm.ErrRecordNotFound)
+	}
+	u, exp, err := s.blobs.DiagnosticReportDownloadSASFromStoredURL(ctx, raw)
+	if err != nil {
+		return "", time.Time{}, apperrors.NewInternal("Failed to generate report download link", err)
+	}
+	return u, exp, nil
 }

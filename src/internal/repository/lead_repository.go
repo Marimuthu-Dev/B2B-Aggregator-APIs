@@ -24,6 +24,9 @@ type LeadRepository interface {
 	FindByPatientID(patientID string) (*domain.Lead, error)
 	FindByContactNumber(contactNumber string) ([]domain.Lead, error)
 	FindByEmail(email string) ([]domain.Lead, error)
+	// FindActiveLeadStatusIDByName resolves LeadStatusID from MediAdmin.tbl_LeadStatusMaster (IsActive = 1).
+	FindActiveLeadStatusIDByName(name string) (int8, error)
+	UpdateLeadReportURLAndStatus(leadID int64, reportURL string, statusID int8, userID int64) error
 }
 
 type leadRepository struct {
@@ -168,4 +171,32 @@ func (r *leadRepository) FindByEmail(email string) ([]domain.Lead, error) {
 	var leads []persistencemodels.Lead
 	err := r.db.Where("EmailID = ?", email).Find(&leads).Error
 	return mapLeadsToDomain(leads), err
+}
+
+func (r *leadRepository) FindActiveLeadStatusIDByName(name string) (int8, error) {
+	var statusID int8
+	err := r.db.Table("MediAdmin.tbl_LeadStatusMaster").
+		Select("LeadStatusID").
+		Where("LeadStatusName = ? AND IsActive = ?", name, true).
+		Take(&statusID).Error
+	if err != nil {
+		return 0, err
+	}
+	return statusID, nil
+}
+
+func (r *leadRepository) UpdateLeadReportURLAndStatus(leadID int64, reportURL string, statusID int8, userID int64) error {
+	result := r.db.Model(&persistencemodels.Lead{}).Where("LeadID = ?", leadID).Updates(map[string]interface{}{
+		"ReportURL":     reportURL,
+		"LeadStatusID":  statusID,
+		"LastUpdatedBy": userID,
+		"LastUpdatedOn": time.Now().UTC(),
+	})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }

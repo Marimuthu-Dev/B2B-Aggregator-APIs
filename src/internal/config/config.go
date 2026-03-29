@@ -22,20 +22,30 @@ type Config struct {
 
 const defaultMoUMaxBytes = 5 * 1024 * 1024
 
-// AzureBlobConfig holds MoU PDF blob settings (from environment).
+// AzureBlobConfig holds MoU and diagnostic-report PDF blob settings (from environment).
 //
-// Environment variables:
+// MoU / legal documents:
 //   - AZURE_STORAGE_CONNECTION_STRING — full Azure Storage connection string (optional; empty disables uploads)
-//   - AZURE_CONTAINER_NAME — blob container name (default: legal-documents)
-//   - MOU_MAX_UPLOAD_BYTES — max PDF size in bytes (default: 5242880 = 5 MiB)
-//   - MOU_UPLOAD_TIMEOUT_SECONDS — per-upload timeout toward Azure (default: 60)
-//   - MOU_SAS_TTL_MINUTES — lifetime of read-only SAS URLs for MoU download (default: 15, max: 1440)
+//   - AZURE_LEGAL_CONTAINER_NAME — MoU PDF container (default: legal-documents)
+//   - MOU_MAX_UPLOAD_BYTES — max MoU PDF size in bytes (default: 5242880 = 5 MiB)
+//   - MOU_UPLOAD_TIMEOUT_SECONDS — MoU upload timeout toward Azure (default: 60)
+//   - MOU_SAS_TTL_MINUTES — read-only SAS lifetime for MoU download (default: 15, max: 1440)
+//
+// Blood test / diagnostic reports (fallback to MoU settings above when unset or invalid):
+//   - AZURE_DIAGNOSTIC_REPORTS_CONTAINER (default: diagnostic-reports)
+//   - DIAGNOSTIC_REPORTS_MAX_UPLOAD_BYTES
+//   - DIAGNOSTIC_REPORTS_UPLOAD_TIMEOUT_SECONDS
+//   - DIAGNOSTIC_REPORTS_SAS_TTL_MINUTES (max: 1440)
 type AzureBlobConfig struct {
-	ConnectionString string
-	ContainerName    string
-	MoUMaxBytes      int64
-	UploadTimeout    time.Duration
-	MoUSASTTL        time.Duration
+	ConnectionString               string
+	ContainerName                  string
+	DiagnosticReportsContainer     string
+	MoUMaxBytes                    int64
+	UploadTimeout                  time.Duration
+	MoUSASTTL                      time.Duration
+	DiagnosticReportsMaxBytes      int64
+	DiagnosticReportsUploadTimeout time.Duration
+	DiagnosticReportsSASTTL        time.Duration
 }
 
 type DBConfig struct {
@@ -126,16 +136,41 @@ func loadAzureBlobConfig() AzureBlobConfig {
 	if sasMin > 1440 {
 		sasMin = 1440
 	}
-	container := strings.TrimSpace(getEnv("AZURE_CONTAINER_NAME", "legal-documents"))
+	container := strings.TrimSpace(getEnv("AZURE_LEGAL_CONTAINER_NAME", "legal-documents"))
 	if container == "" {
 		container = "legal-documents"
 	}
+	reportsContainer := strings.TrimSpace(getEnv("AZURE_DIAGNOSTIC_REPORTS_CONTAINER", "diagnostic-reports"))
+	if reportsContainer == "" {
+		reportsContainer = "diagnostic-reports"
+	}
+
+	reportMax := getEnvAsInt64("DIAGNOSTIC_REPORTS_MAX_UPLOAD_BYTES", maxBytes)
+	if reportMax <= 0 {
+		reportMax = maxBytes
+	}
+	reportTimeoutSec := getEnvAsInt("DIAGNOSTIC_REPORTS_UPLOAD_TIMEOUT_SECONDS", timeoutSec)
+	if reportTimeoutSec <= 0 {
+		reportTimeoutSec = timeoutSec
+	}
+	reportSASMin := getEnvAsInt("DIAGNOSTIC_REPORTS_SAS_TTL_MINUTES", sasMin)
+	if reportSASMin <= 0 {
+		reportSASMin = sasMin
+	}
+	if reportSASMin > 1440 {
+		reportSASMin = 1440
+	}
+
 	return AzureBlobConfig{
-		ConnectionString: trimSurroundingQuotes(getEnv("AZURE_STORAGE_CONNECTION_STRING", "")),
-		ContainerName:    container,
-		MoUMaxBytes:      maxBytes,
-		UploadTimeout:    time.Duration(timeoutSec) * time.Second,
-		MoUSASTTL:        time.Duration(sasMin) * time.Minute,
+		ConnectionString:               trimSurroundingQuotes(getEnv("AZURE_STORAGE_CONNECTION_STRING", "")),
+		ContainerName:                  container,
+		DiagnosticReportsContainer:     reportsContainer,
+		MoUMaxBytes:                    maxBytes,
+		UploadTimeout:                  time.Duration(timeoutSec) * time.Second,
+		MoUSASTTL:                      time.Duration(sasMin) * time.Minute,
+		DiagnosticReportsMaxBytes:      reportMax,
+		DiagnosticReportsUploadTimeout: time.Duration(reportTimeoutSec) * time.Second,
+		DiagnosticReportsSASTTL:        time.Duration(reportSASMin) * time.Minute,
 	}
 }
 

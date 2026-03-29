@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"strings"
+
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
@@ -22,6 +24,7 @@ func mapLeadToDomain(p persistencemodels.Lead) domain.Lead {
 		StateID:       p.StateID,
 		Pincode:       p.Pincode,
 		LeadStatusID:  p.LeadStatusID,
+		ReportURL:     derefReportURL(p.ReportURL),
 		CreatedBy:     p.CreatedBy,
 		CreatedOn:     timeutil.FromTime(p.CreatedOn),
 		LastUpdatedBy: p.LastUpdatedBy,
@@ -45,11 +48,27 @@ func mapLeadToPersistence(d domain.Lead) persistencemodels.Lead {
 		StateID:       d.StateID,
 		Pincode:       d.Pincode,
 		LeadStatusID:  d.LeadStatusID,
+		ReportURL:     stringPtrOrNil(d.ReportURL),
 		CreatedBy:     d.CreatedBy,
 		CreatedOn:     d.CreatedOn.ToTime(),
 		LastUpdatedBy: d.LastUpdatedBy,
 		LastUpdatedOn: d.LastUpdatedOn.ToTime(),
 	}
+}
+
+func derefReportURL(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return strings.TrimSpace(*p)
+}
+
+func stringPtrOrNil(s string) *string {
+	t := strings.TrimSpace(s)
+	if t == "" {
+		return nil
+	}
+	return &t
 }
 
 func mapLeadsToDomain(leads []persistencemodels.Lead) []domain.Lead {

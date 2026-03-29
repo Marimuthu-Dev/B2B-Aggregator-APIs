@@ -17,6 +17,7 @@ type Lead struct {
 	StateID       int8
 	Pincode       string
 	LeadStatusID  int8
+	ReportURL     string `json:"reportUrl,omitempty"`
 	CreatedBy     int64
 	CreatedOn     timeutil.ISTTime
 	LastUpdatedBy int64
@@ -44,4 +45,6 @@ const (
 	LeadActionDelete       = "DELETE"
 	LeadActionStatusUpdate = "STATUS_UPDATE"
 	LeadActionCsvImport    = "CSV_IMPORT"
+	// LeadActionReportUploaded matches tbl_LeadsHistory.Action and tbl_LeadStatusMaster.LeadStatusName lookup value.
+	LeadActionReportUploaded = "Report Uploaded"
 )
