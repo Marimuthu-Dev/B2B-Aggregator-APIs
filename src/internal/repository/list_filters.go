@@ -2,7 +2,7 @@ package repository
 
 import "time"
 
-// MouExpiryDateRange filters MOUEndDate inclusive; use only when both bounds are set.
+// MouExpiryDateRange filters MOUEndDate inclusive; bounds are date-only (UTC midnight). Use only when both are set.
 type MouExpiryDateRange struct {
 	From time.Time
 	To   time.Time

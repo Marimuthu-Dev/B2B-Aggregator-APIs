@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 )
 
 // MouListQuery holds optional MOU filters shared by client and lab list endpoints.
@@ -25,6 +23,8 @@ type ClientListQuery struct {
 }
 
 // ParseMouListFilters parses mouStatus (pipe-separated) and validates coupled mouExpiryFrom/mouExpiryTo.
+// Expiry bounds are plain calendar dates (YYYY-MM-DD): parsed with time.Parse, which uses UTC midnight
+// for date-only strings — no location-specific interpretation.
 // Returns expiry range only when both date params are present; otherwise nil range and no error.
 func ParseMouListFilters(q MouListQuery) (statuses []string, expiryRange *MouExpiryRangeParsed, err error) {
 	statuses, err = parseMouStatusPipeList(q.MouStatus)
@@ -39,12 +39,11 @@ func ParseMouListFilters(q MouListQuery) (statuses []string, expiryRange *MouExp
 	if fromStr == "" || toStr == "" {
 		return nil, nil, fmt.Errorf("mouExpiryFrom and mouExpiryTo must both be set when filtering by MOU expiry date")
 	}
-	loc := timeutil.ISTLocation()
-	from, err := time.ParseInLocation("2006-01-02", fromStr, loc)
+	from, err := time.Parse("2006-01-02", fromStr)
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid mouExpiryFrom: use YYYY-MM-DD")
 	}
-	to, err := time.ParseInLocation("2006-01-02", toStr, loc)
+	to, err := time.Parse("2006-01-02", toStr)
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid mouExpiryTo: use YYYY-MM-DD")
 	}
@@ -54,7 +53,7 @@ func ParseMouListFilters(q MouListQuery) (statuses []string, expiryRange *MouExp
 	return statuses, &MouExpiryRangeParsed{From: from, To: to}, nil
 }
 
-// MouExpiryRangeParsed holds inclusive MOU end-date bounds (IST calendar dates).
+// MouExpiryRangeParsed holds inclusive MOU expiry bounds as calendar dates (UTC midnight per bound).
 type MouExpiryRangeParsed struct {
 	From time.Time
 	To   time.Time
