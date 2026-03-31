@@ -27,6 +27,10 @@ type LeadRepository interface {
 	// FindActiveLeadStatusIDByName resolves LeadStatusID from MediAdmin.tbl_LeadStatusMaster (IsActive = 1).
 	FindActiveLeadStatusIDByName(name string) (int8, error)
 	UpdateLeadReportURLAndStatus(leadID int64, reportURL string, statusID int8, userID int64) error
+	// FindLeadsPendingFitCertification returns leads ready for fitness certificate PDF generation (see worker).
+	FindLeadsPendingFitCertification(limit int, pendingLeadStatusID int8) ([]domain.Lead, error)
+	// MarkFitCertificationGenerated sets certification flags and status if the lead still matches pending criteria; logs history. Returns whether a row was updated.
+	MarkFitCertificationGenerated(leadID int64, userID int64, fromLeadStatusID, toLeadStatusID int8) (updated bool, err error)
 }
 
 type leadRepository struct {
@@ -199,4 +203,49 @@ func (r *leadRepository) UpdateLeadReportURLAndStatus(leadID int64, reportURL st
 		return gorm.ErrRecordNotFound
 	}
 	return nil
+}
+
+func (r *leadRepository) FindLeadsPendingFitCertification(limit int, pendingLeadStatusID int8) ([]domain.Lead, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	var leads []persistencemodels.Lead
+	err := r.db.Where("LeadStatusID = ? AND IsFit = ? AND IsFitCertifiedGenerated = ?", pendingLeadStatusID, true, false).
+		Where("ReportURL IS NOT NULL AND LTRIM(RTRIM(ReportURL)) <> ''").
+		Order("LeadID ASC").
+		Limit(limit).
+		Find(&leads).Error
+	return mapLeadsToDomain(leads), err
+}
+
+func (r *leadRepository) MarkFitCertificationGenerated(leadID int64, userID int64, fromLeadStatusID, toLeadStatusID int8) (bool, error) {
+	var updated bool
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		now := time.Now().UTC()
+		res := tx.Model(&persistencemodels.Lead{}).
+			Where("LeadID = ? AND LeadStatusID = ? AND IsFit = ? AND IsFitCertifiedGenerated = ?",
+				leadID, fromLeadStatusID, true, false).
+			Updates(map[string]interface{}{
+				"IsFitCertifiedGenerated": true,
+				"FitCertifiedGeneratedOn": now,
+				"LeadStatusID":            toLeadStatusID,
+				"LastUpdatedBy":           userID,
+				"LastUpdatedOn":           now,
+			})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return nil
+		}
+		updated = true
+		h := persistencemodels.LeadHistory{
+			LeadID:    leadID,
+			Action:    domain.LeadActionFitCertificationGenerated,
+			CreatedBy: userID,
+			CreatedOn: now,
+		}
+		return tx.Create(&h).Error
+	})
+	return updated, err
 }

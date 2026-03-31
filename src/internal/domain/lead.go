@@ -16,8 +16,10 @@ type Lead struct {
 	CityID        int8
 	StateID       int8
 	Pincode       string
-	LeadStatusID  int8
-	ReportURL     string `json:"reportUrl,omitempty"`
+	LeadStatusID            int8
+	IsFit                   bool
+	IsFitCertifiedGenerated bool
+	ReportURL               string `json:"reportUrl,omitempty"`
 	CreatedBy     int64
 	CreatedOn     timeutil.ISTTime
 	LastUpdatedBy int64
@@ -47,4 +49,6 @@ const (
 	LeadActionCsvImport    = "CSV_IMPORT"
 	// LeadActionReportUploaded matches tbl_LeadsHistory.Action and tbl_LeadStatusMaster.LeadStatusName lookup value.
 	LeadActionReportUploaded = "Report Uploaded"
+	// LeadActionFitCertificationGenerated is logged when the fitness worker merges the certificate PDF with the report.
+	LeadActionFitCertificationGenerated = "Fit Certification Generated"
 )

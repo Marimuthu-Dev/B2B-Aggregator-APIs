@@ -5,9 +5,9 @@ import (
 	"strings"
 )
 
-// parseAzureConnectionString extracts AccountName and AccountKey from a standard Azure Storage connection string.
+// ParseAzureConnectionString extracts AccountName and AccountKey from a standard Azure Storage connection string.
 // Values may contain '='; only the first '=' in each segment splits key and value.
-func parseAzureConnectionString(conn string) (accountName, accountKey string, err error) {
+func ParseAzureConnectionString(conn string) (accountName, accountKey string, err error) {
 	conn = strings.TrimSpace(conn)
 	if conn == "" {
 		return "", "", errors.New("empty connection string")

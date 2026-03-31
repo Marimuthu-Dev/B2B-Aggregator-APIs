@@ -16,8 +16,11 @@ type Lead struct {
 	CityID        int8      `gorm:"column:CityID;not null"`
 	StateID       int8      `gorm:"column:StateID;not null"`
 	Pincode       string    `gorm:"column:Pincode;type:varchar(6);not null"`
-	LeadStatusID  int8      `gorm:"column:LeadStatusID;not null"`
-	ReportURL     *string   `gorm:"column:ReportURL;type:varchar(500)"`
+	LeadStatusID               int8       `gorm:"column:LeadStatusID;not null"`
+	IsFit                      bool       `gorm:"column:IsFit;not null"`
+	IsFitCertifiedGenerated    bool       `gorm:"column:IsFitCertifiedGenerated;not null"`
+	FitCertifiedGeneratedOn    *time.Time `gorm:"column:FitCertifiedGeneratedOn"`
+	ReportURL                  *string    `gorm:"column:ReportURL;type:varchar(500)"`
 	CreatedBy     int64     `gorm:"column:CreatedBy;not null"`
 	CreatedOn     time.Time `gorm:"column:CreatedOn;not null;default:GETDATE()"`
 	LastUpdatedBy int64     `gorm:"column:LastUpdatedBy;not null"`
@@ -31,7 +34,7 @@ func (Lead) TableName() string {
 type LeadHistory struct {
 	UID       int64     `gorm:"primaryKey;column:UID;autoIncrement"`
 	LeadID    int64     `gorm:"column:LeadID;not null"`
-	Action    string    `gorm:"column:Action;type:varchar(25);not null"`
+	Action    string    `gorm:"column:Action;type:varchar(100);not null"`
 	CreatedBy int64     `gorm:"column:CreatedBy;not null"`
 	CreatedOn time.Time `gorm:"column:CreatedOn;not null;default:GETDATE()"`
 }

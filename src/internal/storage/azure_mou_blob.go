@@ -7,7 +7,6 @@ import (
 	"io"
 	"log/slog"
 	"mime/multipart"
-	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -17,7 +16,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
-	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/sas"
 	"github.com/gabriel-vasile/mimetype"
 
 	"b2b-diagnostic-aggregator/apis/internal/config"
@@ -29,7 +27,6 @@ const pdfContentType = "application/pdf"
 type AzureMoUBlobService struct {
 	client            *azblob.Client
 	sharedKey         *azblob.SharedKeyCredential
-	accountName       string
 	container         string
 	reportsContainer  string
 	mouMaxBytes       int64
@@ -38,28 +35,43 @@ type AzureMoUBlobService struct {
 	reportsUploadTimeout time.Duration
 	mouSASTTL         time.Duration
 	reportsSASTTL     time.Duration
+	endpointSuffix    string // e.g. core.windows.net — used for SAS URL host and signing consistency
 	log               *slog.Logger
 }
 
-// NewAzureMoUBlobService builds a blob client from the connection string and ensures the container exists.
+// NewAzureMoUBlobService creates a service client with SharedKeyCredential from AZURE_STORAGE_ACCOUNT /
+// AZURE_STORAGE_KEY, or falls back to parsing AccountName/AccountKey from AZURE_STORAGE_CONNECTION_STRING.
+// SAS tokens are always signed with SharedKeyCredential — never by passing a connection string into SAS APIs.
 func NewAzureMoUBlobService(cfg config.AzureBlobConfig, log *slog.Logger) (*AzureMoUBlobService, error) {
-	if strings.TrimSpace(cfg.ConnectionString) == "" {
-		return nil, errors.New("azure blob: empty connection string")
-	}
 	if strings.TrimSpace(cfg.ContainerName) == "" {
 		return nil, errors.New("azure blob: empty container name")
 	}
-	cli, err := azblob.NewClientFromConnectionString(cfg.ConnectionString, nil)
-	if err != nil {
-		return nil, fmt.Errorf("azure blob: create client: %w", err)
+	acc := strings.ToLower(strings.TrimSpace(cfg.StorageAccountName))
+	key := strings.TrimSpace(cfg.StorageAccountKey)
+	if acc == "" || key == "" {
+		var perr error
+		acc, key, perr = ParseAzureConnectionString(strings.TrimSpace(cfg.ConnectionString))
+		if perr != nil {
+			return nil, fmt.Errorf("azure blob: set AZURE_STORAGE_ACCOUNT and AZURE_STORAGE_KEY, or fix AZURE_STORAGE_CONNECTION_STRING: %w", perr)
+		}
+		if acc == "" || key == "" {
+			return nil, errors.New("azure blob: set AZURE_STORAGE_ACCOUNT and AZURE_STORAGE_KEY (or a connection string with AccountName and AccountKey)")
+		}
+		acc = strings.ToLower(strings.TrimSpace(acc))
+		key = strings.TrimSpace(key)
 	}
-	acc, key, err := parseAzureConnectionString(cfg.ConnectionString)
-	if err != nil {
-		return nil, fmt.Errorf("azure blob: connection string: %w", err)
+	suffix := strings.TrimSpace(cfg.BlobEndpointSuffix)
+	if suffix == "" {
+		suffix = "core.windows.net"
 	}
 	sk, err := azblob.NewSharedKeyCredential(acc, key)
 	if err != nil {
 		return nil, fmt.Errorf("azure blob: shared key credential: %w", err)
+	}
+	serviceURL := fmt.Sprintf("https://%s.blob.%s/", acc, suffix)
+	cli, err := azblob.NewClientWithSharedKeyCredential(serviceURL, sk, nil)
+	if err != nil {
+		return nil, fmt.Errorf("azure blob: create client: %w", err)
 	}
 	mouSASTTL := cfg.MoUSASTTL
 	if mouSASTTL <= 0 {
@@ -95,7 +107,6 @@ func NewAzureMoUBlobService(cfg config.AzureBlobConfig, log *slog.Logger) (*Azur
 	s := &AzureMoUBlobService{
 		client:               cli,
 		sharedKey:            sk,
-		accountName:          acc,
 		container:            cfg.ContainerName,
 		reportsContainer:     reportsContainer,
 		mouMaxBytes:          mouMax,
@@ -104,6 +115,7 @@ func NewAzureMoUBlobService(cfg config.AzureBlobConfig, log *slog.Logger) (*Azur
 		reportsUploadTimeout: reportTimeout,
 		mouSASTTL:            mouSASTTL,
 		reportsSASTTL:        reportsSASTTL,
+		endpointSuffix:       suffix,
 		log:                  log,
 	}
 	return s, nil
@@ -320,6 +332,53 @@ func (s *AzureMoUBlobService) DiagnosticReportDownloadSASURL(ctx context.Context
 	return s.sasURLForBlobInContainer(container, blobName, s.reportsSASTTL)
 }
 
+// DownloadBlob reads an entire blob into memory (used by the fitness certificate worker).
+func (s *AzureMoUBlobService) DownloadBlob(ctx context.Context, container, blobName string) ([]byte, error) {
+	if strings.TrimSpace(container) == "" || strings.TrimSpace(blobName) == "" {
+		return nil, errors.New("azure blob: container and blob name required")
+	}
+	resp, err := s.client.DownloadStream(ctx, container, blobName, nil)
+	if err != nil {
+		return nil, fmt.Errorf("azure blob download: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("azure blob read body: %w", err)
+	}
+	if int64(len(data)) > s.reportsMaxBytes*10 {
+		s.log.Warn("downloaded blob exceeds soft limit", slog.Int("bytes", len(data)), slog.String("blob", blobName))
+	}
+	return data, nil
+}
+
+// UploadDiagnosticReportPDFBytes overwrites an existing diagnostic report blob (same container/path as stored ReportURL).
+func (s *AzureMoUBlobService) UploadDiagnosticReportPDFBytes(ctx context.Context, container, blobName string, pdf []byte) error {
+	if len(pdf) == 0 {
+		return errors.New("azure blob: empty pdf")
+	}
+	// Merged report (certificate + original) can exceed single-upload limit.
+	const mergeSizeMultiplier int64 = 5
+	if int64(len(pdf)) > s.reportsMaxBytes*mergeSizeMultiplier {
+		return fmt.Errorf("azure blob: pdf exceeds maximum size %d bytes", s.reportsMaxBytes*mergeSizeMultiplier)
+	}
+	if uploadTimeout := s.reportsUploadTimeout; uploadTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, uploadTimeout)
+		defer cancel()
+	}
+	_, err := s.client.UploadBuffer(ctx, container, blobName, pdf, &azblob.UploadBufferOptions{
+		HTTPHeaders: &blob.HTTPHeaders{
+			BlobContentType: ptr(pdfContentType),
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("azure blob upload: %w", err)
+	}
+	s.log.Info("diagnostic report pdf overwritten", slog.String("container", container), slog.String("blob", blobName))
+	return nil
+}
+
 // DiagnosticReportDownloadSASFromStoredURL parses a blob HTTPS URL from tbl_Leads.ReportURL and returns a read-only SAS link.
 func (s *AzureMoUBlobService) DiagnosticReportDownloadSASFromStoredURL(ctx context.Context, reportBlobURL string) (string, time.Time, error) {
 	_ = ctx
@@ -331,31 +390,13 @@ func (s *AzureMoUBlobService) DiagnosticReportDownloadSASFromStoredURL(ctx conte
 }
 
 func (s *AzureMoUBlobService) sasURLForBlobInContainer(container, blobName string, ttl time.Duration) (string, time.Time, error) {
-	if s.sharedKey == nil || s.accountName == "" {
+	if s.sharedKey == nil {
 		return "", time.Time{}, errors.New("azure blob: SAS signing unavailable")
 	}
 	if ttl <= 0 {
 		ttl = 15 * time.Minute
 	}
-	expires := time.Now().UTC().Add(ttl)
-	start := time.Now().UTC().Add(-2 * time.Minute)
-	qp, err := sas.BlobSignatureValues{
-		Protocol:      sas.ProtocolHTTPS,
-		StartTime:     start,
-		ExpiryTime:    expires,
-		Permissions:   (&sas.BlobPermissions{Read: true}).String(),
-		ContainerName: container,
-		BlobName:      blobName,
-	}.SignWithSharedKey(s.sharedKey)
-	if err != nil {
-		return "", time.Time{}, fmt.Errorf("azure blob: sign SAS: %w", err)
-	}
-	u := fmt.Sprintf("https://%s.blob.core.windows.net/%s/%s?%s",
-		s.accountName,
-		url.PathEscape(container),
-		url.PathEscape(blobName),
-		qp.Encode())
-	return u, expires, nil
+	return buildBlobReadOnlySASURLRelativeToNow(s.sharedKey, s.endpointSuffix, container, blobName, ttl, s.log)
 }
 
 func formatAzureError(err error) string {
