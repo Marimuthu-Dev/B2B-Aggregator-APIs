@@ -49,6 +49,8 @@ const (
 	LeadActionCsvImport    = "CSV_IMPORT"
 	// LeadActionReportUploaded matches tbl_LeadsHistory.Action and tbl_LeadStatusMaster.LeadStatusName lookup value.
 	LeadActionReportUploaded = "Report Uploaded"
+	// LeadActionReportReadyToDownload is logged when a lead can directly move to downloadable state without certificate generation.
+	LeadActionReportReadyToDownload = "Report Ready to Download"
 	// LeadActionFitCertificationGenerated is logged when the fitness worker merges the certificate PDF with the report.
 	LeadActionFitCertificationGenerated = "Fit Certification Generated"
 )

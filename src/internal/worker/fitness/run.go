@@ -76,6 +76,20 @@ func processLead(ctx context.Context, d Deps, lead domain.Lead, log *slog.Logger
 		return fmt.Errorf("client %d has no ClientTypeID; add certificate template after setting type", lead.ClientID)
 	}
 	ctID := *client.ClientTypeID
+	if !requiresFitnessCertificate(ctID) {
+		updated, err := d.LeadRepo.MarkReportReadyToDownload(lead.LeadID, d.Config.ActorUserID,
+			d.Config.PendingLeadStatusID, d.Config.DoneLeadStatusID)
+		if err != nil {
+			return fmt.Errorf("mark report ready to download: %w", err)
+		}
+		if !updated {
+			log.Warn("lead no longer matched pending report-ready criteria",
+				slog.Int64("leadID", lead.LeadID))
+			return nil
+		}
+		log.Info("report marked ready to download without certificate generation", slog.Int64("leadID", lead.LeadID))
+		return nil
+	}
 
 	dateStr := time.Now().In(timeutil.ISTLocation()).Format("02-Jan-2006")
 	html, err := fitnesscert.RenderCertificateHTML(d.Config.TemplateDir, ctID, fitnesscert.TemplateData{
@@ -87,7 +101,7 @@ func processLead(ctx context.Context, d Deps, lead domain.Lead, log *slog.Logger
 		return err
 	}
 
-	certPDF, err := fitnesscert.HTMLToPDF(ctx, html, d.Config.ChromiumPath)
+	certPDF, err := fitnesscert.HTMLToPDF(ctx, html, d.Config.ChromiumPath, d.Config.TemplateDir)
 	if err != nil {
 		return err
 	}
@@ -123,4 +137,8 @@ func processLead(ctx context.Context, d Deps, lead domain.Lead, log *slog.Logger
 	}
 	log.Info("fitness certificate merged and lead updated", slog.Int64("leadID", lead.LeadID))
 	return nil
+}
+
+func requiresFitnessCertificate(clientTypeID int8) bool {
+	return clientTypeID == 1 || clientTypeID == 2
 }

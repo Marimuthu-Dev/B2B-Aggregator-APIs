@@ -7,15 +7,22 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 )
 
 // HTMLToPDF renders HTML to a single-page (or multi-page) PDF using headless Chromium.
-func HTMLToPDF(ctx context.Context, htmlContent string, chromiumPath string) ([]byte, error) {
-	tmp, err := os.CreateTemp("", "fitness-cert-*.html")
+func HTMLToPDF(ctx context.Context, htmlContent string, chromiumPath string, templateDir string) ([]byte, error) {
+	tempDir := filepath.Join(strings.TrimSpace(templateDir), "tmp")
+	if err := os.MkdirAll(tempDir, 0o755); err != nil {
+		return nil, fmt.Errorf("create temp dir %s: %w", tempDir, err)
+	}
+
+	tmp, err := os.CreateTemp(tempDir, "fitness-cert-*.html")
 	if err != nil {
 		return nil, fmt.Errorf("temp html: %w", err)
 	}
@@ -42,6 +49,7 @@ func HTMLToPDF(ctx context.Context, htmlContent string, chromiumPath string) ([]
 		chromedp.NoSandbox,
 		chromedp.DisableGPU,
 		chromedp.Headless,
+		chromedp.Flag("allow-file-access-from-files", true),
 	)
 	if p := strings.TrimSpace(chromiumPath); p != "" {
 		opts = append([]chromedp.ExecAllocatorOption{chromedp.ExecPath(p)}, opts...)
@@ -54,8 +62,37 @@ func HTMLToPDF(ctx context.Context, htmlContent string, chromiumPath string) ([]
 	runCtx, cancel := context.WithTimeout(chromeCtx, 2*time.Minute)
 	defer cancel()
 
+	var (
+		reqMu          sync.Mutex
+		requestURLs    = make(map[network.RequestID]string)
+		missingFileURL string
+	)
+
+	chromedp.ListenTarget(runCtx, func(ev interface{}) {
+		reqMu.Lock()
+		defer reqMu.Unlock()
+
+		switch e := ev.(type) {
+		case *network.EventRequestWillBeSent:
+			requestURLs[e.RequestID] = e.Request.URL
+		case *network.EventLoadingFailed:
+			if !strings.Contains(e.ErrorText, "ERR_FILE_NOT_FOUND") {
+				return
+			}
+			if u := requestURLs[e.RequestID]; u != "" {
+				missingFileURL = u
+				return
+			}
+			if e.Canceled {
+				return
+			}
+			missingFileURL = fileURL
+		}
+	})
+
 	var pdf []byte
 	err = chromedp.Run(runCtx,
+		network.Enable(),
 		chromedp.Navigate(fileURL),
 		chromedp.ActionFunc(func(actx context.Context) error {
 			var e error
@@ -72,6 +109,11 @@ func HTMLToPDF(ctx context.Context, htmlContent string, chromiumPath string) ([]
 		}),
 	)
 	if err != nil {
+		reqMu.Lock()
+		defer reqMu.Unlock()
+		if missingFileURL != "" {
+			return nil, fmt.Errorf("html to pdf: %w (missing resource: %s)", err, missingFileURL)
+		}
 		return nil, fmt.Errorf("html to pdf: %w", err)
 	}
 	return pdf, nil

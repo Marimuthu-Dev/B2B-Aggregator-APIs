@@ -31,6 +31,8 @@ type LeadRepository interface {
 	FindLeadsPendingFitCertification(limit int, pendingLeadStatusID int8) ([]domain.Lead, error)
 	// MarkFitCertificationGenerated sets certification flags and status if the lead still matches pending criteria; logs history. Returns whether a row was updated.
 	MarkFitCertificationGenerated(leadID int64, userID int64, fromLeadStatusID, toLeadStatusID int8) (updated bool, err error)
+	// MarkReportReadyToDownload advances a lead to the downloadable state without generating a certificate; logs history. Returns whether a row was updated.
+	MarkReportReadyToDownload(leadID int64, userID int64, fromLeadStatusID, toLeadStatusID int8) (updated bool, err error)
 }
 
 type leadRepository struct {
@@ -242,6 +244,36 @@ func (r *leadRepository) MarkFitCertificationGenerated(leadID int64, userID int6
 		h := persistencemodels.LeadHistory{
 			LeadID:    leadID,
 			Action:    domain.LeadActionFitCertificationGenerated,
+			CreatedBy: userID,
+			CreatedOn: now,
+		}
+		return tx.Create(&h).Error
+	})
+	return updated, err
+}
+
+func (r *leadRepository) MarkReportReadyToDownload(leadID int64, userID int64, fromLeadStatusID, toLeadStatusID int8) (bool, error) {
+	var updated bool
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		now := time.Now().UTC()
+		res := tx.Model(&persistencemodels.Lead{}).
+			Where("LeadID = ? AND LeadStatusID = ? AND IsFit = ? AND IsFitCertifiedGenerated = ?",
+				leadID, fromLeadStatusID, true, false).
+			Updates(map[string]interface{}{
+				"LeadStatusID":   toLeadStatusID,
+				"LastUpdatedBy":  userID,
+				"LastUpdatedOn":  now,
+			})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return nil
+		}
+		updated = true
+		h := persistencemodels.LeadHistory{
+			LeadID:    leadID,
+			Action:    domain.LeadActionReportReadyToDownload,
 			CreatedBy: userID,
 			CreatedOn: now,
 		}

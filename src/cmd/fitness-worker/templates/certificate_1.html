@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+            line-height: 1.6;
+        }
+
+        .title {
+            text-align: center;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .subtitle {
+            text-align: center;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .content {
+            margin-top: 20px;
+            font-size: 14px;
+        }
+
+        /* RIGHT SIDE SIGNATURE BLOCK */
+        .signature-container {
+            margin-top: 90px; /* pushed slightly down */
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .signature-block {
+            text-align: center;
+            width: 260px;
+        }
+
+        .signature-block img {
+            display: block;
+            margin: 1px auto;
+            object-fit: contain;
+        }
+
+        /* Signature slightly lower */
+        .doctor-sign {
+            width: 150px;
+            height: 80px;
+            margin-top: 0px;
+        }
+
+        /* Seal increased size */
+        .doctor-seal {
+            width: 250px;
+            height: 150px;
+        }
+
+        .sign-text {
+            margin-top: 0px;
+            font-size: 13px;
+            text-align: center;
+        }
+
+        .footer {
+            margin-top: 40px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="title">
+PROFORMA FOR MEDICAL FITNESS CERTIFICATE FOR FOOD HANDLERS
+</div>
+
+<div class="subtitle">
+(See Para no - 10.1.2, Part-II, Schedule-4 of FSSAI regulation, 2011)
+</div>
+
+<div class="content">
+It is certified that shri / smt / Miss <b>{{.Name}}</b> employed with 
+<b>{{.Company}}</b> coming in direct contact with food items has been carefully 
+examined as mentioned dated <b>{{.Date}}</b>.
+
+<br><br>
+
+Based on the medical examination conducted, he/she is found free from any 
+infectious or communicable diseases and the person is fit to work in the 
+above-mentioned food establishment.
+</div>
+
+<!-- RIGHT ALIGNED SIGNATURE + SEAL -->
+<div class="signature-container">
+    <div class="signature-block">
+
+        <!-- Signature -->
+        <img src="Dr_Sign.jpeg" class="doctor-sign" alt="Doctor Signature">
+
+        <!-- Seal -->
+        <img src="Dr_Seal.jpeg" class="doctor-seal" alt="Doctor Seal">
+
+        <!-- Text -->
+        <div class="sign-text">
+            Name & Signature with Seal<br>
+            Registered Medical Practitioner / Civil Surgeon
+        </div>
+
+    </div>
+</div>
+
+<div class="footer">
+<b>*Medical Examination to be conducted:</b><br>
+1. Physical Examination and General Examination<br>
+2. Any test required to confirm any communicable or infectious disease
+</div>
+
+</body>
+</html>
