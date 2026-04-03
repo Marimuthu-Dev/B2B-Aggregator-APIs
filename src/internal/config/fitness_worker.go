@@ -49,6 +49,13 @@ func LoadFitnessCertWorkerConfig() (FitnessCertWorkerConfig, error) {
 		return c, fmt.Errorf("resolve fitness worker template dir: %w", err)
 	}
 	c.TemplateDir = resolvedTemplateDir
+	if c.ChromiumPath != "" {
+		resolvedChromium, err := resolveAgainstExecutableDir(c.ChromiumPath)
+		if err != nil {
+			return c, fmt.Errorf("resolve CHROMIUM_PATH: %w", err)
+		}
+		c.ChromiumPath = resolvedChromium
+	}
 	if c.BatchSize <= 0 {
 		c.BatchSize = 10
 	}
@@ -69,10 +76,15 @@ func resolveFitnessWorkerPath(path string) (string, error) {
 	if trimmed == "" {
 		trimmed = "./templates"
 	}
+	return resolveAgainstExecutableDir(trimmed)
+}
+
+// resolveAgainstExecutableDir joins non-absolute paths with the directory of os.Executable()
+// so relative CHROMIUM_PATH and template dirs work when the process CWD is not the WebJob folder.
+func resolveAgainstExecutableDir(trimmed string) (string, error) {
 	if filepath.IsAbs(trimmed) {
 		return filepath.Clean(trimmed), nil
 	}
-
 	execPath, err := os.Executable()
 	if err != nil {
 		return "", err

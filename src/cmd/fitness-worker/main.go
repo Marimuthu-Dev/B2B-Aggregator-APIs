@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"io"
 	"log"
 	"log/slog"
+	"os"
 	"os/signal"
 	"syscall"
 
 	"b2b-diagnostic-aggregator/apis/internal/config"
+	"b2b-diagnostic-aggregator/apis/internal/logging"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/storage"
 	"b2b-diagnostic-aggregator/apis/internal/worker/fitness"
@@ -27,12 +30,36 @@ func main() {
 		log.Fatalf("fitness worker config: %v", err)
 	}
 
+	var logOut io.Writer = os.Stderr
+	if logWriter, lwErr := logging.NewHourlyFileWriter(logging.Config{
+		Dir:            appCfg.Log.Dir,
+		RetentionHours: appCfg.Log.RetentionHours,
+		Prefix:         "fitness-worker",
+	}); lwErr != nil {
+		log.Printf("fitness worker: file logging disabled (%v); using stderr only", lwErr)
+		log.SetOutput(os.Stderr)
+	} else {
+		logOut = io.MultiWriter(os.Stderr, logWriter)
+		log.SetOutput(logOut)
+	}
+	log.SetFlags(log.LstdFlags)
+
+	logger := slog.New(slog.NewTextHandler(logOut, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	slog.SetDefault(logger)
+	logger.Info("fitness worker starting",
+		slog.String("logDir", appCfg.Log.Dir),
+		slog.Int("logRetentionHours", appCfg.Log.RetentionHours),
+		slog.String("templateDir", wc.TemplateDir),
+		slog.Bool("runOnce", wc.RunOnce),
+		slog.String("pollInterval", wc.PollInterval.String()),
+	)
+
 	db, err := config.ConnectDatabase(appCfg.DB)
 	if err != nil {
 		log.Fatalf("database: %v", err)
 	}
 
-	blobSvc, err := storage.NewAzureMoUBlobService(appCfg.AzureBlob, slog.Default())
+	blobSvc, err := storage.NewAzureMoUBlobService(appCfg.AzureBlob, logger)
 	if err != nil {
 		log.Fatalf("azure blob: %v", err)
 	}
@@ -43,7 +70,7 @@ func main() {
 		LeadRepo:   repository.NewLeadRepository(db),
 		ClientRepo: repository.NewClientRepository(db),
 		Config:     wc,
-		Log:        slog.Default(),
+		Log:        logger,
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
