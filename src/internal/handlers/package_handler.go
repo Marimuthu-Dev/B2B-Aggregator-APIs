@@ -268,7 +268,20 @@ func (h *PackageHandler) CreatePackageLabMapping(c *gin.Context) {
 }
 
 func (h *PackageHandler) GetAllPackageLabMappings(c *gin.Context) {
-	data, err := h.svc.GetAllPackageLabMappings()
+	var query dto.PackageLabMappingListQuery
+	if !middleware.BindQuery(c, &query) {
+		return
+	}
+	isActive := true
+	if query.IsActive != nil {
+		isActive = *query.IsActive
+	}
+	filter := repository.PackageLabMappingListFilter{
+		PackageID: query.PackageID,
+		LabID:     query.LabID,
+		IsActive:  isActive,
+	}
+	data, err := h.svc.GetAllPackageLabMappings(filter)
 	if err != nil {
 		respondError(c, err)
 		return

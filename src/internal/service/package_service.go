@@ -27,7 +27,7 @@ type PackageService interface {
 	GetAllPackageClientMappings() ([]domain.PackageClientMappingView, error)
 	UpdatePackageClientMappingStatus(id int, isActive bool, lastUpdatedBy int64) (*PackageClientMappingUpdateResult, error)
 	CreatePackageLabMapping(packageID int, labID int64, price float64, createdBy, lastUpdatedBy int64) (*PackageLabMappingResult, error)
-	GetAllPackageLabMappings() ([]domain.PackageLabMappingView, error)
+	GetAllPackageLabMappings(filter repository.PackageLabMappingListFilter) ([]domain.PackageLabMappingView, error)
 	UpdatePackageLabMappingStatus(id int, isActive bool, lastUpdatedBy int64) (*PackageLabMappingUpdateResult, error)
 }
 
@@ -457,25 +457,26 @@ func mappingToLabView(m *persistencemodels.PackageLabMapping, pkgName, labName s
 	}
 }
 
-func (s *packageService) GetAllPackageLabMappings() ([]domain.PackageLabMappingView, error) {
-	list, err := s.labMapRepo.FindAll()
+func (s *packageService) GetAllPackageLabMappings(filter repository.PackageLabMappingListFilter) ([]domain.PackageLabMappingView, error) {
+	rows, err := s.labMapRepo.FindAllWithLabAndPackageNames(filter)
 	if err != nil {
 		return nil, err
 	}
-	packages, _ := s.repo.FindAll()
-	labs, _ := s.labRepo.FindAll()
-	pkgMap := make(map[int]string)
-	for _, p := range packages {
-		pkgMap[p.PackageID] = p.PackageName
-	}
-	labMap := make(map[int64]string)
-	for _, l := range labs {
-		labMap[l.LabID] = l.LabName
-	}
-	var out []domain.PackageLabMappingView
-	for i := range list {
-		v := mappingToLabView(&list[i], pkgMap[list[i].PackageID], labMap[list[i].LabID])
-		out = append(out, *v)
+	out := make([]domain.PackageLabMappingView, 0, len(rows))
+	for i := range rows {
+		row := rows[i]
+		m := persistencemodels.PackageLabMapping{
+			PackageLabID:  row.PackageLabID,
+			PackageID:     row.PackageID,
+			LabID:         row.LabID,
+			Price:         row.Price,
+			IsActive:      row.IsActive,
+			CreatedBy:     row.CreatedBy,
+			CreatedOn:     row.CreatedOn,
+			LastUpdatedBy: row.LastUpdatedBy,
+			LastUpdatedOn: row.LastUpdatedOn,
+		}
+		out = append(out, *mappingToLabView(&m, row.PackageName, row.LabName))
 	}
 	return out, nil
 }
