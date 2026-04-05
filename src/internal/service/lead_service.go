@@ -154,6 +154,13 @@ func (s *leadService) UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUp
 	if update.LeadStatusID != nil {
 		l.LeadStatusID = *update.LeadStatusID
 	}
+	if update.AppointmentAt != nil {
+		at := timeutil.FromTime(*update.AppointmentAt)
+		l.AppointmentAt = &at
+	}
+	if update.LabID != nil {
+		l.LabID = update.LabID
+	}
 
 	l.LeadID = id
 	l.LastUpdatedBy = lastUpdatedBy

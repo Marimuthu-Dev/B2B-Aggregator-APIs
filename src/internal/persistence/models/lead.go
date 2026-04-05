@@ -17,6 +17,8 @@ type Lead struct {
 	StateID                 int8       `gorm:"column:StateID;not null"`
 	Pincode                 string     `gorm:"column:Pincode;type:varchar(6);not null"`
 	LeadStatusID            int8       `gorm:"column:LeadStatusID;not null"`
+	AppointmentAt           *time.Time `gorm:"column:AppointmentAt"`
+	LabID                   *int64     `gorm:"column:LabID"`
 	IsFit                   int8       `gorm:"column:IsFit;not null"`
 	IsReportDownloadable    bool       `gorm:"column:IsReportDownloadable;not null;default:false"`
 	ApprovalRemarks         *string    `gorm:"column:ApprovalRemarks;type:varchar(250)"`
