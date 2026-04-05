@@ -84,6 +84,9 @@ func (s *leadService) CreateLead(l *domain.Lead, createdBy int64) error {
 	l.IsFit = domain.LeadFitUnfit
 	l.IsReportDownloadable = false
 	l.PatientID = s.GeneratePatientID(l.PatientName, l.ContactNumber)
+	if l.LeadStatusID == 0 {
+		l.LeadStatusID = domain.LeadStatusIDDefault
+	}
 
 	return s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
 		if err := leadRepo.Create(l); err != nil {
@@ -309,6 +312,11 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 			return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: PatientName and ContactNumber are required", rowIdx+1), nil)
 		}
 
+		leadStatusID := atInt8(row, "LeadStatusID")
+		if leadStatusID == 0 {
+			leadStatusID = domain.LeadStatusIDDefault
+		}
+
 		now := time.Now()
 		lead := &domain.Lead{
 			ClientID:      clientID,
@@ -323,7 +331,7 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 			CityID:        atInt8(row, "CityID"),
 			StateID:       atInt8(row, "StateID"),
 			Pincode:       at(row, "Pincode"),
-			LeadStatusID:  atInt8(row, "LeadStatusID"),
+			LeadStatusID:  leadStatusID,
 			IsFit:         domain.LeadFitUnfit,
 			CreatedBy:     createdBy,
 			CreatedOn:     timeutil.FromTime(now),

@@ -18,7 +18,7 @@ type LeadRequest struct {
 	CityID        int8   `binding:"required"`
 	StateID       int8   `binding:"required"`
 	Pincode       string `binding:"required"`
-	LeadStatusID  int8   // defaults to 0 when omitted in POST payload
+	LeadStatusID  int8   // omitted or 0 → service uses domain.LeadStatusIDDefault (1)
 }
 
 type BulkUpdateLeadStatusRequest struct {

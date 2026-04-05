@@ -9,6 +9,9 @@ const (
 	LeadFitFit   int8 = 1
 )
 
+// LeadStatusIDDefault is the initial status for new leads when the client omits LeadStatusID (JSON zero / empty CSV).
+const LeadStatusIDDefault int8 = 1
+
 // Lead workflow: 8 = report uploaded (eligible for POST /leads/{id}/report-approve); 9 = report approved (set when IsFit = 1 on approve).
 const (
 	LeadStatusIDReportUploaded int8 = 8
