@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"database/sql"
 	"time"
 
 	"b2b-diagnostic-aggregator/apis/internal/domain"
@@ -33,6 +34,8 @@ type LeadRepository interface {
 	MarkFitCertificationGenerated(leadID int64, userID int64, fromLeadStatusID, toLeadStatusID int8) (updated bool, err error)
 	// MarkReportReadyToDownload advances a lead to the downloadable state without generating a certificate; logs history. Returns whether a row was updated.
 	MarkReportReadyToDownload(leadID int64, userID int64, fromLeadStatusID, toLeadStatusID int8) (updated bool, err error)
+	// UpdateLeadReportApproval sets IsFit (-1/0/1), download flag, remarks, FitUpdatedOn, and last-updated audit. Only rows with LeadStatusID = 8 (uploaded) match; when IsFit = 1, LeadStatusID is set to 9 (approved). Otherwise LeadStatusID is not changed. remarks nil or empty clears ApprovalRemarks.
+	UpdateLeadReportApproval(leadID int64, lastUpdatedBy int64, isFit int8, allowDownload bool, remarks *string) (rowsAffected int64, err error)
 }
 
 type leadRepository struct {
@@ -132,9 +135,9 @@ func (r *leadRepository) Delete(id int64) error {
 
 func (r *leadRepository) UpdateStatusForIDs(leadIDs []int64, statusID int8, lastUpdatedBy int64) (int64, error) {
 	result := r.db.Model(&persistencemodels.Lead{}).Where("LeadID IN ?", leadIDs).Updates(map[string]interface{}{
-		"LeadStatusID":   statusID,
-		"LastUpdatedBy":  lastUpdatedBy,
-		"LastUpdatedOn":  time.Now(),
+		"LeadStatusID":  statusID,
+		"LastUpdatedBy": lastUpdatedBy,
+		"LastUpdatedOn": time.Now(),
 	})
 	return result.RowsAffected, result.Error
 }
@@ -212,7 +215,7 @@ func (r *leadRepository) FindLeadsPendingFitCertification(limit int, pendingLead
 		limit = 10
 	}
 	var leads []persistencemodels.Lead
-	err := r.db.Where("LeadStatusID = ? AND IsFit = ? AND IsFitCertifiedGenerated = ?", pendingLeadStatusID, true, false).
+	err := r.db.Where("LeadStatusID = ? AND IsFit = ? AND IsFitCertifiedGenerated = ?", pendingLeadStatusID, domain.LeadFitFit, false).
 		Where("ReportURL IS NOT NULL AND LTRIM(RTRIM(ReportURL)) <> ''").
 		Order("LeadID ASC").
 		Limit(limit).
@@ -226,7 +229,7 @@ func (r *leadRepository) MarkFitCertificationGenerated(leadID int64, userID int6
 		now := time.Now().UTC()
 		res := tx.Model(&persistencemodels.Lead{}).
 			Where("LeadID = ? AND LeadStatusID = ? AND IsFit = ? AND IsFitCertifiedGenerated = ?",
-				leadID, fromLeadStatusID, true, false).
+				leadID, fromLeadStatusID, domain.LeadFitFit, false).
 			Updates(map[string]interface{}{
 				"IsFitCertifiedGenerated": true,
 				"FitCertifiedGeneratedOn": now,
@@ -258,11 +261,11 @@ func (r *leadRepository) MarkReportReadyToDownload(leadID int64, userID int64, f
 		now := time.Now().UTC()
 		res := tx.Model(&persistencemodels.Lead{}).
 			Where("LeadID = ? AND LeadStatusID = ? AND IsFit = ? AND IsFitCertifiedGenerated = ?",
-				leadID, fromLeadStatusID, true, false).
+				leadID, fromLeadStatusID, domain.LeadFitFit, false).
 			Updates(map[string]interface{}{
-				"LeadStatusID":   toLeadStatusID,
-				"LastUpdatedBy":  userID,
-				"LastUpdatedOn":  now,
+				"LeadStatusID":  toLeadStatusID,
+				"LastUpdatedBy": userID,
+				"LastUpdatedOn": now,
 			})
 		if res.Error != nil {
 			return res.Error
@@ -280,4 +283,30 @@ func (r *leadRepository) MarkReportReadyToDownload(leadID int64, userID int64, f
 		return tx.Create(&h).Error
 	})
 	return updated, err
+}
+
+func (r *leadRepository) UpdateLeadReportApproval(leadID int64, lastUpdatedBy int64, isFit int8, allowDownload bool, remarks *string) (int64, error) {
+	now := time.Now().UTC()
+	var ar sql.NullString
+	if remarks != nil {
+		s := *remarks
+		if s != "" {
+			ar = sql.NullString{String: s, Valid: true}
+		}
+	}
+	updates := map[string]interface{}{
+		"IsFit":                isFit,
+		"IsReportDownloadable": allowDownload,
+		"ApprovalRemarks":      ar,
+		"FitUpdatedOn":         now,
+		"LastUpdatedBy":        lastUpdatedBy,
+		"LastUpdatedOn":        now,
+		"LeadStatusID": gorm.Expr("CASE WHEN ? = ? THEN ? ELSE LeadStatusID END",
+			isFit, domain.LeadFitFit, domain.LeadStatusIDReportApproved),
+	}
+	res := r.db.Model(&persistencemodels.Lead{}).Where("LeadID = ? AND LeadStatusID = ?", leadID, domain.LeadStatusIDReportApproval).Updates(updates)
+	if res.Error != nil {
+		return 0, res.Error
+	}
+	return res.RowsAffected, nil
 }

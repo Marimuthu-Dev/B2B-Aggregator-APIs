@@ -5,25 +5,32 @@ import (
 )
 
 type LeadRequest struct {
-	LeadID        int64     `binding:"omitempty"`
-	ClientID      int64     `binding:"required"`
-	PatientID     string    `binding:"omitempty"`
-	PatientName   string    `binding:"required"`
-	Age           int8      `binding:"required"`
-	Gender        string    `binding:"required"`
-	PackageID     int       `binding:"required"`
-	ContactNumber string    `binding:"required"`
-	Emailid       string    `binding:"required"`
-	Address       string    `binding:"required"`
-	CityID        int8      `binding:"required"`
-	StateID       int8      `binding:"required"`
-	Pincode       string    `binding:"required"`
-	LeadStatusID int8 // defaults to 0 when omitted in POST payload
+	LeadID        int64  `binding:"omitempty"`
+	ClientID      int64  `binding:"required"`
+	PatientID     string `binding:"omitempty"`
+	PatientName   string `binding:"required"`
+	Age           int8   `binding:"required"`
+	Gender        string `binding:"required"`
+	PackageID     int    `binding:"required"`
+	ContactNumber string `binding:"required"`
+	Emailid       string `binding:"required"`
+	Address       string `binding:"required"`
+	CityID        int8   `binding:"required"`
+	StateID       int8   `binding:"required"`
+	Pincode       string `binding:"required"`
+	LeadStatusID  int8   // defaults to 0 when omitted in POST payload
 }
 
 type BulkUpdateLeadStatusRequest struct {
 	LeadIDs      []int64 `json:"leadIds" binding:"required"`
 	LeadStatusID int8    `json:"leadStatusId" binding:"required"`
+}
+
+// ApproveLeadRequest is the body for POST /api/v1/leads/{id}/report-approve (report fit / hold / unfit).
+type ApproveLeadRequest struct {
+	Status        string `json:"status" binding:"required"`
+	Remarks       string `json:"remarks"`
+	AllowDownload bool   `json:"allowDownload"`
 }
 
 // LeadUpdateRequest is for PUT; all fields optional. At least one must be set.

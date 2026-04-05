@@ -4,59 +4,65 @@ import (
 	"strings"
 
 	"b2b-diagnostic-aggregator/apis/internal/domain"
-	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
+	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 )
 
 func mapLeadToDomain(p persistencemodels.Lead) domain.Lead {
 	return domain.Lead{
-		LeadID:        p.LeadID,
-		ClientID:      p.ClientID,
-		PatientID:     p.PatientID,
-		PatientName:   p.PatientName,
-		Age:           p.Age,
-		Gender:        p.Gender,
-		PackageID:     p.PackageID,
-		ContactNumber: p.ContactNumber,
-		Emailid:       p.Emailid,
-		Address:       p.Address,
-		CityID:        p.CityID,
-		StateID:       p.StateID,
-		Pincode:       p.Pincode,
+		LeadID:                  p.LeadID,
+		ClientID:                p.ClientID,
+		PatientID:               p.PatientID,
+		PatientName:             p.PatientName,
+		Age:                     p.Age,
+		Gender:                  p.Gender,
+		PackageID:               p.PackageID,
+		ContactNumber:           p.ContactNumber,
+		Emailid:                 p.Emailid,
+		Address:                 p.Address,
+		CityID:                  p.CityID,
+		StateID:                 p.StateID,
+		Pincode:                 p.Pincode,
 		LeadStatusID:            p.LeadStatusID,
 		IsFit:                   p.IsFit,
+		IsReportDownloadable:    p.IsReportDownloadable,
+		ApprovalRemarks:         derefString(p.ApprovalRemarks),
+		FitUpdatedOn:            timeutil.FromTimePtr(p.FitUpdatedOn),
 		IsFitCertifiedGenerated: p.IsFitCertifiedGenerated,
 		ReportURL:               derefReportURL(p.ReportURL),
-		CreatedBy:     p.CreatedBy,
-		CreatedOn:     timeutil.FromTime(p.CreatedOn),
-		LastUpdatedBy: p.LastUpdatedBy,
-		LastUpdatedOn: timeutil.FromTime(p.LastUpdatedOn),
+		CreatedBy:               p.CreatedBy,
+		CreatedOn:               timeutil.FromTime(p.CreatedOn),
+		LastUpdatedBy:           p.LastUpdatedBy,
+		LastUpdatedOn:           timeutil.FromTime(p.LastUpdatedOn),
 	}
 }
 
 func mapLeadToPersistence(d domain.Lead) persistencemodels.Lead {
 	return persistencemodels.Lead{
-		LeadID:        d.LeadID,
-		ClientID:      d.ClientID,
-		PatientID:     d.PatientID,
-		PatientName:   d.PatientName,
-		Age:           d.Age,
-		Gender:        d.Gender,
-		PackageID:     d.PackageID,
-		ContactNumber: d.ContactNumber,
-		Emailid:       d.Emailid,
-		Address:       d.Address,
-		CityID:        d.CityID,
-		StateID:       d.StateID,
-		Pincode:       d.Pincode,
+		LeadID:                  d.LeadID,
+		ClientID:                d.ClientID,
+		PatientID:               d.PatientID,
+		PatientName:             d.PatientName,
+		Age:                     d.Age,
+		Gender:                  d.Gender,
+		PackageID:               d.PackageID,
+		ContactNumber:           d.ContactNumber,
+		Emailid:                 d.Emailid,
+		Address:                 d.Address,
+		CityID:                  d.CityID,
+		StateID:                 d.StateID,
+		Pincode:                 d.Pincode,
 		LeadStatusID:            d.LeadStatusID,
 		IsFit:                   d.IsFit,
+		IsReportDownloadable:    d.IsReportDownloadable,
+		ApprovalRemarks:         stringPtrOrNil(d.ApprovalRemarks),
+		FitUpdatedOn:            timeutil.ToTimePtr(d.FitUpdatedOn),
 		IsFitCertifiedGenerated: d.IsFitCertifiedGenerated,
 		ReportURL:               stringPtrOrNil(d.ReportURL),
-		CreatedBy:     d.CreatedBy,
-		CreatedOn:     d.CreatedOn.ToTime(),
-		LastUpdatedBy: d.LastUpdatedBy,
-		LastUpdatedOn: d.LastUpdatedOn.ToTime(),
+		CreatedBy:               d.CreatedBy,
+		CreatedOn:               d.CreatedOn.ToTime(),
+		LastUpdatedBy:           d.LastUpdatedBy,
+		LastUpdatedOn:           d.LastUpdatedOn.ToTime(),
 	}
 }
 
@@ -73,6 +79,13 @@ func stringPtrOrNil(s string) *string {
 		return nil
 	}
 	return &t
+}
+
+func derefString(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return strings.TrimSpace(*p)
 }
 
 func mapLeadsToDomain(leads []persistencemodels.Lead) []domain.Lead {

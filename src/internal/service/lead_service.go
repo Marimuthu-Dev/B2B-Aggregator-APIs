@@ -32,6 +32,8 @@ type LeadService interface {
 	UploadBloodTestReport(ctx context.Context, leadID int64, uploadedBy int64, fh *multipart.FileHeader) (reportURL string, err error)
 	// GetLeadReportDownloadURL returns a time-limited SAS URL for the lead's stored ReportURL blob.
 	GetLeadReportDownloadURL(ctx context.Context, leadID int64) (downloadURL string, expiresAt time.Time, err error)
+	// ApproveLeadReport sets tri-state IsFit, download flag, and approval remarks (see domain.LeadFit*).
+	ApproveLeadReport(leadID int64, req *dto.ApproveLeadRequest, userID int64) error
 }
 
 type leadService struct {
@@ -78,6 +80,9 @@ func (s *leadService) CreateLead(l *domain.Lead, createdBy int64) error {
 	l.CreatedOn = timeutil.FromTime(now)
 	l.LastUpdatedBy = createdBy
 	l.LastUpdatedOn = timeutil.FromTime(now)
+	// Default matches legacy BIT false -> UNFIT after migration; create payload does not send approval fields.
+	l.IsFit = domain.LeadFitUnfit
+	l.IsReportDownloadable = false
 	l.PatientID = s.GeneratePatientID(l.PatientName, l.ContactNumber)
 
 	return s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
@@ -319,6 +324,7 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 			StateID:       atInt8(row, "StateID"),
 			Pincode:       at(row, "Pincode"),
 			LeadStatusID:  atInt8(row, "LeadStatusID"),
+			IsFit:         domain.LeadFitUnfit,
 			CreatedBy:     createdBy,
 			CreatedOn:     timeutil.FromTime(now),
 			LastUpdatedBy: createdBy,
@@ -422,6 +428,10 @@ func (s *leadService) GetLeadReportDownloadURL(ctx context.Context, leadID int64
 		}
 		return "", time.Time{}, err
 	}
+	// FIT may download by default; ON HOLD / UNFIT require IsReportDownloadable (explicit approval flag).
+	if lead.IsFit != domain.LeadFitFit && !lead.IsReportDownloadable {
+		return "", time.Time{}, apperrors.NewForbidden("Report download is not allowed for this lead", nil)
+	}
 	raw := strings.TrimSpace(lead.ReportURL)
 	if raw == "" {
 		return "", time.Time{}, apperrors.NewNotFound("No report uploaded for this lead", gorm.ErrRecordNotFound)
@@ -431,4 +441,69 @@ func (s *leadService) GetLeadReportDownloadURL(ctx context.Context, leadID int64
 		return "", time.Time{}, apperrors.NewInternal("Failed to generate report download link", err)
 	}
 	return u, exp, nil
+}
+
+func parseLeadApprovalStatus(s string) (int8, error) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "fit":
+		return domain.LeadFitFit, nil
+	case "unfit":
+		return domain.LeadFitUnfit, nil
+	case "hold":
+		return domain.LeadFitHold, nil
+	default:
+		return 0, apperrors.NewBadRequest(`status must be "fit", "unfit", or "hold"`, nil)
+	}
+}
+
+func truncateLeadApprovalRemarks(s string, maxRunes int) string {
+	r := []rune(strings.TrimSpace(s))
+	if len(r) <= maxRunes {
+		return string(r)
+	}
+	return string(r[:maxRunes])
+}
+
+func (s *leadService) ApproveLeadReport(leadID int64, req *dto.ApproveLeadRequest, userID int64) error {
+	if req == nil {
+		return apperrors.NewBadRequest("Request body is required", nil)
+	}
+	isFit, err := parseLeadApprovalStatus(req.Status)
+	if err != nil {
+		return err
+	}
+	lead, err := s.repo.FindByID(leadID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return apperrors.NewNotFound("Lead not found", err)
+		}
+		return err
+	}
+	if lead.LeadStatusID != domain.LeadStatusIDReportApproval {
+		return apperrors.NewBadRequest("Report approval is only allowed when lead status ID is 8", nil)
+	}
+	remarksNorm := truncateLeadApprovalRemarks(req.Remarks, 250)
+	var remarksPtr *string
+	if remarksNorm != "" {
+		remarksPtr = &remarksNorm
+	}
+	// Skip DB only when nothing changes; if status is still "uploaded" (8) but decision is FIT, we must run once to set LeadStatusID = 9.
+	same := lead.IsFit == isFit && lead.IsReportDownloadable == req.AllowDownload && strings.TrimSpace(lead.ApprovalRemarks) == remarksNorm
+	if same && !(isFit == domain.LeadFitFit && lead.LeadStatusID == domain.LeadStatusIDReportUploaded) {
+		return nil
+	}
+	return s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
+		n, err := leadRepo.UpdateLeadReportApproval(leadID, userID, isFit, req.AllowDownload, remarksPtr)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return apperrors.NewConflict("Lead could not be updated; it may no longer be in status 8", nil)
+		}
+		return historyRepo.LogAction(&domain.LeadHistory{
+			LeadID:    leadID,
+			Action:    domain.LeadActionReportApproval,
+			CreatedBy: userID,
+		})
+	})
 }

@@ -175,6 +175,67 @@ func (h *LeadHandler) UploadReport(c *gin.Context) {
 	respondData(c, http.StatusOK, gin.H{"reportUrl": reportURL}, "Report uploaded successfully", nil)
 }
 
+// ApproveReport updates lead report approval (fit / unfit / hold), download flag, and remarks.
+//
+// OpenAPI 3.0 (informal):
+//
+//	post:
+//	  summary: Approve lead report status
+//	  operationId: approveLeadReport
+//	  path: /api/v1/leads/{id}/report-approve
+//	  tags: [Leads]
+//	  security: [{ bearerAuth: [] }]
+//	  parameters:
+//	    - name: id
+//	      in: path
+//	      required: true
+//	      schema: { type: integer, format: int64 }
+//	  requestBody:
+//	    required: true
+//	    content:
+//	      application/json:
+//	        schema:
+//	          type: object
+//	          required: [status]
+//	          properties:
+//	            status: { type: string, enum: [fit, unfit, hold] }
+//	            remarks: { type: string, maxLength: 250 }
+//	            allowDownload: { type: boolean }
+//	  responses:
+//	    "200":
+//	      description: OK
+//	      content:
+//	        application/json:
+//	          schema:
+//	            type: object
+//	            properties:
+//	              success: { type: boolean, example: true }
+//	              message: { type: string }
+//	              timestamp: { type: string, format: date-time }
+func (h *LeadHandler) ApproveReport(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+		return
+	}
+	var params dto.IDParam
+	if !middleware.BindUri(c, &params) {
+		return
+	}
+	if !middleware.RequirePositiveID(c, params.ID) {
+		return
+	}
+	var req dto.ApproveLeadRequest
+	if !middleware.BindJSON(c, &req) {
+		return
+	}
+	if err := h.svc.ApproveLeadReport(params.ID, &req, userID); err != nil {
+		respondError(c, err)
+		return
+	}
+	respondMessage(c, http.StatusOK, "Lead report status updated successfully")
+}
+
 // GetReportDownloadURL returns a short-lived SAS URL to view/download the lead's blood test report PDF.
 func (h *LeadHandler) GetReportDownloadURL(c *gin.Context) {
 	var params dto.IDParam
