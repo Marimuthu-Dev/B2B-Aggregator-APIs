@@ -76,14 +76,14 @@ func mapClientLocationToDomain(p persistencemodels.ClientLocation) domain.Client
 	return domain.ClientLocation{
 		ClientLocationID: p.ClientLocationID,
 		ClientID:         p.ClientID,
-		Address:          p.Address,
-		Pincode:          p.Pincode,
+		Address:          derefString(p.Address),
+		Pincode:          derefString(p.Pincode),
 		CityID:           p.CityID,
 		StateID:          p.StateID,
-		IsActive:         p.IsActive,
-		CreatedBy:        p.CreatedBy,
+		IsActive:         derefBoolDefaultTrue(p.IsActive),
+		CreatedBy:        derefInt64Zero(p.CreatedBy),
 		CreatedOn:        timeutil.FromTime(p.CreatedOn),
-		LastUpdatedBy:    p.LastUpdatedBy,
+		LastUpdatedBy:    derefInt64Zero(p.LastUpdatedBy),
 		LastUpdatedOn:    timeutil.FromTime(p.LastUpdatedOn),
 	}
 }
@@ -92,16 +92,43 @@ func mapClientLocationToPersistence(d domain.ClientLocation) persistencemodels.C
 	return persistencemodels.ClientLocation{
 		ClientLocationID: d.ClientLocationID,
 		ClientID:         d.ClientID,
-		Address:          d.Address,
-		Pincode:          d.Pincode,
+		Address:          stringPtrOrNil(d.Address),
+		Pincode:          stringPtrOrNil(d.Pincode),
 		CityID:           d.CityID,
 		StateID:          d.StateID,
-		IsActive:         d.IsActive,
-		CreatedBy:        d.CreatedBy,
+		IsActive:         boolPtr(d.IsActive),
+		CreatedBy:        int64PtrOrNil(d.CreatedBy),
 		CreatedOn:        d.CreatedOn.ToTime(),
-		LastUpdatedBy:    d.LastUpdatedBy,
+		LastUpdatedBy:    int64PtrOrNil(d.LastUpdatedBy),
 		LastUpdatedOn:    d.LastUpdatedOn.ToTime(),
 	}
+}
+
+func derefBoolDefaultTrue(p *bool) bool {
+	if p == nil {
+		return true
+	}
+	return *p
+}
+
+func derefInt64Zero(p *int64) int64 {
+	if p == nil {
+		return 0
+	}
+	return *p
+}
+
+func boolPtr(b bool) *bool {
+	x := b
+	return &x
+}
+
+func int64PtrOrNil(v int64) *int64 {
+	if v == 0 {
+		return nil
+	}
+	x := v
+	return &x
 }
 
 func mapClientLocationsToDomain(list []persistencemodels.ClientLocation) []domain.ClientLocation {

@@ -8,10 +8,10 @@ import (
 
 type PackageClientMappingRepository interface {
 	Create(m *persistencemodels.PackageClientMapping) error
-	FindByPackageAndClient(packageID int, clientID int64) (*persistencemodels.PackageClientMapping, error)
-	FindByID(id int) (*persistencemodels.PackageClientMapping, error)
+	FindByPackageAndClient(packageID int64, clientID int64) (*persistencemodels.PackageClientMapping, error)
+	FindByID(id int64) (*persistencemodels.PackageClientMapping, error)
 	FindAll() ([]persistencemodels.PackageClientMapping, error)
-	FindByPackageID(packageID int) ([]persistencemodels.PackageClientMapping, error)
+	FindByPackageID(packageID int64) ([]persistencemodels.PackageClientMapping, error)
 	Update(m *persistencemodels.PackageClientMapping) error
 }
 
@@ -27,7 +27,7 @@ func (r *packageClientMappingRepository) Create(m *persistencemodels.PackageClie
 	return r.db.Create(m).Error
 }
 
-func (r *packageClientMappingRepository) FindByPackageAndClient(packageID int, clientID int64) (*persistencemodels.PackageClientMapping, error) {
+func (r *packageClientMappingRepository) FindByPackageAndClient(packageID int64, clientID int64) (*persistencemodels.PackageClientMapping, error) {
 	var m persistencemodels.PackageClientMapping
 	err := r.db.Where("PackageID = ? AND ClientID = ? AND IsActive = ?", packageID, clientID, true).First(&m).Error
 	if err != nil {
@@ -36,7 +36,7 @@ func (r *packageClientMappingRepository) FindByPackageAndClient(packageID int, c
 	return &m, nil
 }
 
-func (r *packageClientMappingRepository) FindByID(id int) (*persistencemodels.PackageClientMapping, error) {
+func (r *packageClientMappingRepository) FindByID(id int64) (*persistencemodels.PackageClientMapping, error) {
 	var m persistencemodels.PackageClientMapping
 	err := r.db.First(&m, id).Error
 	if err != nil {
@@ -51,7 +51,7 @@ func (r *packageClientMappingRepository) FindAll() ([]persistencemodels.PackageC
 	return list, err
 }
 
-func (r *packageClientMappingRepository) FindByPackageID(packageID int) ([]persistencemodels.PackageClientMapping, error) {
+func (r *packageClientMappingRepository) FindByPackageID(packageID int64) ([]persistencemodels.PackageClientMapping, error) {
 	var list []persistencemodels.PackageClientMapping
 	err := r.db.Where("PackageID = ?", packageID).Find(&list).Error
 	return list, err

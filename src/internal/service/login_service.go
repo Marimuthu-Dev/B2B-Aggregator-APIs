@@ -137,7 +137,7 @@ func (s *loginService) Login(req dto.LoginRequest) (*dto.LoginResponse, error) {
 		userTypeStr = login.UserType
 		userType = 0
 		switch login.UserType {
-		case "1", "employee", "um-staging-ops-web.azurewebsites.net":
+		case "1", "employee", "um-staging-ops-web.azurewebsites.net","um-prod-web.azurewebsites.net":
 			userType = utils.UserTypeEmployee
 		case "2", "client", "um-staging-client-web.azurewebsites.net":
 			userType = utils.UserTypeClient

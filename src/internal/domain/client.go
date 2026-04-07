@@ -18,6 +18,7 @@ type Client struct {
 	ContactPerson2EmailID     *string
 	ContactPerson2Designation *string
 	CategoryID                *int8
+	NatureOfBusiness          *string
 	GSTIN_UIN                 *string
 	PANNumber                 *string
 	BusinessVertical          string	

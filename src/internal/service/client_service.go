@@ -174,6 +174,9 @@ func applyClientUpdatePatch(c *domain.Client, update *dto.ClientUpdateRequest) {
 	if update.CategoryID != nil {
 		c.CategoryID = update.CategoryID
 	}
+	if update.NatureOfBusiness != nil {
+		c.NatureOfBusiness = update.NatureOfBusiness
+	}
 	if update.GSTIN_UIN != nil {
 		c.GSTIN_UIN = update.GSTIN_UIN
 	}

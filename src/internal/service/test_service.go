@@ -13,7 +13,7 @@ import (
 type TestService interface {
 	GetAllTests() ([]domain.Test, error)
 	GetActiveTests() ([]domain.Test, error)
-	GetTestByID(id int) (*domain.Test, error)
+	GetTestByID(id int64) (*domain.Test, error)
 }
 
 type testService struct {
@@ -32,7 +32,7 @@ func (s *testService) GetActiveTests() ([]domain.Test, error) {
 	return s.repo.FindAllActive()
 }
 
-func (s *testService) GetTestByID(id int) (*domain.Test, error) {
+func (s *testService) GetTestByID(id int64) (*domain.Test, error) {
 	test, err := s.repo.FindByID(id)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, apperrors.NewNotFound("Test not found", err)

@@ -15,7 +15,7 @@ const (
 func GetUserTypeFromDomain(domain string) int {
 	var userType int
 	switch domain {
-	case "1", "employee", "um-staging-ops-web.azurewebsites.net":
+	case "1", "employee", "um-staging-ops-web.azurewebsites.net","um-prod-web.azurewebsites.net":
 		userType = UserTypeEmployee
 	case "2", "client", "um-staging-client-web.azurewebsites.net":
 		userType = UserTypeClient

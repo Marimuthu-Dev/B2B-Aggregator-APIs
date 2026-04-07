@@ -5,15 +5,15 @@ type IDParam struct {
 }
 
 type PackageIDParam struct {
-	ID int `uri:"id" binding:"required"`
+	ID int64 `uri:"id" binding:"required"`
 }
 
 type TestIDParam struct {
-	ID int `uri:"id" binding:"required"`
+	ID int64 `uri:"id" binding:"required"`
 }
 
 type PackageMappingIDParam struct {
-	ID int `uri:"id" binding:"required"`
+	ID int64 `uri:"id" binding:"required"`
 }
 
 type ClientIDPathParam struct {

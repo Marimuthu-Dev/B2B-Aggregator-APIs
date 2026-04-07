@@ -3,9 +3,9 @@ package models
 import "time"
 
 type Package struct {
-	PackageID     int       `gorm:"primaryKey;column:PackageID;autoIncrement"`
-	PackageName   string    `gorm:"column:PackageName;type:varchar(500);not null"`
-	Description   string    `gorm:"column:Description;type:text"`
+	PackageID     int64     `gorm:"primaryKey;column:PackageID;autoIncrement"`
+	PackageName   string    `gorm:"column:PackageName;type:varchar(75);not null"`
+	Description   *string   `gorm:"column:Description;type:varchar(250)"`
 	IsActive      bool      `gorm:"column:IsActive;not null;default:true"`
 	CreatedBy     int64     `gorm:"column:CreatedBy;not null"`
 	CreatedOn     time.Time `gorm:"column:CreatedOn;not null;default:GETDATE()"`

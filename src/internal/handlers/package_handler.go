@@ -161,7 +161,7 @@ func (h *PackageHandler) UpdatePackageStatus(c *gin.Context) {
 	if !middleware.BindUri(c, &params) {
 		return
 	}
-	if !middleware.RequirePositiveID(c, int64(params.ID)) {
+	if !middleware.RequirePositiveID(c, params.ID) {
 		return
 	}
 	var req dto.PackageStatusUpdateRequest
@@ -226,7 +226,7 @@ func (h *PackageHandler) UpdatePackageClientMappingStatus(c *gin.Context) {
 	if !middleware.BindUri(c, &params) {
 		return
 	}
-	if !middleware.RequirePositiveID(c, int64(params.ID)) {
+	if !middleware.RequirePositiveID(c, params.ID) {
 		return
 	}
 	var req dto.PackageMappingStatusUpdateRequest
@@ -299,7 +299,7 @@ func (h *PackageHandler) UpdatePackageLabMappingStatus(c *gin.Context) {
 	if !middleware.BindUri(c, &params) {
 		return
 	}
-	if !middleware.RequirePositiveID(c, int64(params.ID)) {
+	if !middleware.RequirePositiveID(c, params.ID) {
 		return
 	}
 	var req dto.PackageMappingStatusUpdateRequest

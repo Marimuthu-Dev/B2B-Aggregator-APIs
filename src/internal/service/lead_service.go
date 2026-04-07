@@ -67,7 +67,7 @@ func (s *leadService) GetLeadByID(id int64) (*domain.LeadDetail, error) {
 		}
 	}
 	if lead.PackageID != 0 {
-		if pkg, _ := s.packageRepo.FindByID(lead.PackageID); pkg != nil {
+		if pkg, _ := s.packageRepo.FindByID(int64(lead.PackageID)); pkg != nil {
 			detail.PackageName = pkg.PackageName
 		}
 	}

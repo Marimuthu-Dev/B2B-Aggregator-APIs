@@ -26,7 +26,7 @@ func mapLeadToDomain(p persistencemodels.Lead) domain.Lead {
 		LeadStatusID:            p.LeadStatusID,
 		AppointmentAt:           timeutil.FromTimePtr(p.AppointmentAt),
 		LabID:                   p.LabID,
-		IsFit:                   p.IsFit,
+		IsFit:                   isFitFromPtr(p.IsFit),
 		IsReportDownloadable:    p.IsReportDownloadable,
 		ApprovalRemarks:         derefString(p.ApprovalRemarks),
 		FitUpdatedOn:            timeutil.FromTimePtr(p.FitUpdatedOn),
@@ -57,7 +57,7 @@ func mapLeadToPersistence(d domain.Lead) persistencemodels.Lead {
 		LeadStatusID:            d.LeadStatusID,
 		AppointmentAt:           timeutil.ToTimePtr(d.AppointmentAt),
 		LabID:                   d.LabID,
-		IsFit:                   d.IsFit,
+		IsFit:                   isFitToPtr(d.IsFit),
 		IsReportDownloadable:    d.IsReportDownloadable,
 		ApprovalRemarks:         stringPtrOrNil(d.ApprovalRemarks),
 		FitUpdatedOn:            timeutil.ToTimePtr(d.FitUpdatedOn),
@@ -90,6 +90,18 @@ func derefString(p *string) string {
 		return ""
 	}
 	return strings.TrimSpace(*p)
+}
+
+func isFitFromPtr(p *int8) int8 {
+	if p == nil {
+		return domain.LeadFitHold
+	}
+	return *p
+}
+
+func isFitToPtr(v int8) *int8 {
+	x := v
+	return &x
 }
 
 func mapLeadsToDomain(leads []persistencemodels.Lead) []domain.Lead {

@@ -3,7 +3,7 @@ package domain
 import "b2b-diagnostic-aggregator/apis/internal/timeutil"
 
 type Package struct {
-	PackageID     int
+	PackageID     int64
 	PackageName   string
 	Description   string
 	IsActive      bool
@@ -16,13 +16,13 @@ type Package struct {
 // PackageWithTestsDetail is one item for GET /packages/with-tests-details response.
 type PackageWithTestsDetail struct {
 	PackageDetails Package `json:"packageDetails"`
-	TestIDs       []int          `json:"testIds"`
+	TestIDs       []int64        `json:"testIds"`
 	TestCount     int            `json:"testCount"`
 	TestDetails   []TestInPackage `json:"testDetails"`
 }
 
 type TestInPackage struct {
-	TestID   int    `json:"TestID"`
+	TestID   int64  `json:"TestID"`
 	TestName string `json:"TestName"`
 	Category string `json:"Category"`
 	IsActive bool   `json:"IsActive"`
@@ -30,10 +30,10 @@ type TestInPackage struct {
 
 // PackageClientMappingView is package-client mapping with names for list response.
 type PackageClientMappingView struct {
-	PackageClientID int       `json:"PackageClientID"`
-	PackageID       int       `json:"PackageID"`
+	PackageClientID int64     `json:"PackageClientID"`
+	PackageID       int64     `json:"PackageID"`
 	ClientID        int64     `json:"ClientID"`
-	Price           float64   `json:"Price"`
+	Price           int       `json:"Price"`
 	IsActive        bool      `json:"IsActive"`
 	CreatedBy       int64     `json:"CreatedBy"`
 	CreatedOn       timeutil.ISTTime `json:"CreatedOn"`
@@ -45,10 +45,10 @@ type PackageClientMappingView struct {
 
 // PackageLabMappingView is package-lab mapping with names for list response.
 type PackageLabMappingView struct {
-	PackageLabID  int       `json:"PackageLabID"`
-	PackageID     int       `json:"PackageID"`
+	PackageLabID  int64     `json:"PackageLabID"`
+	PackageID     int64     `json:"PackageID"`
 	LabID         int64     `json:"LabID"`
-	Price         float64   `json:"Price"`
+	Price         int       `json:"Price"`
 	IsActive      bool      `json:"IsActive"`
 	CreatedBy     int64     `json:"CreatedBy"`
 	CreatedOn     timeutil.ISTTime `json:"CreatedOn"`
