@@ -12,7 +12,7 @@ const (
 // LeadStatusIDDefault is the initial status for new leads when the client omits LeadStatusID (JSON zero / empty CSV).
 const LeadStatusIDDefault int8 = 1
 
-// Lead workflow: 8 = report uploaded (eligible for POST /leads/{id}/report-approve); 9 = report approved (set when IsFit = 1 on approve).
+// Lead workflow: 8 = report uploaded (eligible for POST /leads/{id}/reports/approve); 9 = report approved (set when IsFit = 1 on approve).
 const (
 	LeadStatusIDReportUploaded int8 = 8
 	LeadStatusIDReportApproved int8 = 9
@@ -80,6 +80,6 @@ const (
 	LeadActionReportReadyToDownload = "Report Ready to Download"
 	// LeadActionFitCertificationGenerated is logged when the fitness worker merges the certificate PDF with the report.
 	LeadActionFitCertificationGenerated = "Fit Certification Generated"
-	// LeadActionReportApproval is logged when a user sets fit/hold/unfit and download/remarks via report-approve API.
+	// LeadActionReportApproval is logged when a user sets fit/hold/unfit and download/remarks via POST /leads/{id}/reports/approve.
 	LeadActionReportApproval = "Report Approval"
 )

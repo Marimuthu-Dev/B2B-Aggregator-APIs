@@ -31,7 +31,7 @@ type BulkUpdateLeadStatusRequest struct {
 	LeadStatusID int8    `json:"leadStatusId" binding:"required"`
 }
 
-// ApproveLeadRequest is the body for POST /api/v1/leads/{id}/report-approve (report fit / hold / unfit).
+// ApproveLeadRequest is the body for POST /api/v1/leads/{id}/reports/approve (report fit / hold / unfit).
 type ApproveLeadRequest struct {
 	Status        string `json:"status" binding:"required"`
 	Remarks       string `json:"remarks"`

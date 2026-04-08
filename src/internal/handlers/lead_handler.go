@@ -165,6 +165,7 @@ func (h *LeadHandler) BulkUpdateStatus(c *gin.Context) {
 	respondData(c, http.StatusOK, gin.H{"updatedCount": count}, "Lead statuses updated successfully", nil)
 }
 
+// UploadReport handles POST /api/v1/leads/{id}/reports/upload (multipart field "file", PDF).
 func (h *LeadHandler) UploadReport(c *gin.Context) {
 	userID, ok := middleware.GetUserID(c)
 	if !ok {
@@ -208,7 +209,7 @@ func (h *LeadHandler) UploadReport(c *gin.Context) {
 //	post:
 //	  summary: Approve lead report status
 //	  operationId: approveLeadReport
-//	  path: /api/v1/leads/{id}/report-approve
+//	  path: /api/v1/leads/{id}/reports/approve
 //	  tags: [Leads]
 //	  security: [{ bearerAuth: [] }]
 //	  parameters:
@@ -271,7 +272,7 @@ func (h *LeadHandler) ApproveReport(c *gin.Context) {
 	respondMessage(c, http.StatusOK, "Lead report status updated successfully")
 }
 
-// GetReportDownloadURL returns a short-lived SAS URL to view/download the lead's blood test report PDF.
+// GetReportDownloadURL handles GET /api/v1/leads/{id}/reports/download-url (short-lived SAS URL for the report PDF).
 func (h *LeadHandler) GetReportDownloadURL(c *gin.Context) {
 	var params dto.IDParam
 	if !middleware.BindUri(c, &params) {
