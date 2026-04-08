@@ -1,6 +1,11 @@
 package utils
 
-import "fmt"
+import (
+	"fmt"
+	"net"
+	"net/url"
+	"strings"
+)
 
 // UserType constants matching Node.js (1=employee, 2=client, 3=lab)
 const (
@@ -9,17 +14,35 @@ const (
 	UserTypeLab      = 3
 )
 
+// normalizeLoginDomain trims, lowercases, extracts host from full URLs, strips ports, and trailing dots.
+func normalizeLoginDomain(raw string) string {
+	s := strings.TrimSpace(strings.ToLower(raw))
+	if s == "" {
+		return ""
+	}
+	if strings.Contains(s, "://") {
+		if u, err := url.Parse(s); err == nil && u.Host != "" {
+			s = u.Hostname()
+		}
+	} else if host, _, err := net.SplitHostPort(s); err == nil {
+		s = host
+	}
+	return strings.TrimSuffix(s, ".")
+}
+
 // GetUserTypeFromDomain returns userType (1=employee, 2=client, 3=lab) from domain string.
-// Accepts short names (employee, client, lab), numeric ("1","2","3"), or staging URLs.
+// Accepts short names (employee, client, lab), numeric ("1","2","3"), staging URLs, or prod hostnames.
+// Full URLs (e.g. https://ops.urmediconnect.com) and host:port are normalized to the hostname.
 // Returns 0 for invalid/unknown domain (matches Node.js getUserTypeFromDomain).
 func GetUserTypeFromDomain(domain string) int {
+	domain = normalizeLoginDomain(domain)
 	var userType int
 	switch domain {
-	case "1", "employee", "um-staging-ops-web.azurewebsites.net","um-prod-web.azurewebsites.net":
+	case "1", "employee", "um-staging-ops-web.azurewebsites.net", "um-prod-web.azurewebsites.net", "ops.urmediconnect.com":
 		userType = UserTypeEmployee
-	case "2", "client", "um-staging-client-web.azurewebsites.net":
+	case "2", "client", "um-staging-client-web.azurewebsites.net", "client.urmediconnect.com":
 		userType = UserTypeClient
-	case "3", "lab", "um-staging-lab-web.azurewebsites.net":
+	case "3", "lab", "um-staging-lab-web.azurewebsites.net", "lab.urmediconnect.com":
 		userType = UserTypeLab
 	default:
 		userType = 0 // invalid domain, same as Node.js
