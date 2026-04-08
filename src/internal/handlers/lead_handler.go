@@ -7,10 +7,12 @@ import (
 	"time"
 
 	"b2b-diagnostic-aggregator/apis/internal/apperrors"
+	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
 	"b2b-diagnostic-aggregator/apis/internal/middleware"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/service"
+	"b2b-diagnostic-aggregator/apis/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -29,6 +31,11 @@ func (h *LeadHandler) GetAll(c *gin.Context) {
 		return
 	}
 	if err := enrichLeadListQueryFromPascalCaseKeys(c, &query); err != nil {
+		respondError(c, err)
+		return
+	}
+	applyLeadListScopeFromJWT(c, &query)
+	if err := requireLeadListJWTSatisfied(c, &query); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -65,6 +72,10 @@ func (h *LeadHandler) GetByID(c *gin.Context) {
 	data, err := h.svc.GetLeadByID(params.ID)
 	if err != nil {
 		respondError(c, err)
+		return
+	}
+	if !leadDetailAccessibleByJWT(c, data) {
+		respondError(c, apperrors.NewNotFound("Lead not found", nil))
 		return
 	}
 	respondData(c, http.StatusOK, data, "Success", nil)
@@ -255,7 +266,8 @@ func (h *LeadHandler) GetReportDownloadURL(c *gin.Context) {
 	if ut, ok := middleware.GetUserType(c); ok {
 		userType = ut
 	}
-	downloadURL, expiresAt, err := h.svc.GetLeadReportDownloadURL(c.Request.Context(), params.ID, userType)
+	userID, _ := middleware.GetUserID(c)
+	downloadURL, expiresAt, err := h.svc.GetLeadReportDownloadURL(c.Request.Context(), params.ID, userType, userID)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -305,6 +317,70 @@ func (h *LeadHandler) BulkImportCsv(c *gin.Context) {
 		return
 	}
 	respondData(c, http.StatusCreated, gin.H{"insertedCount": inserted}, "Leads imported successfully", nil)
+}
+
+// applyLeadListScopeFromJWT forces client/lab list scope from JWT: userType 2 → ClientID = userId;
+// userType 3 → LabID = userId (matches login token payload). Employees are unchanged; query filters
+// from the URL cannot widen scope for client/lab users.
+func applyLeadListScopeFromJWT(c *gin.Context, q *dto.LeadListQuery) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok || userID <= 0 {
+		return
+	}
+	userType, ok := middleware.GetUserType(c)
+	if !ok {
+		return
+	}
+	switch userType {
+	case utils.UserTypeClient:
+		q.ClientID = &userID
+	case utils.UserTypeLab:
+		q.LabID = &userID
+	}
+}
+
+// requireLeadListJWTSatisfied ensures client/lab callers always have a forced filter (no unscoped list).
+func requireLeadListJWTSatisfied(c *gin.Context, q *dto.LeadListQuery) error {
+	userType, ok := middleware.GetUserType(c)
+	if !ok {
+		return nil
+	}
+	switch userType {
+	case utils.UserTypeClient:
+		if q.ClientID == nil {
+			return apperrors.NewUnauthorized("Authentication required", nil)
+		}
+	case utils.UserTypeLab:
+		if q.LabID == nil {
+			return apperrors.NewUnauthorized("Authentication required", nil)
+		}
+	}
+	return nil
+}
+
+// leadDetailAccessibleByJWT enforces the same scope for single-lead reads (client / lab).
+func leadDetailAccessibleByJWT(c *gin.Context, d *domain.LeadDetail) bool {
+	if d == nil {
+		return false
+	}
+	userID, idOK := middleware.GetUserID(c)
+	userType, typeOK := middleware.GetUserType(c)
+	if !idOK || userID <= 0 || !typeOK {
+		return false
+	}
+	switch userType {
+	case utils.UserTypeEmployee:
+		return true
+	case utils.UserTypeClient:
+		return d.ClientID == userID
+	case utils.UserTypeLab:
+		if d.LabID == nil {
+			return false
+		}
+		return *d.LabID == userID
+	default:
+		return false
+	}
 }
 
 // enrichLeadListQueryFromPascalCaseKeys maps LabID / ClientID query keys to the DTO. Gin binds only

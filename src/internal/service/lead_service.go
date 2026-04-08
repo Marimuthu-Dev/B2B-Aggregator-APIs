@@ -33,7 +33,8 @@ type LeadService interface {
 	UploadBloodTestReport(ctx context.Context, leadID int64, uploadedBy int64, fh *multipart.FileHeader) (reportURL string, err error)
 	// GetLeadReportDownloadURL returns a time-limited SAS URL for the lead's stored ReportURL blob.
 	// For client JWTs (userType 2), download is allowed only when FIT or IsReportDownloadable; other user types skip that gate.
-	GetLeadReportDownloadURL(ctx context.Context, leadID int64, jwtUserType int) (downloadURL string, expiresAt time.Time, err error)
+	// jwtUserID scopes client (2) and lab (3) users to their own leads; employees ignore this value.
+	GetLeadReportDownloadURL(ctx context.Context, leadID int64, jwtUserType int, jwtUserID int64) (downloadURL string, expiresAt time.Time, err error)
 	// ApproveLeadReport sets tri-state IsFit, download flag, and approval remarks (see domain.LeadFit*).
 	ApproveLeadReport(leadID int64, req *dto.ApproveLeadRequest, userID int64) error
 }
@@ -434,7 +435,7 @@ func (s *leadService) UploadBloodTestReport(ctx context.Context, leadID int64, u
 	return reportURL, nil
 }
 
-func (s *leadService) GetLeadReportDownloadURL(ctx context.Context, leadID int64, jwtUserType int) (string, time.Time, error) {
+func (s *leadService) GetLeadReportDownloadURL(ctx context.Context, leadID int64, jwtUserType int, jwtUserID int64) (string, time.Time, error) {
 	if s.blobs == nil {
 		return "", time.Time{}, apperrors.NewInternal("Report storage is not configured", nil)
 	}
@@ -444,6 +445,22 @@ func (s *leadService) GetLeadReportDownloadURL(ctx context.Context, leadID int64
 			return "", time.Time{}, apperrors.NewNotFound("Lead not found", err)
 		}
 		return "", time.Time{}, err
+	}
+	if jwtUserType == utils.UserTypeClient {
+		if jwtUserID <= 0 {
+			return "", time.Time{}, apperrors.NewUnauthorized("Authentication required", nil)
+		}
+		if lead.ClientID != jwtUserID {
+			return "", time.Time{}, apperrors.NewNotFound("Lead not found", nil)
+		}
+	}
+	if jwtUserType == utils.UserTypeLab {
+		if jwtUserID <= 0 {
+			return "", time.Time{}, apperrors.NewUnauthorized("Authentication required", nil)
+		}
+		if lead.LabID == nil || *lead.LabID != jwtUserID {
+			return "", time.Time{}, apperrors.NewNotFound("Lead not found", nil)
+		}
 	}
 	// Client portal (JWT userType 2): FIT may download by default; ON HOLD / UNFIT require IsReportDownloadable.
 	if jwtUserType == utils.UserTypeClient {
