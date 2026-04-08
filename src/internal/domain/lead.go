@@ -16,6 +16,9 @@ const LeadStatusIDDefault int8 = 1
 const (
 	LeadStatusIDReportUploaded int8 = 8
 	LeadStatusIDReportApproved int8 = 9
+	// LeadStatusIDClientDownloadNoFitGate is the minimum LeadStatusID at which clients may obtain a report
+	// download URL without IsFit / IsReportDownloadable checks (e.g. post certificate merge, typically 10).
+	LeadStatusIDClientDownloadNoFitGate int8 = 10
 )
 
 // LeadStatusIDReportApproval is the LeadStatusID required on the lead row before approve may run (report uploaded).

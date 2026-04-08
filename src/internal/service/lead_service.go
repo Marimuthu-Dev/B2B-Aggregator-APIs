@@ -32,7 +32,9 @@ type LeadService interface {
 	// UploadBloodTestReport validates a PDF, uploads to blob storage, then updates lead + history in one DB transaction.
 	UploadBloodTestReport(ctx context.Context, leadID int64, uploadedBy int64, fh *multipart.FileHeader) (reportURL string, err error)
 	// GetLeadReportDownloadURL returns a time-limited SAS URL for the lead's stored ReportURL blob.
-	// For client JWTs (userType 2), download is allowed only when FIT or IsReportDownloadable; other user types skip that gate.
+	// Requires LeadStatusID >= LeadStatusIDReportUploaded (8) for all callers. For client JWTs (userType 2) with
+	// LeadStatusID < LeadStatusIDClientDownloadNoFitGate (10): FIT may download; ON HOLD (IsFit=0) only if
+	// IsReportDownloadable; UNFIT cannot download via IsReportDownloadable. At status >= 10, clients skip those checks.
 	// jwtUserID scopes client (2) and lab (3) users to their own leads; employees ignore this value.
 	GetLeadReportDownloadURL(ctx context.Context, leadID int64, jwtUserType int, jwtUserID int64) (downloadURL string, expiresAt time.Time, err error)
 	// ApproveLeadReport sets tri-state IsFit, download flag, and approval remarks (see domain.LeadFit*).
@@ -446,6 +448,9 @@ func (s *leadService) GetLeadReportDownloadURL(ctx context.Context, leadID int64
 		}
 		return "", time.Time{}, err
 	}
+	if lead.LeadStatusID < domain.LeadStatusIDReportUploaded {
+		return "", time.Time{}, apperrors.NewBadRequest("Report download is only allowed when lead status is report uploaded or later", nil)
+	}
 	if jwtUserType == utils.UserTypeClient {
 		if jwtUserID <= 0 {
 			return "", time.Time{}, apperrors.NewUnauthorized("Authentication required", nil)
@@ -462,9 +467,16 @@ func (s *leadService) GetLeadReportDownloadURL(ctx context.Context, leadID int64
 			return "", time.Time{}, apperrors.NewNotFound("Lead not found", nil)
 		}
 	}
-	// Client portal (JWT userType 2): FIT may download by default; ON HOLD / UNFIT require IsReportDownloadable.
-	if jwtUserType == utils.UserTypeClient {
-		if lead.IsFit != domain.LeadFitFit && !lead.IsReportDownloadable {
+	// Client portal: below status 10, FIT may download; HOLD (IsFit=0) only if IsReportDownloadable; UNFIT never via flag.
+	if jwtUserType == utils.UserTypeClient && lead.LeadStatusID < domain.LeadStatusIDClientDownloadNoFitGate {
+		switch lead.IsFit {
+		case domain.LeadFitFit:
+			// ok
+		case domain.LeadFitHold:
+			if !lead.IsReportDownloadable {
+				return "", time.Time{}, apperrors.NewForbidden("Report download is not allowed for this lead", nil)
+			}
+		default:
 			return "", time.Time{}, apperrors.NewForbidden("Report download is not allowed for this lead", nil)
 		}
 	}
