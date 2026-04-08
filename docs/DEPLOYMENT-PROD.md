@@ -127,7 +127,7 @@ az login
 
 ```bash
 az account list --output table
-az account set --subscription "Your production subscription name or ID"
+az account set --subscription "Azure subscription 1"
 ```
 
 Use the exact subscription name or ID from the list.
