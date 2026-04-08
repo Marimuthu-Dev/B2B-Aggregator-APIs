@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"b2b-diagnostic-aggregator/apis/internal/apperrors"
@@ -27,6 +28,10 @@ func (h *LeadHandler) GetAll(c *gin.Context) {
 	if !middleware.BindQuery(c, &query) {
 		return
 	}
+	if err := enrichLeadListQueryFromPascalCaseKeys(c, &query); err != nil {
+		respondError(c, err)
+		return
+	}
 	page := query.PaginationQuery.Normalize("createdOn", 0)
 	filter := repository.LeadListFilter{
 		Page:      page.Page,
@@ -34,6 +39,7 @@ func (h *LeadHandler) GetAll(c *gin.Context) {
 		SortBy:    page.SortBy,
 		SortOrder: page.SortOrder,
 		ClientID:  query.ClientID,
+		LabID:     query.LabID,
 		StatusID:  query.StatusID,
 		PackageID: query.PackageID,
 	}
@@ -245,7 +251,11 @@ func (h *LeadHandler) GetReportDownloadURL(c *gin.Context) {
 	if !middleware.RequirePositiveID(c, params.ID) {
 		return
 	}
-	downloadURL, expiresAt, err := h.svc.GetLeadReportDownloadURL(c.Request.Context(), params.ID)
+	userType := 0
+	if ut, ok := middleware.GetUserType(c); ok {
+		userType = ut
+	}
+	downloadURL, expiresAt, err := h.svc.GetLeadReportDownloadURL(c.Request.Context(), params.ID, userType)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -295,4 +305,29 @@ func (h *LeadHandler) BulkImportCsv(c *gin.Context) {
 		return
 	}
 	respondData(c, http.StatusCreated, gin.H{"insertedCount": inserted}, "Leads imported successfully", nil)
+}
+
+// enrichLeadListQueryFromPascalCaseKeys maps LabID / ClientID query keys to the DTO. Gin binds only
+// form-tagged names (labId, clientId); callers using PascalCase would otherwise get no filter.
+func enrichLeadListQueryFromPascalCaseKeys(c *gin.Context, q *dto.LeadListQuery) error {
+	if err := mergePositiveInt64Query(c, &q.LabID, "LabID"); err != nil {
+		return err
+	}
+	return mergePositiveInt64Query(c, &q.ClientID, "ClientID")
+}
+
+func mergePositiveInt64Query(c *gin.Context, dest **int64, key string) error {
+	if *dest != nil {
+		return nil
+	}
+	raw := strings.TrimSpace(c.Query(key))
+	if raw == "" {
+		return nil
+	}
+	id, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || id < 1 {
+		return apperrors.NewBadRequest("Invalid query parameter "+key+": must be a positive integer", err)
+	}
+	*dest = &id
+	return nil
 }

@@ -16,6 +16,7 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/dto"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/timeutil"
+	"b2b-diagnostic-aggregator/apis/pkg/utils"
 
 	"gorm.io/gorm"
 )
@@ -31,7 +32,8 @@ type LeadService interface {
 	// UploadBloodTestReport validates a PDF, uploads to blob storage, then updates lead + history in one DB transaction.
 	UploadBloodTestReport(ctx context.Context, leadID int64, uploadedBy int64, fh *multipart.FileHeader) (reportURL string, err error)
 	// GetLeadReportDownloadURL returns a time-limited SAS URL for the lead's stored ReportURL blob.
-	GetLeadReportDownloadURL(ctx context.Context, leadID int64) (downloadURL string, expiresAt time.Time, err error)
+	// For client JWTs (userType 2), download is allowed only when FIT or IsReportDownloadable; other user types skip that gate.
+	GetLeadReportDownloadURL(ctx context.Context, leadID int64, jwtUserType int) (downloadURL string, expiresAt time.Time, err error)
 	// ApproveLeadReport sets tri-state IsFit, download flag, and approval remarks (see domain.LeadFit*).
 	ApproveLeadReport(leadID int64, req *dto.ApproveLeadRequest, userID int64) error
 }
@@ -432,7 +434,7 @@ func (s *leadService) UploadBloodTestReport(ctx context.Context, leadID int64, u
 	return reportURL, nil
 }
 
-func (s *leadService) GetLeadReportDownloadURL(ctx context.Context, leadID int64) (string, time.Time, error) {
+func (s *leadService) GetLeadReportDownloadURL(ctx context.Context, leadID int64, jwtUserType int) (string, time.Time, error) {
 	if s.blobs == nil {
 		return "", time.Time{}, apperrors.NewInternal("Report storage is not configured", nil)
 	}
@@ -443,9 +445,11 @@ func (s *leadService) GetLeadReportDownloadURL(ctx context.Context, leadID int64
 		}
 		return "", time.Time{}, err
 	}
-	// FIT may download by default; ON HOLD / UNFIT require IsReportDownloadable (explicit approval flag).
-	if lead.IsFit != domain.LeadFitFit && !lead.IsReportDownloadable {
-		return "", time.Time{}, apperrors.NewForbidden("Report download is not allowed for this lead", nil)
+	// Client portal (JWT userType 2): FIT may download by default; ON HOLD / UNFIT require IsReportDownloadable.
+	if jwtUserType == utils.UserTypeClient {
+		if lead.IsFit != domain.LeadFitFit && !lead.IsReportDownloadable {
+			return "", time.Time{}, apperrors.NewForbidden("Report download is not allowed for this lead", nil)
+		}
 	}
 	raw := strings.TrimSpace(lead.ReportURL)
 	if raw == "" {

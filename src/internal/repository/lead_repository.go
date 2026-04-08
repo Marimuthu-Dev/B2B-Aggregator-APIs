@@ -57,6 +57,9 @@ func (r *leadRepository) List(filter LeadListFilter) ([]domain.Lead, int64, erro
 	if filter.ClientID != nil {
 		query = query.Where("ClientID = ?", *filter.ClientID)
 	}
+	if filter.LabID != nil {
+		query = query.Where("LabID = ?", *filter.LabID)
+	}
 	if filter.StatusID != nil {
 		query = query.Where("LeadStatusID = ?", *filter.StatusID)
 	}
@@ -84,6 +87,8 @@ func mapLeadSortColumn(sortBy string) string {
 		return "PatientName"
 	case "clientId":
 		return "ClientID"
+	case "labId":
+		return "LabID"
 	case "statusId":
 		return "LeadStatusID"
 	case "createdOn":
