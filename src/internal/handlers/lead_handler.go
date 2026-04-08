@@ -244,6 +244,15 @@ func (h *LeadHandler) ApproveReport(c *gin.Context) {
 		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
 		return
 	}
+	userType, typeOK := middleware.GetUserType(c)
+	if !typeOK {
+		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+		return
+	}
+	if userType != utils.UserTypeEmployee {
+		respondError(c, apperrors.NewForbidden("You are not authorized for this activity.", nil))
+		return
+	}
 	var params dto.IDParam
 	if !middleware.BindUri(c, &params) {
 		return
