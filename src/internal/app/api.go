@@ -60,8 +60,11 @@ func Run() error {
 	packageSvc := service.NewPackageService(packageRepo, testRepo, packageClientMapRepo, packageLabMapRepo, clientRepo, labRepo)
 	loginSvc := service.NewLoginService(loginRepo, forgotPasswordRepo, clientRepo, employeeRepo, labRepo, cfg.JWT)
 	var blobSvc service.BlobService
-	if strings.TrimSpace(cfg.AzureBlob.ConnectionString) != "" {
-		bs, err := storage.NewAzureMoUBlobService(cfg.AzureBlob, slog.Default())
+	ab := cfg.AzureBlob
+	blobConfigured := strings.TrimSpace(ab.ConnectionString) != "" ||
+		(strings.TrimSpace(ab.StorageAccountName) != "" && strings.TrimSpace(ab.StorageAccountKey) != "")
+	if blobConfigured {
+		bs, err := storage.NewAzureMoUBlobService(ab, slog.Default())
 		if err != nil {
 			log.Printf("MoU Azure Blob disabled (invalid config): %v", err)
 		} else {

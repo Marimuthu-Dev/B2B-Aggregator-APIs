@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/render"
 )
 
 func serverTimestamp() string {
@@ -18,7 +19,8 @@ func respondData(c *gin.Context, status int, data interface{}, message string, e
 	for key, value := range extra {
 		body[key] = value
 	}
-	c.JSON(status, body)
+	// PureJSON avoids encoding '&' as \u0026 in URL fields (e.g. SAS query strings).
+	c.Render(status, render.PureJSON{Data: body})
 }
 
 func respondMessage(c *gin.Context, status int, message string) {

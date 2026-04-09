@@ -31,18 +31,52 @@ type CORSConfig struct {
 // DefaultCORSConfig returns config equivalent to the Node.js snippet.
 func DefaultCORSConfig() CORSConfig {
 	return CORSConfig{
-		AllowOrigins:     nil, // allow all
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
-		AllowHeaders:     []string{"Content-Type", "Authorization", "x-domain"},
+		AllowOrigins: nil, // allow all (with credentials, request Origin is reflected)
+		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
+		// Include common casing variants; preflight also merges Access-Control-Request-Headers.
+		AllowHeaders: []string{
+			"Content-Type", "Authorization",
+			"x-domain", "X-Domain",
+			"Accept", "Accept-Language", "X-Requested-With",
+		},
 		AllowCredentials: true,
 	}
+}
+
+func mergeAllowHeaders(defaults []string, requestHeaders string) string {
+	if strings.TrimSpace(requestHeaders) == "" {
+		return strings.Join(defaults, ", ")
+	}
+	seen := make(map[string]struct{})
+	var out []string
+	for _, d := range defaults {
+		d = strings.TrimSpace(d)
+		if d == "" {
+			continue
+		}
+		seen[strings.ToLower(d)] = struct{}{}
+		out = append(out, d)
+	}
+	for _, part := range strings.Split(requestHeaders, ",") {
+		p := strings.TrimSpace(part)
+		if p == "" {
+			continue
+		}
+		key := strings.ToLower(p)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, p)
+	}
+	return strings.Join(out, ", ")
 }
 
 // CORSMiddleware returns a Gin handler that sets CORS headers and handles OPTIONS preflight.
 // Register it first so OPTIONS requests get a 204 and never hit route-not-found (404).
 func CORSMiddleware(cfg CORSConfig) gin.HandlerFunc {
 	methods := strings.Join(cfg.AllowMethods, ", ")
-	headers := strings.Join(cfg.AllowHeaders, ", ")
+	defaultHeaders := cfg.AllowHeaders
 	allowCreds := "true"
 
 	return func(c *gin.Context) {
@@ -51,6 +85,7 @@ func CORSMiddleware(cfg CORSConfig) gin.HandlerFunc {
 		// With credentials: true, browser does not accept "*"; reflect request origin.
 		if cfg.AllowCredentials && origin != "" {
 			c.Header(corsAllowOrigin, origin)
+			c.Header("Vary", "Origin")
 		} else if len(cfg.AllowOrigins) == 0 {
 			c.Header(corsAllowOrigin, "*")
 		} else {
@@ -67,8 +102,11 @@ func CORSMiddleware(cfg CORSConfig) gin.HandlerFunc {
 		}
 
 		c.Header(corsAllowMethods, methods)
-		c.Header(corsAllowHeaders, headers)
+		reqHdrs := c.GetHeader(corsRequestHeaders)
+		c.Header(corsAllowHeaders, mergeAllowHeaders(defaultHeaders, reqHdrs))
 		c.Header(corsAllowCredentials, allowCreds)
+		// Cache preflight in the browser (reduces OPTIONS chatter during local dev).
+		c.Header("Access-Control-Max-Age", "86400")
 
 		if c.Request.Method == http.MethodOptions {
 			c.AbortWithStatus(http.StatusNoContent)

@@ -55,3 +55,22 @@ func GetUserID(c *gin.Context) (int64, bool) {
 		return 0, false
 	}
 }
+
+// GetUserType returns the authenticated user type from context (set by AuthMiddleware from JWT).
+// Values match login: 1=employee, 2=client, 3=lab. Returns (0, false) if not found or invalid.
+func GetUserType(c *gin.Context) (int, bool) {
+	v, ok := c.Get("userType")
+	if !ok {
+		return 0, false
+	}
+	switch t := v.(type) {
+	case int:
+		return t, true
+	case int64:
+		return int(t), true
+	case float64:
+		return int(t), true
+	default:
+		return 0, false
+	}
+}

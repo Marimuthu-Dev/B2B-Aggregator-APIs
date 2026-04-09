@@ -10,7 +10,7 @@ func mapPackageToDomain(p persistencemodels.Package) domain.Package {
 	return domain.Package{
 		PackageID:     p.PackageID,
 		PackageName:   p.PackageName,
-		Description:   p.Description,
+		Description:   derefString(p.Description),
 		IsActive:      p.IsActive,
 		CreatedBy:     p.CreatedBy,
 		CreatedOn:     timeutil.FromTime(p.CreatedOn),
@@ -23,7 +23,7 @@ func mapPackageToPersistence(d domain.Package) persistencemodels.Package {
 	return persistencemodels.Package{
 		PackageID:     d.PackageID,
 		PackageName:   d.PackageName,
-		Description:   d.Description,
+		Description:   stringPtrOrNil(d.Description),
 		IsActive:      d.IsActive,
 		CreatedBy:     d.CreatedBy,
 		CreatedOn:     d.CreatedOn.ToTime(),

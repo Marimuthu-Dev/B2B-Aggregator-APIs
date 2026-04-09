@@ -15,26 +15,26 @@ import (
 
 type PackageService interface {
 	ListPackages(filter repository.PackageListFilter) ([]domain.Package, int64, error)
-	GetPackageByID(id int) (*domain.Package, error)
+	GetPackageByID(id int64) (*domain.Package, error)
 	CreatePackage(p *domain.Package, createdBy int64) error
 	UpdatePackage(p *domain.Package, lastUpdatedBy int64) error
-	DeletePackage(id int) error
+	DeletePackage(id int64) error
 	GetActivePackages() ([]domain.Package, error)
-	CreatePackageWithTests(p *domain.Package, testIDs []int, createdBy int64) (*CreatePackageWithTestsResult, error)
+	CreatePackageWithTests(p *domain.Package, testIDs []int64, createdBy int64) (*CreatePackageWithTestsResult, error)
 	GetAllPackagesWithTestsDetails() ([]domain.PackageWithTestsDetail, error)
-	UpdatePackageStatus(packageID int, isActive bool, lastUpdatedBy int64) (*UpdatePackageStatusResult, error)
-	CreatePackageClientMapping(packageID int, clientID int64, price float64, createdBy, lastUpdatedBy int64) (*PackageClientMappingResult, error)
+	UpdatePackageStatus(packageID int64, isActive bool, lastUpdatedBy int64) (*UpdatePackageStatusResult, error)
+	CreatePackageClientMapping(packageID int64, clientID int64, price int, createdBy, lastUpdatedBy int64) (*PackageClientMappingResult, error)
 	GetAllPackageClientMappings() ([]domain.PackageClientMappingView, error)
-	UpdatePackageClientMappingStatus(id int, isActive bool, lastUpdatedBy int64) (*PackageClientMappingUpdateResult, error)
-	CreatePackageLabMapping(packageID int, labID int64, price float64, createdBy, lastUpdatedBy int64) (*PackageLabMappingResult, error)
-	GetAllPackageLabMappings() ([]domain.PackageLabMappingView, error)
-	UpdatePackageLabMappingStatus(id int, isActive bool, lastUpdatedBy int64) (*PackageLabMappingUpdateResult, error)
+	UpdatePackageClientMappingStatus(id int64, isActive bool, lastUpdatedBy int64) (*PackageClientMappingUpdateResult, error)
+	CreatePackageLabMapping(packageID int64, labID int64, price int, createdBy, lastUpdatedBy int64) (*PackageLabMappingResult, error)
+	GetAllPackageLabMappings(filter repository.PackageLabMappingListFilter) ([]domain.PackageLabMappingView, error)
+	UpdatePackageLabMappingStatus(id int64, isActive bool, lastUpdatedBy int64) (*PackageLabMappingUpdateResult, error)
 }
 
 type CreatePackageWithTestsResult struct {
 	RetVal          int
 	Package         *domain.Package
-	TestIDs         []int
+	TestIDs         []int64
 	Message         string
 }
 
@@ -101,7 +101,7 @@ func (s *packageService) ListPackages(filter repository.PackageListFilter) ([]do
 	return s.repo.List(filter)
 }
 
-func (s *packageService) GetPackageByID(id int) (*domain.Package, error) {
+func (s *packageService) GetPackageByID(id int64) (*domain.Package, error) {
 	pkg, err := s.repo.FindByID(id)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, apperrors.NewNotFound("Package not found", err)
@@ -133,7 +133,7 @@ func (s *packageService) UpdatePackage(p *domain.Package, lastUpdatedBy int64) e
 	return s.repo.Update(p)
 }
 
-func (s *packageService) DeletePackage(id int) error {
+func (s *packageService) DeletePackage(id int64) error {
 	exists, err := s.repo.ExistsByID(id)
 	if err != nil {
 		return err
@@ -148,7 +148,7 @@ func (s *packageService) GetActivePackages() ([]domain.Package, error) {
 	return s.repo.FindAllActive()
 }
 
-func (s *packageService) CreatePackageWithTests(p *domain.Package, testIDs []int, createdBy int64) (*CreatePackageWithTestsResult, error) {
+func (s *packageService) CreatePackageWithTests(p *domain.Package, testIDs []int64, createdBy int64) (*CreatePackageWithTestsResult, error) {
 	if len(testIDs) == 0 {
 		return nil, apperrors.NewBadRequest("TestIDs is required and must be a non-empty array", nil)
 	}
@@ -161,7 +161,7 @@ func (s *packageService) CreatePackageWithTests(p *domain.Package, testIDs []int
 		return nil, apperrors.NewNotFound("One or more test IDs are invalid", nil)
 	}
 	// Dedupe and sort for comparison
-	unique := uniqueInts(testIDs)
+	unique := uniqueInt64s(testIDs)
 	matching, err := s.repo.FindPackagesByExactTestIds(unique)
 	if err != nil {
 		return nil, err
@@ -193,9 +193,9 @@ func (s *packageService) CreatePackageWithTests(p *domain.Package, testIDs []int
 	}, nil
 }
 
-func uniqueInts(a []int) []int {
-	seen := make(map[int]struct{})
-	var out []int
+func uniqueInt64s(a []int64) []int64 {
+	seen := make(map[int64]struct{})
+	var out []int64
 	for _, v := range a {
 		if _, ok := seen[v]; !ok {
 			seen[v] = struct{}{}
@@ -218,13 +218,13 @@ func (s *packageService) GetAllPackagesWithTestsDetails() ([]domain.PackageWithT
 	if err != nil {
 		return nil, err
 	}
-	testMap := make(map[int]domain.TestInPackage)
+	testMap := make(map[int64]domain.TestInPackage)
 	for _, t := range tests {
 		testMap[t.TestID] = domain.TestInPackage{
 			TestID: t.TestID, TestName: t.TestName, Category: t.Category, IsActive: t.IsActive,
 		}
 	}
-	pkgTestIDs := make(map[int][]int)
+	pkgTestIDs := make(map[int64][]int64)
 	for _, m := range mappings {
 		pkgTestIDs[m.PackageID] = append(pkgTestIDs[m.PackageID], m.TestID)
 	}
@@ -247,7 +247,7 @@ func (s *packageService) GetAllPackagesWithTestsDetails() ([]domain.PackageWithT
 	return result, nil
 }
 
-func (s *packageService) UpdatePackageStatus(packageID int, isActive bool, lastUpdatedBy int64) (*UpdatePackageStatusResult, error) {
+func (s *packageService) UpdatePackageStatus(packageID int64, isActive bool, lastUpdatedBy int64) (*UpdatePackageStatusResult, error) {
 	exists, err := s.repo.ExistsByID(packageID)
 	if err != nil {
 		return nil, err
@@ -269,7 +269,7 @@ func (s *packageService) UpdatePackageStatus(packageID int, isActive bool, lastU
 	}, nil
 }
 
-func (s *packageService) CreatePackageClientMapping(packageID int, clientID int64, price float64, createdBy, lastUpdatedBy int64) (*PackageClientMappingResult, error) {
+func (s *packageService) CreatePackageClientMapping(packageID int64, clientID int64, price int, createdBy, lastUpdatedBy int64) (*PackageClientMappingResult, error) {
 	if _, err := s.repo.FindByID(packageID); err != nil {
 		return nil, apperrors.NewNotFound("Package not found", err)
 	}
@@ -338,7 +338,7 @@ func (s *packageService) GetAllPackageClientMappings() ([]domain.PackageClientMa
 	}
 	packages, _ := s.repo.FindAll()
 	clients, _ := s.clientRepo.FindAll()
-	pkgMap := make(map[int]string)
+	pkgMap := make(map[int64]string)
 	for _, p := range packages {
 		pkgMap[p.PackageID] = p.PackageName
 	}
@@ -354,7 +354,7 @@ func (s *packageService) GetAllPackageClientMappings() ([]domain.PackageClientMa
 	return out, nil
 }
 
-func (s *packageService) UpdatePackageClientMappingStatus(id int, isActive bool, lastUpdatedBy int64) (*PackageClientMappingUpdateResult, error) {
+func (s *packageService) UpdatePackageClientMappingStatus(id int64, isActive bool, lastUpdatedBy int64) (*PackageClientMappingUpdateResult, error) {
 	m, err := s.clientMapRepo.FindByID(id)
 	if err != nil || m == nil {
 		return nil, apperrors.NewNotFound("Package-Client mapping not found", gorm.ErrRecordNotFound)
@@ -395,7 +395,7 @@ func (s *packageService) UpdatePackageClientMappingStatus(id int, isActive bool,
 	return &PackageClientMappingUpdateResult{RetVal: 1, Mapping: v, Message: "Package-Client mapping status updated successfully"}, nil
 }
 
-func (s *packageService) CreatePackageLabMapping(packageID int, labID int64, price float64, createdBy, lastUpdatedBy int64) (*PackageLabMappingResult, error) {
+func (s *packageService) CreatePackageLabMapping(packageID int64, labID int64, price int, createdBy, lastUpdatedBy int64) (*PackageLabMappingResult, error) {
 	if _, err := s.repo.FindByID(packageID); err != nil {
 		return nil, apperrors.NewNotFound("Package not found", err)
 	}
@@ -457,30 +457,31 @@ func mappingToLabView(m *persistencemodels.PackageLabMapping, pkgName, labName s
 	}
 }
 
-func (s *packageService) GetAllPackageLabMappings() ([]domain.PackageLabMappingView, error) {
-	list, err := s.labMapRepo.FindAll()
+func (s *packageService) GetAllPackageLabMappings(filter repository.PackageLabMappingListFilter) ([]domain.PackageLabMappingView, error) {
+	rows, err := s.labMapRepo.FindAllWithLabAndPackageNames(filter)
 	if err != nil {
 		return nil, err
 	}
-	packages, _ := s.repo.FindAll()
-	labs, _ := s.labRepo.FindAll()
-	pkgMap := make(map[int]string)
-	for _, p := range packages {
-		pkgMap[p.PackageID] = p.PackageName
-	}
-	labMap := make(map[int64]string)
-	for _, l := range labs {
-		labMap[l.LabID] = l.LabName
-	}
-	var out []domain.PackageLabMappingView
-	for i := range list {
-		v := mappingToLabView(&list[i], pkgMap[list[i].PackageID], labMap[list[i].LabID])
-		out = append(out, *v)
+	out := make([]domain.PackageLabMappingView, 0, len(rows))
+	for i := range rows {
+		row := rows[i]
+		m := persistencemodels.PackageLabMapping{
+			PackageLabID:  row.PackageLabID,
+			PackageID:     row.PackageID,
+			LabID:         row.LabID,
+			Price:         row.Price,
+			IsActive:      row.IsActive,
+			CreatedBy:     row.CreatedBy,
+			CreatedOn:     row.CreatedOn,
+			LastUpdatedBy: row.LastUpdatedBy,
+			LastUpdatedOn: row.LastUpdatedOn,
+		}
+		out = append(out, *mappingToLabView(&m, row.PackageName, row.LabName))
 	}
 	return out, nil
 }
 
-func (s *packageService) UpdatePackageLabMappingStatus(id int, isActive bool, lastUpdatedBy int64) (*PackageLabMappingUpdateResult, error) {
+func (s *packageService) UpdatePackageLabMappingStatus(id int64, isActive bool, lastUpdatedBy int64) (*PackageLabMappingUpdateResult, error) {
 	m, err := s.labMapRepo.FindByID(id)
 	if err != nil || m == nil {
 		return nil, apperrors.NewNotFound("Package-Lab mapping not found", gorm.ErrRecordNotFound)

@@ -1,6 +1,8 @@
-# B2B Aggregator API – Setup and Deployment to Azure
+# B2B Aggregator API – Setup and Deployment to Azure (Staging)
 
-**Audience:** Developers (including juniors) deploying the Go API to Azure App Service.
+**Audience:** Developers (including juniors) deploying the Go API to Azure App Service in **staging** (or similar non-production) environments.
+
+**Production:** For deploying to **production**, use [DEPLOYMENT-PROD.md](./DEPLOYMENT-PROD.md) (different App Service / ACR names and required `APP_NAME` / `RESOURCE_GROUP` exports).
 
 This guide is **reusable**: replace placeholder values (e.g. your ACR name, resource group) with your own when your environment differs. Example values: **um-staging-api** (App Service), **umstagingacr** (ACR), **um-staging-rg-appservice** (resource group).
 

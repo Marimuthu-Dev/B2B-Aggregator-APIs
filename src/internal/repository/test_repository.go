@@ -11,9 +11,9 @@ import (
 type TestRepository interface {
 	FindAll() ([]domain.Test, error)
 	FindAllActive() ([]domain.Test, error)
-	FindByID(id int) (*domain.Test, error)
-	FindByIDs(ids []int) ([]domain.Test, error)
-	ExistsByID(id int) (bool, error)
+	FindByID(id int64) (*domain.Test, error)
+	FindByIDs(ids []int64) ([]domain.Test, error)
+	ExistsByID(id int64) (bool, error)
 }
 
 type testRepository struct {
@@ -36,7 +36,7 @@ func (r *testRepository) FindAllActive() ([]domain.Test, error) {
 	return mapTestsToDomain(tests), err
 }
 
-func (r *testRepository) FindByID(id int) (*domain.Test, error) {
+func (r *testRepository) FindByID(id int64) (*domain.Test, error) {
 	var t persistencemodels.Test
 	err := r.db.First(&t, id).Error
 	if err != nil {
@@ -46,7 +46,7 @@ func (r *testRepository) FindByID(id int) (*domain.Test, error) {
 	return &domainTest, nil
 }
 
-func (r *testRepository) FindByIDs(ids []int) ([]domain.Test, error) {
+func (r *testRepository) FindByIDs(ids []int64) ([]domain.Test, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
@@ -57,7 +57,7 @@ func (r *testRepository) FindByIDs(ids []int) ([]domain.Test, error) {
 	return mapTestsToDomain(tests), nil
 }
 
-func (r *testRepository) ExistsByID(id int) (bool, error) {
+func (r *testRepository) ExistsByID(id int64) (bool, error) {
 	var count int64
 	if err := r.db.Model(&persistencemodels.Test{}).Where("TestID = ?", id).Limit(1).Count(&count).Error; err != nil {
 		return false, err

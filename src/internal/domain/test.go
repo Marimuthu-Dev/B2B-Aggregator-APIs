@@ -3,7 +3,7 @@ package domain
 import "b2b-diagnostic-aggregator/apis/internal/timeutil"
 
 type Test struct {
-	TestID        int
+	TestID        int64
 	TestName      string
 	Category      string
 	IsActive      bool

@@ -5,11 +5,12 @@ import "errors"
 type Kind string
 
 const (
-	KindBadRequest  Kind = "bad_request"
-	KindUnauthorized     = "unauthorized"
-	KindNotFound         = "not_found"
-	KindConflict         = "conflict"
-	KindInternal         = "internal"
+	KindBadRequest   Kind = "bad_request"
+	KindUnauthorized      = "unauthorized"
+	KindForbidden         = "forbidden"
+	KindNotFound          = "not_found"
+	KindConflict          = "conflict"
+	KindInternal          = "internal"
 )
 
 type AppError struct {
@@ -46,6 +47,10 @@ func NewNotFound(message string, err error) *AppError {
 
 func NewUnauthorized(message string, err error) *AppError {
 	return &AppError{Kind: KindUnauthorized, Message: message, Err: err}
+}
+
+func NewForbidden(message string, err error) *AppError {
+	return &AppError{Kind: KindForbidden, Message: message, Err: err}
 }
 
 func NewBadRequest(message string, err error) *AppError {

@@ -22,6 +22,8 @@ func respondError(c *gin.Context, err error) {
 			status = http.StatusBadRequest
 		case apperrors.KindUnauthorized:
 			status = http.StatusUnauthorized
+		case apperrors.KindForbidden:
+			status = http.StatusForbidden
 		case apperrors.KindNotFound:
 			status = http.StatusNotFound
 		case apperrors.KindConflict:

@@ -31,6 +31,7 @@ type ClientCreateForm struct {
 	ContactPerson2EmailID     *string `form:"ContactPerson2EmailID"`
 	ContactPerson2Designation *string `form:"ContactPerson2Designation"`
 	CategoryID                *int8   `form:"CategoryID"`
+	NatureOfBusiness          *string `form:"NatureOfBusiness"`
 	GSTIN_UIN                 *string `form:"GSTIN_UIN"`
 	PANNumber                 *string `form:"PANNumber"`
 	BusinessVertical          string  `form:"BusinessVertical" binding:"required"`
@@ -85,6 +86,7 @@ func (f ClientCreateForm) toClientRequest() (ClientRequest, error) {
 		ContactPerson2EmailID:     f.ContactPerson2EmailID,
 		ContactPerson2Designation: f.ContactPerson2Designation,
 		CategoryID:                f.CategoryID,
+		NatureOfBusiness:          f.NatureOfBusiness,
 		GSTIN_UIN:                 f.GSTIN_UIN,
 		PANNumber:                 f.PANNumber,
 		BusinessVertical:          f.BusinessVertical,
@@ -186,6 +188,9 @@ func buildClientUpdateRequestFromForm(c *gin.Context) (*ClientUpdateRequest, err
 			x := int8(n)
 			req.CategoryID = &x
 		}
+	}
+	if v, ok := firstFormValue(vals, "NatureOfBusiness"); ok {
+		req.NatureOfBusiness = stringPtr(v)
 	}
 	if v, ok := firstFormValue(vals, "GSTIN_UIN"); ok {
 		req.GSTIN_UIN = stringPtr(v)

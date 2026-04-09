@@ -24,10 +24,10 @@ type Lab struct {
 	MOUEndDate                 *time.Time `gorm:"column:MOUEndDate;type:date"`
 	MoUDocumentURL             *string    `gorm:"column:MoUDocumentURL;type:varchar(500)"`
 	AccreditationID            *int8      `gorm:"column:AccreditationID"`
-	AccreditationExpirationDate *time.Time `gorm:"column:AccreditationExpirationDate;type:date"`
+	AccreditationExpirationDate *time.Time `gorm:"column:AccreditationExpirationDate"`
 	CollectionTypes            *string    `gorm:"column:CollectionTypes;type:varchar(10)"` // JSON string
 	ServicesID                 *string    `gorm:"column:ServicesID;type:varchar(10)"`      // JSON string
-	CollectionPincodes         *string    `gorm:"column:CollectionPincodes;type:text"`     // JSON string
+	CollectionPincodes         *string    `gorm:"column:CollectionPincodes;type:varchar(max)"`
 	LabGrade                   *string    `gorm:"column:LabGrade;type:varchar(20)"`
 	IsActive                   *bool      `gorm:"column:IsActive"`
 	CreatedBy                  *int64     `gorm:"column:CreatedBy"`

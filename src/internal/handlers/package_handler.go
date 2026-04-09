@@ -161,7 +161,7 @@ func (h *PackageHandler) UpdatePackageStatus(c *gin.Context) {
 	if !middleware.BindUri(c, &params) {
 		return
 	}
-	if !middleware.RequirePositiveID(c, int64(params.ID)) {
+	if !middleware.RequirePositiveID(c, params.ID) {
 		return
 	}
 	var req dto.PackageStatusUpdateRequest
@@ -226,7 +226,7 @@ func (h *PackageHandler) UpdatePackageClientMappingStatus(c *gin.Context) {
 	if !middleware.BindUri(c, &params) {
 		return
 	}
-	if !middleware.RequirePositiveID(c, int64(params.ID)) {
+	if !middleware.RequirePositiveID(c, params.ID) {
 		return
 	}
 	var req dto.PackageMappingStatusUpdateRequest
@@ -268,7 +268,20 @@ func (h *PackageHandler) CreatePackageLabMapping(c *gin.Context) {
 }
 
 func (h *PackageHandler) GetAllPackageLabMappings(c *gin.Context) {
-	data, err := h.svc.GetAllPackageLabMappings()
+	var query dto.PackageLabMappingListQuery
+	if !middleware.BindQuery(c, &query) {
+		return
+	}
+	isActive := true
+	if query.IsActive != nil {
+		isActive = *query.IsActive
+	}
+	filter := repository.PackageLabMappingListFilter{
+		PackageID: query.PackageID,
+		LabID:     query.LabID,
+		IsActive:  isActive,
+	}
+	data, err := h.svc.GetAllPackageLabMappings(filter)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -286,7 +299,7 @@ func (h *PackageHandler) UpdatePackageLabMappingStatus(c *gin.Context) {
 	if !middleware.BindUri(c, &params) {
 		return
 	}
-	if !middleware.RequirePositiveID(c, int64(params.ID)) {
+	if !middleware.RequirePositiveID(c, params.ID) {
 		return
 	}
 	var req dto.PackageMappingStatusUpdateRequest

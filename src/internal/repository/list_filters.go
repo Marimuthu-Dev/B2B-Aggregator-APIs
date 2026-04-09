@@ -40,6 +40,7 @@ type LeadListFilter struct {
 	SortBy    string
 	SortOrder string
 	ClientID  *int64
+	LabID     *int64
 	StatusID  *int8
 	PackageID *int
 }

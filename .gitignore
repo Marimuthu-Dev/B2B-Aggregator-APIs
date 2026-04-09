@@ -4,3 +4,7 @@ src/.env
 
 # Ignore cursor AI rules
 .cursor/rules/codacy.mdc
+/src/cmd/api/logs
+/src/chrome-win64
+*.exe
+*.zip

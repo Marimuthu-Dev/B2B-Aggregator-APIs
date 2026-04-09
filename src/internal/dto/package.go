@@ -5,7 +5,7 @@ import (
 )
 
 type PackageRequest struct {
-	PackageID   int     `binding:"omitempty"`
+	PackageID   int64   `binding:"omitempty"`
 	PackageName string  `binding:"required"`
 	Description string  `binding:"omitempty"`
 	IsActive    *bool   `binding:"omitempty"`
@@ -13,7 +13,7 @@ type PackageRequest struct {
 
 type CreatePackageWithTestsRequest struct {
 	PackageRequest
-	TestIDs []int `json:"testIds" binding:"required"`
+	TestIDs []int64 `json:"testIds" binding:"required"`
 }
 
 type PackageStatusUpdateRequest struct {
@@ -21,17 +21,25 @@ type PackageStatusUpdateRequest struct {
 }
 
 type PackageClientMappingRequest struct {
-	PackageID int     `json:"PackageID" binding:"required"`
-	ClientID  int64   `json:"ClientID" binding:"required"`
-	Price     float64 `json:"Price" binding:"required,min=0"`
+	PackageID int64 `json:"PackageID" binding:"required"`
+	ClientID  int64 `json:"ClientID" binding:"required"`
+	Price     int   `json:"Price" binding:"required,min=0,max=32767"`
 	IsActive  *bool   `json:"IsActive"`
 }
 
 type PackageLabMappingRequest struct {
-	PackageID int     `json:"PackageID" binding:"required"`
-	LabID     int64   `json:"LabID" binding:"required"`
-	Price     float64 `json:"Price" binding:"required,min=0"`
+	PackageID int64 `json:"PackageID" binding:"required"`
+	LabID     int64 `json:"LabID" binding:"required"`
+	Price     int   `json:"Price" binding:"required,min=0,max=32767"`
 	IsActive  *bool   `json:"IsActive"`
+}
+
+// PackageLabMappingListQuery is optional filters for GET /packages/lab-mapping.
+// IsActive: omit to default to active-only (true); send true/false to override.
+type PackageLabMappingListQuery struct {
+	PackageID *int64 `form:"PackageID" binding:"omitempty,min=1"`
+	LabID     *int64 `form:"LabID" binding:"omitempty,min=1"`
+	IsActive  *bool  `form:"IsActive" binding:"omitempty"`
 }
 
 type PackageMappingStatusUpdateRequest struct {

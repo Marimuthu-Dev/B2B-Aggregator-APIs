@@ -12,18 +12,18 @@ import (
 type PackageRepository interface {
 	FindAll() ([]domain.Package, error)
 	List(filter PackageListFilter) ([]domain.Package, int64, error)
-	FindByID(id int) (*domain.Package, error)
-	ExistsByID(id int) (bool, error)
+	FindByID(id int64) (*domain.Package, error)
+	ExistsByID(id int64) (bool, error)
 	Create(p *domain.Package) error
 	Update(p *domain.Package) error
-	Delete(id int) error
+	Delete(id int64) error
 	FindAllActive() ([]domain.Package, error)
 	FindByName(name string) (*domain.Package, error)
 	SearchByName(searchTerm string) ([]domain.Package, error)
-	CreateWithTests(p *domain.Package, testIDs []int) error
+	CreateWithTests(p *domain.Package, testIDs []int64) error
 	FindAllPackageTestMappings() ([]persistencemodels.PackageTestMapping, error)
-	FindPackagesByExactTestIds(testIDs []int) ([]int, error)
-	UpdatePackageStatusCascade(packageID int, isActive bool, lastUpdatedBy int64) (testCount, clientCount, labCount int, err error)
+	FindPackagesByExactTestIds(testIDs []int64) ([]int64, error)
+	UpdatePackageStatusCascade(packageID int64, isActive bool, lastUpdatedBy int64) (testCount, clientCount, labCount int, err error)
 }
 
 type packageRepository struct {
@@ -74,7 +74,7 @@ func mapPackageSortColumn(sortBy string) string {
 	}
 }
 
-func (r *packageRepository) FindByID(id int) (*domain.Package, error) {
+func (r *packageRepository) FindByID(id int64) (*domain.Package, error) {
 	var p persistencemodels.Package
 	err := r.db.First(&p, id).Error
 	if err != nil {
@@ -84,7 +84,7 @@ func (r *packageRepository) FindByID(id int) (*domain.Package, error) {
 	return &domainPackage, nil
 }
 
-func (r *packageRepository) ExistsByID(id int) (bool, error) {
+func (r *packageRepository) ExistsByID(id int64) (bool, error) {
 	var count int64
 	if err := r.db.Model(&persistencemodels.Package{}).Where("PackageID = ?", id).Limit(1).Count(&count).Error; err != nil {
 		return false, err
@@ -110,7 +110,7 @@ func (r *packageRepository) Update(p *domain.Package) error {
 	return nil
 }
 
-func (r *packageRepository) Delete(id int) error {
+func (r *packageRepository) Delete(id int64) error {
 	return r.db.Delete(&persistencemodels.Package{}, id).Error
 }
 
@@ -136,7 +136,7 @@ func (r *packageRepository) SearchByName(searchTerm string) ([]domain.Package, e
 	return mapPackagesToDomain(packages), err
 }
 
-func (r *packageRepository) CreateWithTests(p *domain.Package, testIDs []int) error {
+func (r *packageRepository) CreateWithTests(p *domain.Package, testIDs []int64) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		// Create package
 		persist := mapPackageToPersistence(*p)
@@ -171,31 +171,31 @@ func (r *packageRepository) FindAllPackageTestMappings() ([]persistencemodels.Pa
 	return out, err
 }
 
-func (r *packageRepository) FindPackagesByExactTestIds(testIDs []int) ([]int, error) {
+func (r *packageRepository) FindPackagesByExactTestIds(testIDs []int64) ([]int64, error) {
 	var mappings []persistencemodels.PackageTestMapping
 	if err := r.db.Where("IsActive = ?", true).Find(&mappings).Error; err != nil {
 		return nil, err
 	}
 	// Group by PackageID
-	packageTests := make(map[int][]int)
+	packageTests := make(map[int64][]int64)
 	for _, m := range mappings {
 		packageTests[m.PackageID] = append(packageTests[m.PackageID], m.TestID)
 	}
 	// Sort input for comparison
-	sortedInput := make([]int, len(testIDs))
+	sortedInput := make([]int64, len(testIDs))
 	copy(sortedInput, testIDs)
-	sort.Ints(sortedInput)
-	var match []int
+	sort.Slice(sortedInput, func(i, j int) bool { return sortedInput[i] < sortedInput[j] })
+	var match []int64
 	for pkgID, ids := range packageTests {
-		sort.Ints(ids)
-		if len(ids) == len(sortedInput) && intSlicesEqual(ids, sortedInput) {
+		sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+		if len(ids) == len(sortedInput) && int64SlicesEqual(ids, sortedInput) {
 			match = append(match, pkgID)
 		}
 	}
 	return match, nil
 }
 
-func intSlicesEqual(a, b []int) bool {
+func int64SlicesEqual(a, b []int64) bool {
 	if len(a) != len(b) {
 		return false
 	}
@@ -207,7 +207,7 @@ func intSlicesEqual(a, b []int) bool {
 	return true
 }
 
-func (r *packageRepository) UpdatePackageStatusCascade(packageID int, isActive bool, lastUpdatedBy int64) (testCount, clientCount, labCount int, err error) {
+func (r *packageRepository) UpdatePackageStatusCascade(packageID int64, isActive bool, lastUpdatedBy int64) (testCount, clientCount, labCount int, err error) {
 	err = r.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(&persistencemodels.Package{}).Where("PackageID = ?", packageID).Updates(map[string]interface{}{
 			"IsActive": isActive, "LastUpdatedBy": lastUpdatedBy,

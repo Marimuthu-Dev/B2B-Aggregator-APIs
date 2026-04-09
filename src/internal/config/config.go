@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -24,8 +25,10 @@ const defaultMoUMaxBytes = 5 * 1024 * 1024
 
 // AzureBlobConfig holds MoU and diagnostic-report PDF blob settings (from environment).
 //
-// MoU / legal documents:
-//   - AZURE_STORAGE_CONNECTION_STRING — full Azure Storage connection string (optional; empty disables uploads)
+// MoU / legal documents — storage auth (use either connection string or account + key):
+//   - AZURE_STORAGE_CONNECTION_STRING — full connection string (optional)
+//   - AZURE_STORAGE_ACCOUNT + AZURE_STORAGE_KEY — built into a connection string if the full string is unset
+//   - AZURE_STORAGE_ENDPOINT_SUFFIX — optional (default: core.windows.net)
 //   - AZURE_LEGAL_CONTAINER_NAME — MoU PDF container (default: legal-documents)
 //   - MOU_MAX_UPLOAD_BYTES — max MoU PDF size in bytes (default: 5242880 = 5 MiB)
 //   - MOU_UPLOAD_TIMEOUT_SECONDS — MoU upload timeout toward Azure (default: 60)
@@ -37,7 +40,12 @@ const defaultMoUMaxBytes = 5 * 1024 * 1024
 //   - DIAGNOSTIC_REPORTS_UPLOAD_TIMEOUT_SECONDS
 //   - DIAGNOSTIC_REPORTS_SAS_TTL_MINUTES (max: 1440)
 type AzureBlobConfig struct {
-	ConnectionString               string
+	ConnectionString string
+	// StorageAccountName and StorageAccountKey are the preferred way to authenticate (see AZURE_STORAGE_*).
+	// Used with NewClientWithSharedKeyCredential and for SAS signing; never pass the raw connection string into SAS APIs.
+	StorageAccountName             string
+	StorageAccountKey              string
+	BlobEndpointSuffix             string // e.g. core.windows.net (no https://)
 	ContainerName                  string
 	DiagnosticReportsContainer     string
 	MoUMaxBytes                    int64
@@ -120,6 +128,28 @@ func LoadConfig() *Config {
 	}
 }
 
+// resolveAzureStorageConnectionString prefers AZURE_STORAGE_CONNECTION_STRING;
+// otherwise builds one from AZURE_STORAGE_ACCOUNT, AZURE_STORAGE_KEY, and optional AZURE_STORAGE_ENDPOINT_SUFFIX.
+func resolveAzureStorageConnectionString() string {
+	conn := trimSurroundingQuotes(getEnv("AZURE_STORAGE_CONNECTION_STRING", ""))
+	if strings.TrimSpace(conn) != "" {
+		return conn
+	}
+	acc := trimSurroundingQuotes(getEnv("AZURE_STORAGE_ACCOUNT", ""))
+	key := trimSurroundingQuotes(getEnv("AZURE_STORAGE_KEY", ""))
+	if strings.TrimSpace(acc) == "" || strings.TrimSpace(key) == "" {
+		return ""
+	}
+	suffix := trimSurroundingQuotes(getEnv("AZURE_STORAGE_ENDPOINT_SUFFIX", "core.windows.net"))
+	if suffix == "" {
+		suffix = "core.windows.net"
+	}
+	return fmt.Sprintf(
+		"DefaultEndpointsProtocol=https;AccountName=%s;AccountKey=%s;EndpointSuffix=%s",
+		acc, key, suffix,
+	)
+}
+
 func loadAzureBlobConfig() AzureBlobConfig {
 	maxBytes := getEnvAsInt64("MOU_MAX_UPLOAD_BYTES", defaultMoUMaxBytes)
 	if maxBytes <= 0 {
@@ -161,8 +191,16 @@ func loadAzureBlobConfig() AzureBlobConfig {
 		reportSASMin = 1440
 	}
 
+	conn := resolveAzureStorageConnectionString()
+	suffix := trimSurroundingQuotes(getEnv("AZURE_STORAGE_ENDPOINT_SUFFIX", "core.windows.net"))
+	if strings.TrimSpace(suffix) == "" {
+		suffix = "core.windows.net"
+	}
 	return AzureBlobConfig{
-		ConnectionString:               trimSurroundingQuotes(getEnv("AZURE_STORAGE_CONNECTION_STRING", "")),
+		ConnectionString:               conn,
+		StorageAccountName:             trimSurroundingQuotes(getEnv("AZURE_STORAGE_ACCOUNT", "")),
+		StorageAccountKey:              trimSurroundingQuotes(getEnv("AZURE_STORAGE_KEY", "")),
+		BlobEndpointSuffix:             suffix,
 		ContainerName:                  container,
 		DiagnosticReportsContainer:     reportsContainer,
 		MoUMaxBytes:                    maxBytes,
