@@ -34,7 +34,7 @@ type LeadService interface {
 	// GetLeadReportDownloadURL returns a time-limited SAS URL for the lead's stored ReportURL blob.
 	// Requires LeadStatusID >= LeadStatusIDReportUploaded (8) for all callers. For client JWTs (userType 2) with
 	// LeadStatusID < LeadStatusIDClientDownloadNoFitGate (10): FIT may download; ON HOLD (IsFit=0) only if
-	// IsReportDownloadable; UNFIT cannot download via IsReportDownloadable. At status >= 10, clients skip those checks.
+	// IsReportDownloadable; UNFIT (IsFit=2) cannot download via IsReportDownloadable. At status >= 10, clients skip those checks.
 	// jwtUserID scopes client (2) and lab (3) users to their own leads; employees ignore this value.
 	GetLeadReportDownloadURL(ctx context.Context, leadID int64, jwtUserType int, jwtUserID int64) (downloadURL string, expiresAt time.Time, err error)
 	// ApproveLeadReport sets tri-state IsFit, download flag, and approval remarks (see domain.LeadFit*).
@@ -467,7 +467,7 @@ func (s *leadService) GetLeadReportDownloadURL(ctx context.Context, leadID int64
 			return "", time.Time{}, apperrors.NewNotFound("Lead not found", nil)
 		}
 	}
-	// Client portal: below status 10, FIT may download; HOLD (IsFit=0) only if IsReportDownloadable; UNFIT never via flag.
+	// Client portal: below status 10, FIT may download; HOLD (IsFit=0) only if IsReportDownloadable; UNFIT (IsFit=2) never via flag.
 	if jwtUserType == utils.UserTypeClient && lead.LeadStatusID < domain.LeadStatusIDClientDownloadNoFitGate {
 		switch lead.IsFit {
 		case domain.LeadFitFit:
@@ -476,6 +476,8 @@ func (s *leadService) GetLeadReportDownloadURL(ctx context.Context, leadID int64
 			if !lead.IsReportDownloadable {
 				return "", time.Time{}, apperrors.NewForbidden("Report download is not allowed for this lead", nil)
 			}
+		case domain.LeadFitUnfit:
+			return "", time.Time{}, apperrors.NewForbidden("Report download is not allowed for this lead", nil)
 		default:
 			return "", time.Time{}, apperrors.NewForbidden("Report download is not allowed for this lead", nil)
 		}

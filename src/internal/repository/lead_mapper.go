@@ -96,6 +96,10 @@ func isFitFromPtr(p *int8) int8 {
 	if p == nil {
 		return domain.LeadFitHold
 	}
+	// Legacy rows may have used -1 for unfit before tinyint-safe encoding.
+	if *p == -1 {
+		return domain.LeadFitUnfit
+	}
 	return *p
 }
 

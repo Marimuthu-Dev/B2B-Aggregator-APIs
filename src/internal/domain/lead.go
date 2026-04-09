@@ -3,10 +3,11 @@ package domain
 import "b2b-diagnostic-aggregator/apis/internal/timeutil"
 
 // Lead fitness / report approval tri-state (MediAdmin.tbl_Leads.IsFit, TINYINT).
+// Values must fit SQL Server tinyint (0–255): 0 = on hold, 1 = fit, 2 = unfit.
 const (
-	LeadFitUnfit int8 = -1
 	LeadFitHold  int8 = 0
 	LeadFitFit   int8 = 1
+	LeadFitUnfit int8 = 2
 )
 
 // LeadStatusIDDefault is the initial status for new leads when the client omits LeadStatusID (JSON zero / empty CSV).
