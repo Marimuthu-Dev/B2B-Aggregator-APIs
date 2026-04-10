@@ -9,6 +9,7 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/middleware"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/service"
+	"b2b-diagnostic-aggregator/apis/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -208,7 +209,38 @@ func (h *PackageHandler) CreatePackageClientMapping(c *gin.Context) {
 }
 
 func (h *PackageHandler) GetAllPackageClientMappings(c *gin.Context) {
-	data, err := h.svc.GetAllPackageClientMappings()
+	userType, typeOK := middleware.GetUserType(c)
+	if !typeOK {
+		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+		return
+	}
+	if userType == utils.UserTypeLab {
+		respondError(c, apperrors.NewForbidden("You are not authorized for this activity.", nil))
+		return
+	}
+
+	userID, idOK := middleware.GetUserID(c)
+	var clientID *int64
+
+	switch userType {
+	case utils.UserTypeClient:
+		if !idOK || userID <= 0 {
+			respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+			return
+		}
+		clientID = &userID
+	case utils.UserTypeEmployee:
+		var query dto.PackageClientMappingListQuery
+		if !middleware.BindQuery(c, &query) {
+			return
+		}
+		clientID = query.ClientID
+	default:
+		respondError(c, apperrors.NewForbidden("You are not authorized for this activity.", nil))
+		return
+	}
+
+	data, err := h.svc.GetAllPackageClientMappings(clientID)
 	if err != nil {
 		respondError(c, err)
 		return

@@ -11,6 +11,8 @@ type PackageClientMappingRepository interface {
 	FindByPackageAndClient(packageID int64, clientID int64) (*persistencemodels.PackageClientMapping, error)
 	FindByID(id int64) (*persistencemodels.PackageClientMapping, error)
 	FindAll() ([]persistencemodels.PackageClientMapping, error)
+	// FindAllByOptionalClientID returns all rows when clientID is nil; otherwise filters by ClientID.
+	FindAllByOptionalClientID(clientID *int64) ([]persistencemodels.PackageClientMapping, error)
 	FindByPackageID(packageID int64) ([]persistencemodels.PackageClientMapping, error)
 	Update(m *persistencemodels.PackageClientMapping) error
 }
@@ -48,6 +50,16 @@ func (r *packageClientMappingRepository) FindByID(id int64) (*persistencemodels.
 func (r *packageClientMappingRepository) FindAll() ([]persistencemodels.PackageClientMapping, error) {
 	var list []persistencemodels.PackageClientMapping
 	err := r.db.Find(&list).Error
+	return list, err
+}
+
+func (r *packageClientMappingRepository) FindAllByOptionalClientID(clientID *int64) ([]persistencemodels.PackageClientMapping, error) {
+	var list []persistencemodels.PackageClientMapping
+	q := r.db
+	if clientID != nil {
+		q = q.Where("ClientID = ?", *clientID)
+	}
+	err := q.Find(&list).Error
 	return list, err
 }
 

@@ -24,7 +24,7 @@ type PackageService interface {
 	GetAllPackagesWithTestsDetails() ([]domain.PackageWithTestsDetail, error)
 	UpdatePackageStatus(packageID int64, isActive bool, lastUpdatedBy int64) (*UpdatePackageStatusResult, error)
 	CreatePackageClientMapping(packageID int64, clientID int64, price int, createdBy, lastUpdatedBy int64) (*PackageClientMappingResult, error)
-	GetAllPackageClientMappings() ([]domain.PackageClientMappingView, error)
+	GetAllPackageClientMappings(clientID *int64) ([]domain.PackageClientMappingView, error)
 	UpdatePackageClientMappingStatus(id int64, isActive bool, lastUpdatedBy int64) (*PackageClientMappingUpdateResult, error)
 	CreatePackageLabMapping(packageID int64, labID int64, price int, createdBy, lastUpdatedBy int64) (*PackageLabMappingResult, error)
 	GetAllPackageLabMappings(filter repository.PackageLabMappingListFilter) ([]domain.PackageLabMappingView, error)
@@ -331,8 +331,8 @@ func mappingToClientView(m *persistencemodels.PackageClientMapping, pkgName, cli
 	}
 }
 
-func (s *packageService) GetAllPackageClientMappings() ([]domain.PackageClientMappingView, error) {
-	list, err := s.clientMapRepo.FindAll()
+func (s *packageService) GetAllPackageClientMappings(clientID *int64) ([]domain.PackageClientMappingView, error) {
+	list, err := s.clientMapRepo.FindAllByOptionalClientID(clientID)
 	if err != nil {
 		return nil, err
 	}
