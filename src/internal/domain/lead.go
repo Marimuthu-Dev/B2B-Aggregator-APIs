@@ -20,7 +20,14 @@ const (
 	// LeadStatusIDClientDownloadNoFitGate is the minimum LeadStatusID at which clients may obtain a report
 	// download URL without IsFit / IsReportDownloadable checks (e.g. post certificate merge, typically 10).
 	LeadStatusIDClientDownloadNoFitGate int8 = 10
+	LeadStatusIDReportDownloaded        int8 = 11
 )
+
+// LeadStatusIDForbiddenForPUTLead is true when id must not be applied via PUT /api/v1/leads/{id}
+// (statuses >= 8 are workflow-only: report pipeline through download/sent).
+func LeadStatusIDForbiddenForPUTLead(id int8) bool {
+	return id >= LeadStatusIDReportUploaded
+}
 
 // LeadStatusIDReportApproval is the LeadStatusID required on the lead row before approve may run (report uploaded).
 const LeadStatusIDReportApproval = LeadStatusIDReportUploaded

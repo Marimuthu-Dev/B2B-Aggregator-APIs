@@ -157,6 +157,12 @@ func (s *leadService) UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUp
 		l.Pincode = *update.Pincode
 	}
 	if update.LeadStatusID != nil {
+		if domain.LeadStatusIDForbiddenForPUTLead(*update.LeadStatusID) {
+			return nil, apperrors.NewBadRequest(
+				"LeadStatusID cannot be set to 8 or higher via this endpoint; use the workflow APIs for report-related statuses",
+				nil,
+			)
+		}
 		l.LeadStatusID = *update.LeadStatusID
 	}
 	if update.AppointmentAt != nil {
