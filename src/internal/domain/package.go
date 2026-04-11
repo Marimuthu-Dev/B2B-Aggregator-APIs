@@ -15,10 +15,10 @@ type Package struct {
 
 // PackageWithTestsDetail is one item for GET /packages/with-tests-details response.
 type PackageWithTestsDetail struct {
-	PackageDetails Package `json:"packageDetails"`
-	TestIDs       []int64        `json:"testIds"`
-	TestCount     int            `json:"testCount"`
-	TestDetails   []TestInPackage `json:"testDetails"`
+	PackageDetails Package           `json:"PackageDetails"`
+	TestIDs        []int64           `json:"TestIDs"`
+	TestCount      int               `json:"TestCount"`
+	TestDetails    []TestInPackage   `json:"TestDetails"`
 }
 
 type TestInPackage struct {

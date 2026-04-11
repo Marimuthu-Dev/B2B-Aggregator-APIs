@@ -82,8 +82,8 @@ func (r LabUpdateRequest) GetCollectionPincodes() *string   { return r.Collectio
 
 // LabMoUDownloadURLResponse is returned by GET /api/v1/labs/:id/mou/download-url (SAS link for the MoU PDF).
 type LabMoUDownloadURLResponse struct {
-	URL       string    `json:"url"`
-	ExpiresAt time.Time `json:"expiresAt"`
+	URL       string    `json:"URL"`
+	ExpiresAt time.Time `json:"ExpiresAt"`
 }
 
 func (r LabRequest) ToDomain() domain.Lab {

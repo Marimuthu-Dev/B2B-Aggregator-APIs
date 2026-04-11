@@ -22,9 +22,9 @@ func registerMiddleware(r *gin.Engine, dbReady bool) {
 				return
 			}
 			c.JSON(503, gin.H{
-				"success":   false,
-				"message":   "Database unavailable",
-				"timestamp": time.Now().UTC().Format(time.RFC3339),
+				"Success":   false,
+				"Message":   "Database unavailable",
+				"Timestamp": time.Now().UTC().Format(time.RFC3339),
 			})
 			c.Abort()
 		})

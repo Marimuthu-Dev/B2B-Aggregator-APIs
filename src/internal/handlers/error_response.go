@@ -37,14 +37,14 @@ func respondError(c *gin.Context, err error) {
 			message = http.StatusText(status)
 		}
 
-		c.JSON(status, gin.H{"success": false, "message": message, "timestamp": serverTimestamp()})
+		c.JSON(status, gin.H{"Success": false, "Message": message, "Timestamp": serverTimestamp()})
 		return
 	}
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "Resource not found", "timestamp": serverTimestamp()})
+		c.JSON(http.StatusNotFound, gin.H{"Success": false, "Message": "Resource not found", "Timestamp": serverTimestamp()})
 		return
 	}
 
-	c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": err.Error(), "timestamp": serverTimestamp()})
+	c.JSON(http.StatusInternalServerError, gin.H{"Success": false, "Message": err.Error(), "Timestamp": serverTimestamp()})
 }

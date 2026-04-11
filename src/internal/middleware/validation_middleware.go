@@ -43,9 +43,9 @@ func BindUri(c *gin.Context, obj interface{}) bool {
 func RequirePositiveID(c *gin.Context, id int64) bool {
 	if id <= 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"success":   false,
-			"message":   "id is required and must be a positive integer",
-			"timestamp": time.Now().UTC().Format(time.RFC3339),
+			"Success":   false,
+			"Message":   "id is required and must be a positive integer",
+			"Timestamp": time.Now().UTC().Format(time.RFC3339),
 		})
 		c.Abort()
 		return false
@@ -68,10 +68,10 @@ func ValidationErrorMiddleware() gin.HandlerFunc {
 
 			if ve, ok := err.Err.(validator.ValidationErrors); ok {
 				c.JSON(http.StatusBadRequest, gin.H{
-					"success":   false,
-					"message":   "Validation failed",
-					"errors":    formatValidationErrors(ve),
-					"timestamp": time.Now().UTC().Format(time.RFC3339),
+					"Success":   false,
+					"Message":   "Validation failed",
+					"Errors":    formatValidationErrors(ve),
+					"Timestamp": time.Now().UTC().Format(time.RFC3339),
 				})
 				return
 			}
@@ -79,17 +79,17 @@ func ValidationErrorMiddleware() gin.HandlerFunc {
 			var typeErr *json.UnmarshalTypeError
 			if errors.As(err.Err, &typeErr) {
 				c.JSON(http.StatusBadRequest, gin.H{
-					"success":   false,
-					"message":   "Invalid type for field " + typeErr.Field,
-					"timestamp": time.Now().UTC().Format(time.RFC3339),
+					"Success":   false,
+					"Message":   "Invalid type for field " + typeErr.Field,
+					"Timestamp": time.Now().UTC().Format(time.RFC3339),
 				})
 				return
 			}
 
 			c.JSON(http.StatusBadRequest, gin.H{
-				"success":   false,
-				"message":   err.Err.Error(),
-				"timestamp": time.Now().UTC().Format(time.RFC3339),
+				"Success":   false,
+				"Message":   err.Err.Error(),
+				"Timestamp": time.Now().UTC().Format(time.RFC3339),
 			})
 			return
 		}

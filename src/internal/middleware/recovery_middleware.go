@@ -12,9 +12,9 @@ func RecoveryMiddleware() gin.HandlerFunc {
 		defer func() {
 			if rec := recover(); rec != nil {
 				c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
-					"success":   false,
-					"message":   "Internal server error",
-					"timestamp": time.Now().UTC().Format(time.RFC3339),
+					"Success":   false,
+					"Message":   "Internal server error",
+					"Timestamp": time.Now().UTC().Format(time.RFC3339),
 				})
 			}
 		}()

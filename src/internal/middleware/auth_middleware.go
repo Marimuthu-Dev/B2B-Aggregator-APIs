@@ -15,9 +15,9 @@ func AuthMiddleware(secret string) gin.HandlerFunc {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{
-				"success":   false,
-				"message":   "Authorization header is required",
-				"timestamp": time.Now().UTC().Format(time.RFC3339),
+				"Success":   false,
+				"Message":   "Authorization header is required",
+				"Timestamp": time.Now().UTC().Format(time.RFC3339),
 			})
 			c.Abort()
 			return
@@ -26,9 +26,9 @@ func AuthMiddleware(secret string) gin.HandlerFunc {
 		parts := strings.SplitN(authHeader, " ", 2)
 		if !(len(parts) == 2 && parts[0] == "Bearer") {
 			c.JSON(http.StatusUnauthorized, gin.H{
-				"success":   false,
-				"message":   "Authorization header format must be Bearer {token}",
-				"timestamp": time.Now().UTC().Format(time.RFC3339),
+				"Success":   false,
+				"Message":   "Authorization header format must be Bearer {token}",
+				"Timestamp": time.Now().UTC().Format(time.RFC3339),
 			})
 			c.Abort()
 			return
@@ -37,9 +37,9 @@ func AuthMiddleware(secret string) gin.HandlerFunc {
 		claims, err := utils.ValidateToken(parts[1], secret)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{
-				"success":   false,
-				"message":   "Invalid or expired token",
-				"timestamp": time.Now().UTC().Format(time.RFC3339),
+				"Success":   false,
+				"Message":   "Invalid or expired token",
+				"Timestamp": time.Now().UTC().Format(time.RFC3339),
 			})
 			c.Abort()
 			return

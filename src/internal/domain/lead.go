@@ -48,14 +48,14 @@ type Lead struct {
 	Pincode                 string
 	LeadStatusID            int8
 	AppointmentAt           *timeutil.ISTTime `json:"AppointmentAt"`
-	LabID                   *int64            `json:"labId,omitempty"`
+	LabID                   *int64            `json:"LabID,omitempty"`
 	LabName                 string            `json:"LabName,omitempty"`
-	IsFit                   int8              `json:"isFit"`
-	IsReportDownloadable    bool              `json:"isReportDownloadable"`
-	ApprovalRemarks         string            `json:"approvalRemarks,omitempty"`
-	FitUpdatedOn            *timeutil.ISTTime `json:"fitUpdatedOn,omitempty"`
+	IsFit                   int8              `json:"IsFit"`
+	IsReportDownloadable    bool              `json:"IsReportDownloadable"`
+	ApprovalRemarks         string            `json:"ApprovalRemarks,omitempty"`
+	FitUpdatedOn            *timeutil.ISTTime `json:"FitUpdatedOn,omitempty"`
 	IsFitCertifiedGenerated bool
-	ReportURL               string `json:"reportUrl,omitempty"`
+	ReportURL               string `json:"ReportURL,omitempty"`
 	CreatedBy               int64
 	CreatedOn               timeutil.ISTTime
 	LastUpdatedBy           int64
@@ -65,8 +65,8 @@ type Lead struct {
 // LeadDetail is lead with resolved ClientName and PackageName for API response.
 type LeadDetail struct {
 	Lead
-	ClientName  string `json:"clientName,omitempty"`
-	PackageName string `json:"packageName,omitempty"`
+	ClientName  string `json:"ClientName,omitempty"`
+	PackageName string `json:"PackageName,omitempty"`
 }
 
 type LeadHistory struct {

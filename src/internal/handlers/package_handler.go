@@ -43,10 +43,10 @@ func (h *PackageHandler) GetAll(c *gin.Context) {
 		return
 	}
 	respondData(c, http.StatusOK, packages, "", gin.H{
-		"count":    len(packages),
-		"page":     filter.Page,
-		"pageSize": filter.PageSize,
-		"total":    total,
+		"Count":    len(packages),
+		"Page":     filter.Page,
+		"PageSize": filter.PageSize,
+		"Total":    total,
 	})
 }
 
@@ -149,7 +149,7 @@ func (h *PackageHandler) GetAllWithTestsDetails(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	respondData(c, http.StatusOK, data, "Packages retrieved successfully with test details", gin.H{"count": len(data)})
+	respondData(c, http.StatusOK, data, "Packages retrieved successfully with test details", gin.H{"Count": len(data)})
 }
 
 func (h *PackageHandler) UpdatePackageStatus(c *gin.Context) {
@@ -245,7 +245,7 @@ func (h *PackageHandler) GetAllPackageClientMappings(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	respondData(c, http.StatusOK, data, "Package-Client mappings retrieved successfully", gin.H{"count": len(data)})
+	respondData(c, http.StatusOK, data, "Package-Client mappings retrieved successfully", gin.H{"Count": len(data)})
 }
 
 func (h *PackageHandler) UpdatePackageClientMappingStatus(c *gin.Context) {
@@ -318,7 +318,7 @@ func (h *PackageHandler) GetAllPackageLabMappings(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	respondData(c, http.StatusOK, data, "Package-Lab mappings retrieved successfully", gin.H{"count": len(data)})
+	respondData(c, http.StatusOK, data, "Package-Lab mappings retrieved successfully", gin.H{"Count": len(data)})
 }
 
 func (h *PackageHandler) UpdatePackageLabMappingStatus(c *gin.Context) {

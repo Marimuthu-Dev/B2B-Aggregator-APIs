@@ -137,6 +137,6 @@ func (r ClientRequest) ToDomain() domain.Client {
 
 // ClientMoUDownloadURLResponse is returned by GET /api/v1/clients/:id/mou/download-url (SAS link for viewing the PDF).
 type ClientMoUDownloadURLResponse struct {
-	URL       string    `json:"url"`
-	ExpiresAt time.Time `json:"expiresAt"`
+	URL       string    `json:"URL"`
+	ExpiresAt time.Time `json:"ExpiresAt"`
 }

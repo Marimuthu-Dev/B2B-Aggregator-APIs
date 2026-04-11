@@ -57,10 +57,10 @@ func (h *LeadHandler) GetAll(c *gin.Context) {
 		return
 	}
 	respondData(c, http.StatusOK, data, "Success", gin.H{
-		"count":    len(data),
-		"page":     filter.Page,
-		"pageSize": filter.PageSize,
-		"total":    total,
+		"Count":    len(data),
+		"Page":     filter.Page,
+		"PageSize": filter.PageSize,
+		"Total":    total,
 	})
 }
 
@@ -162,7 +162,7 @@ func (h *LeadHandler) BulkUpdateStatus(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	respondData(c, http.StatusOK, gin.H{"updatedCount": count}, "Lead statuses updated successfully", nil)
+	respondData(c, http.StatusOK, gin.H{"UpdatedCount": count}, "Lead statuses updated successfully", nil)
 }
 
 // UploadReport handles POST /api/v1/leads/{id}/reports/upload (multipart field "file", PDF).
@@ -199,7 +199,7 @@ func (h *LeadHandler) UploadReport(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	respondData(c, http.StatusOK, gin.H{"reportUrl": reportURL}, "Report uploaded successfully", nil)
+	respondData(c, http.StatusOK, gin.H{"ReportURL": reportURL}, "Report uploaded successfully", nil)
 }
 
 // ApproveReport updates lead report approval (fit / unfit / hold), download flag, and remarks.
@@ -292,8 +292,8 @@ func (h *LeadHandler) GetReportDownloadURL(c *gin.Context) {
 		return
 	}
 	respondData(c, http.StatusOK, gin.H{
-		"downloadUrl": downloadURL,
-		"expiresAt":   expiresAt.UTC().Format(time.RFC3339),
+		"DownloadURL": downloadURL,
+		"ExpiresAt":   expiresAt.UTC().Format(time.RFC3339),
 	}, "Success", nil)
 }
 
@@ -335,7 +335,7 @@ func (h *LeadHandler) BulkImportCsv(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	respondData(c, http.StatusCreated, gin.H{"insertedCount": inserted}, "Leads imported successfully", nil)
+	respondData(c, http.StatusCreated, gin.H{"InsertedCount": inserted}, "Leads imported successfully", nil)
 }
 
 // applyLeadListScopeFromJWT forces client/lab list scope from JWT: userType 2 → ClientID = userId;
