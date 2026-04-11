@@ -47,8 +47,9 @@ type Lead struct {
 	StateID                 int8
 	Pincode                 string
 	LeadStatusID            int8
-	AppointmentAt           *timeutil.ISTTime `json:"appointmentAt,omitempty"`
+	AppointmentAt           *timeutil.ISTTime `json:"AppointmentAt"`
 	LabID                   *int64            `json:"labId,omitempty"`
+	LabName                 string            `json:"LabName,omitempty"`
 	IsFit                   int8              `json:"isFit"`
 	IsReportDownloadable    bool              `json:"isReportDownloadable"`
 	ApprovalRemarks         string            `json:"approvalRemarks,omitempty"`

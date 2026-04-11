@@ -1,12 +1,21 @@
 package repository
 
 import (
+	"database/sql"
 	"strings"
 
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 )
+
+func mapLeadToDomainWithOptionalLabName(p persistencemodels.Lead, labName sql.NullString) domain.Lead {
+	d := mapLeadToDomain(p)
+	if labName.Valid {
+		d.LabName = strings.TrimSpace(labName.String)
+	}
+	return d
+}
 
 func mapLeadToDomain(p persistencemodels.Lead) domain.Lead {
 	return domain.Lead{

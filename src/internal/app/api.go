@@ -75,7 +75,7 @@ func Run() error {
 	clientLocationSvc := service.NewClientLocationService(clientLocationRepo)
 	employeeSvc := service.NewEmployeeService(employeeRepo)
 	labSvc := service.NewLabService(labRepo, blobSvc)
-	leadSvc := service.NewLeadService(leadRepo, leadUow, clientRepo, packageRepo, blobSvc)
+	leadSvc := service.NewLeadService(leadRepo, leadUow, clientRepo, packageRepo, labRepo, blobSvc)
 	testSvc := service.NewTestService(testRepo)
 
 	// Initialize Handlers

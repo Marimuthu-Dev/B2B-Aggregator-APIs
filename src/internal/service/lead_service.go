@@ -46,11 +46,12 @@ type leadService struct {
 	uow         repository.LeadUnitOfWork
 	clientRepo  repository.ClientRepository
 	packageRepo repository.PackageRepository
+	labRepo     repository.LabRepository
 	blobs       BlobService
 }
 
-func NewLeadService(repo repository.LeadRepository, uow repository.LeadUnitOfWork, clientRepo repository.ClientRepository, packageRepo repository.PackageRepository, blobs BlobService) LeadService {
-	return &leadService{repo: repo, uow: uow, clientRepo: clientRepo, packageRepo: packageRepo, blobs: blobs}
+func NewLeadService(repo repository.LeadRepository, uow repository.LeadUnitOfWork, clientRepo repository.ClientRepository, packageRepo repository.PackageRepository, labRepo repository.LabRepository, blobs BlobService) LeadService {
+	return &leadService{repo: repo, uow: uow, clientRepo: clientRepo, packageRepo: packageRepo, labRepo: labRepo, blobs: blobs}
 }
 
 func (s *leadService) ListLeads(filter repository.LeadListFilter) ([]domain.Lead, int64, error) {
@@ -74,6 +75,11 @@ func (s *leadService) GetLeadByID(id int64) (*domain.LeadDetail, error) {
 	if lead.PackageID != 0 {
 		if pkg, _ := s.packageRepo.FindByID(int64(lead.PackageID)); pkg != nil {
 			detail.PackageName = pkg.PackageName
+		}
+	}
+	if lead.LabID != nil && *lead.LabID != 0 {
+		if lab, err := s.labRepo.FindByID(*lead.LabID); err == nil && lab != nil {
+			detail.LabName = lab.LabName
 		}
 	}
 	return detail, nil

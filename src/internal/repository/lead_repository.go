@@ -42,6 +42,12 @@ type leadRepository struct {
 	db *gorm.DB
 }
 
+// leadListScan is tbl_Leads with an optional lab name from LEFT JOIN tbl_LabMaster.
+type leadListScan struct {
+	persistencemodels.Lead
+	JoinedLabName sql.NullString `gorm:"column:joined_lab_name"`
+}
+
 func NewLeadRepository(db *gorm.DB) LeadRepository {
 	return &leadRepository{db: db}
 }
@@ -53,32 +59,53 @@ func (r *leadRepository) FindAll() ([]domain.Lead, error) {
 }
 
 func (r *leadRepository) List(filter LeadListFilter) ([]domain.Lead, int64, error) {
-	query := r.db.Model(&persistencemodels.Lead{})
-	if filter.ClientID != nil {
-		query = query.Where("ClientID = ?", *filter.ClientID)
-	}
-	if filter.LabID != nil {
-		query = query.Where("LabID = ?", *filter.LabID)
-	}
-	if filter.StatusID != nil {
-		query = query.Where("LeadStatusID = ?", *filter.StatusID)
-	}
-	if filter.PackageID != nil {
-		query = query.Where("PackageID = ?", *filter.PackageID)
-	}
+	q := r.leadListJoinedQuery(filter)
 
 	var total int64
-	if err := query.Count(&total).Error; err != nil {
+	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
-	sortColumn := mapLeadSortColumn(filter.SortBy)
+	sortColumn := "l." + mapLeadSortColumn(filter.SortBy)
 	order := normalizeSortOrder(filter.SortOrder)
 	offset := (filter.Page - 1) * filter.PageSize
 
-	var leads []persistencemodels.Lead
-	err := query.Order(sortColumn + " " + order).Limit(filter.PageSize).Offset(offset).Find(&leads).Error
-	return mapLeadsToDomain(leads), total, err
+	var rows []leadListScan
+	err := r.leadListJoinedQuery(filter).
+		Select("l.*, lm.LabName AS joined_lab_name").
+		Order(sortColumn + " " + order).
+		Limit(filter.PageSize).
+		Offset(offset).
+		Find(&rows).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	out := make([]domain.Lead, len(rows))
+	for i := range rows {
+		out[i] = mapLeadToDomainWithOptionalLabName(rows[i].Lead, rows[i].JoinedLabName)
+	}
+	return out, total, nil
+}
+
+func (r *leadRepository) leadListJoinedQuery(filter LeadListFilter) *gorm.DB {
+	leadTable := persistencemodels.Lead{}.TableName()
+	labTable := persistencemodels.Lab{}.TableName()
+	q := r.db.Table(leadTable + " AS l").
+		Joins("LEFT JOIN " + labTable + " AS lm ON l.LabID = lm.LabID")
+	if filter.ClientID != nil {
+		q = q.Where("l.ClientID = ?", *filter.ClientID)
+	}
+	if filter.LabID != nil {
+		q = q.Where("l.LabID = ?", *filter.LabID)
+	}
+	if filter.StatusID != nil {
+		q = q.Where("l.LeadStatusID = ?", *filter.StatusID)
+	}
+	if filter.PackageID != nil {
+		q = q.Where("l.PackageID = ?", *filter.PackageID)
+	}
+	return q
 }
 
 func mapLeadSortColumn(sortBy string) string {
