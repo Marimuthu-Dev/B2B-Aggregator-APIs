@@ -166,7 +166,14 @@ func (s *leadService) UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUp
 		l.LeadStatusID = *update.LeadStatusID
 	}
 	if update.AppointmentAt != nil {
-		at := timeutil.FromTime(*update.AppointmentAt)
+		appt := *update.AppointmentAt
+		if appt.Before(time.Now()) {
+			return nil, apperrors.NewBadRequest(
+				"AppointmentAt must be at or after the current time (India Standard Time)",
+				nil,
+			)
+		}
+		at := timeutil.FromTime(appt)
 		l.AppointmentAt = &at
 	}
 	if update.LabID != nil {
