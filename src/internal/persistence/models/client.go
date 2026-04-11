@@ -17,8 +17,6 @@ type Client struct {
 	ContactPerson2Number      *string   `gorm:"column:ContactPerson2Number;type:varchar(10)"`
 	ContactPerson2EmailID     *string   `gorm:"column:ContactPerson2EmailID;type:varchar(75)"`
 	ContactPerson2Designation *string   `gorm:"column:ContactPerson2Designation;type:varchar(25)"`
-	CategoryID                *int8     `gorm:"column:CategoryID"`
-	NatureOfBusiness          *string   `gorm:"column:NatureOfBusiness;type:varchar(20)"`
 	GSTIN_UIN                 *string   `gorm:"column:GSTIN_UIN;type:varchar(20)"`
 	PANNumber                 *string   `gorm:"column:PANNumber;type:varchar(10)"`
 	BusinessVertical          string    `gorm:"column:BusinessVertical;type:varchar(15);not null"`

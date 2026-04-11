@@ -22,8 +22,6 @@ type ClientRequest struct {
 	ContactPerson2Number      *string    `binding:"omitempty"`
 	ContactPerson2EmailID     *string    `binding:"omitempty"`
 	ContactPerson2Designation *string    `binding:"omitempty"`
-	CategoryID                *int8      `binding:"omitempty"`
-	NatureOfBusiness          *string    `binding:"omitempty"`
 	GSTIN_UIN                 *string    `binding:"omitempty"`
 	PANNumber                 *string    `binding:"omitempty"`
 	BusinessVertical          string     `binding:"required"`
@@ -51,8 +49,6 @@ type ClientUpdateRequest struct {
 	ContactPerson2Number      *string    `json:"ContactPerson2Number"`
 	ContactPerson2EmailID     *string    `json:"ContactPerson2EmailID"`
 	ContactPerson2Designation *string    `json:"ContactPerson2Designation"`
-	CategoryID                *int8      `json:"CategoryID"`
-	NatureOfBusiness          *string    `json:"NatureOfBusiness"`
 	GSTIN_UIN                 *string    `json:"GSTIN_UIN"`
 	PANNumber                 *string    `json:"PANNumber"`
 	BusinessVertical          *string    `json:"BusinessVertical"`
@@ -69,7 +65,7 @@ func (r ClientUpdateRequest) HasAtLeastOneField() bool {
 	return r.ClientName != nil || r.Address != nil || r.CityID != nil || r.StateID != nil || r.Pincode != nil ||
 		r.ContactPerson1Name != nil || r.ContactPerson1Number != nil || r.ContactPerson1EmailID != nil || r.ContactPerson1Designation != nil ||
 		r.ContactPerson2Name != nil || r.ContactPerson2Number != nil || r.ContactPerson2EmailID != nil || r.ContactPerson2Designation != nil ||
-		r.CategoryID != nil || r.NatureOfBusiness != nil || r.GSTIN_UIN != nil || r.PANNumber != nil || r.BusinessVertical != nil ||
+		r.GSTIN_UIN != nil || r.PANNumber != nil || r.BusinessVertical != nil ||
 		r.BillingName != nil || r.BillingAdderss != nil || r.BillingPincode != nil || r.ClientTypeID != nil || r.IsAcitve != nil ||
 		r.MOUStartDate != nil || r.MOUEndDate != nil
 }
@@ -126,8 +122,6 @@ func (r ClientRequest) ToDomain() domain.Client {
 		ContactPerson2Number:      r.ContactPerson2Number,
 		ContactPerson2EmailID:     r.ContactPerson2EmailID,
 		ContactPerson2Designation: r.ContactPerson2Designation,
-		CategoryID:                r.CategoryID,
-		NatureOfBusiness:          r.NatureOfBusiness,
 		GSTIN_UIN:                 r.GSTIN_UIN,
 		PANNumber:                 r.PANNumber,
 		BusinessVertical:          r.BusinessVertical,
