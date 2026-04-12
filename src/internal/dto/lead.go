@@ -82,7 +82,7 @@ func (r LeadRequest) ToDomain() domain.Lead {
 		LabID:         r.LabID,
 	}
 	if r.AppointmentAt != nil {
-		at := timeutil.FromTime(*r.AppointmentAt)
+		at := timeutil.StoredFromTime(*r.AppointmentAt)
 		l.AppointmentAt = &at
 	}
 	return l

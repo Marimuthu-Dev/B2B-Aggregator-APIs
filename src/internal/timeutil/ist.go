@@ -65,3 +65,41 @@ func ToTimePtr(t *ISTTime) *time.Time {
 	tt := t.Time
 	return &tt
 }
+
+// StoredTime wraps time.Time when the database already stores the intended wall-clock instant
+// (e.g. IST). JSON marshals as RFC3339 using the time's own location — it does not shift to Asia/Kolkata.
+type StoredTime struct {
+	time.Time
+}
+
+// MarshalJSON outputs RFC3339 without converting zones (unlike ISTTime).
+func (t *StoredTime) MarshalJSON() ([]byte, error) {
+	if t == nil || t.IsZero() {
+		return []byte("null"), nil
+	}
+	s := t.Time.Format(time.RFC3339)
+	return json.Marshal(s)
+}
+
+// StoredFromTime wraps t as StoredTime (e.g. from API input before save).
+func StoredFromTime(t time.Time) StoredTime {
+	return StoredTime{Time: t}
+}
+
+// StoredFromTimePtr wraps *time.Time as *StoredTime. Returns nil if t is nil.
+func StoredFromTimePtr(t *time.Time) *StoredTime {
+	if t == nil {
+		return nil
+	}
+	s := StoredTime{Time: *t}
+	return &s
+}
+
+// StoredToTimePtr returns *time.Time from *StoredTime for persistence. Returns nil if t is nil.
+func StoredToTimePtr(t *StoredTime) *time.Time {
+	if t == nil {
+		return nil
+	}
+	tt := t.Time
+	return &tt
+}

@@ -34,7 +34,7 @@ func Ping(c *gin.Context) {
 		"Environment":       env,
 		"Current TimeStamp": currentTS,
 		"IST TimeStamp":     istTS,
-		"Last Build Pushed": "11-Apr-2026 23:35:00",
-		"Latest commit":     "PascalCase Updates.",
+		"Last Build Pushed": "13-Apr-2026 01:45:00",
+		"Latest commit":     "AppointmentAt Converation and TinyINT issue resolved for CityID and StateID.",
 	})
 }

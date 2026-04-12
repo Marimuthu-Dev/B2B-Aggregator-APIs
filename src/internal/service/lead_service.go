@@ -179,7 +179,7 @@ func (s *leadService) UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUp
 				nil,
 			)
 		}
-		at := timeutil.FromTime(appt)
+		at := timeutil.StoredFromTime(appt)
 		l.AppointmentAt = &at
 	}
 	if update.LabID != nil {
