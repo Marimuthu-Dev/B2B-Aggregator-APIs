@@ -100,8 +100,8 @@ func normalizeMouStatusToken(p string) (string, bool) {
 
 type LabListQuery struct {
 	PaginationQuery
-	CityID   *int8 `form:"cityId" binding:"omitempty,min=1"`
-	StateID  *int8 `form:"stateId" binding:"omitempty,min=1"`
+	CityID   *uint8 `form:"cityId" binding:"omitempty,min=1"`
+	StateID  *uint8 `form:"stateId" binding:"omitempty,min=1"`
 	IsActive *bool `form:"isActive" binding:"omitempty"`
 	MouListQuery
 	Search string `form:"search" binding:"omitempty"`

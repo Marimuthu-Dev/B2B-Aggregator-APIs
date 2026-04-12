@@ -26,8 +26,8 @@ type LabListFilter struct {
 	PageSize       int
 	SortBy         string
 	SortOrder      string
-	CityID         *int8
-	StateID        *int8
+	CityID         *uint8
+	StateID        *uint8
 	IsActive       *bool
 	MouStatuses    []string
 	MouExpiryRange *MouExpiryDateRange

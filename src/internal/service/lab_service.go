@@ -28,8 +28,8 @@ type LabService interface {
 	GetLabMoUDownloadURL(ctx context.Context, labID int64) (*dto.LabMoUDownloadURLResponse, error)
 	DeleteLab(id int64) error
 	GetActiveLabs() ([]domain.Lab, error)
-	GetLabsByCity(cityID int8) ([]domain.Lab, error)
-	GetLabsByState(stateID int8) ([]domain.Lab, error)
+	GetLabsByCity(cityID uint8) ([]domain.Lab, error)
+	GetLabsByState(stateID uint8) ([]domain.Lab, error)
 }
 
 type labService struct {
@@ -351,10 +351,10 @@ func (s *labService) GetActiveLabs() ([]domain.Lab, error) {
 	return s.repo.FindAllActive()
 }
 
-func (s *labService) GetLabsByCity(cityID int8) ([]domain.Lab, error) {
+func (s *labService) GetLabsByCity(cityID uint8) ([]domain.Lab, error) {
 	return s.repo.FindByCity(cityID)
 }
 
-func (s *labService) GetLabsByState(stateID int8) ([]domain.Lab, error) {
+func (s *labService) GetLabsByState(stateID uint8) ([]domain.Lab, error) {
 	return s.repo.FindByState(stateID)
 }

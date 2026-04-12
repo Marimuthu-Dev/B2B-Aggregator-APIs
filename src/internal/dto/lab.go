@@ -10,8 +10,8 @@ type LabRequest struct {
 	LabID                      int64      `binding:"omitempty"`
 	LabName                    string     `binding:"required"`
 	Address                    *string    `binding:"omitempty"`
-	CityID                     *int8      `binding:"omitempty"`
-	StateID                    *int8      `binding:"omitempty"`
+	CityID                     *uint8     `binding:"omitempty"`
+	StateID                    *uint8     `binding:"omitempty"`
 	Pincode                    *string    `binding:"omitempty"`
 	ContactPerson1Name         *string    `binding:"omitempty"`
 	ContactPerson1Number       *string    `binding:"omitempty"`
@@ -39,8 +39,8 @@ type LabRequest struct {
 type LabUpdateRequest struct {
 	LabName                    *string    `json:"LabName"`
 	Address                    *string   `json:"Address"`
-	CityID                     *int8     `json:"CityID"`
-	StateID                    *int8     `json:"StateID"`
+	CityID                     *uint8    `json:"CityID"`
+	StateID                    *uint8    `json:"StateID"`
 	Pincode                    *string   `json:"Pincode"`
 	ContactPerson1Name         *string   `json:"ContactPerson1Name"`
 	ContactPerson1Number       *string   `json:"ContactPerson1Number"`
