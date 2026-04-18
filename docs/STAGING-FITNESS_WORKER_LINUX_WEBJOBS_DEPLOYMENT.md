@@ -1,6 +1,6 @@
 # Staging — Deploying `fitness-worker` to Linux App Service with WebJobs (Publish: Code)
 
-**Guide:** **Staging** — use this for your **non-production** (staging) Linux Web App. For **PROD**, see [FITNESS_WORKER_LINUX_WEBJOBS_DEPLOYMENT_PROD.md](./FITNESS_WORKER_LINUX_WEBJOBS_DEPLOYMENT_PROD.md) (**PROD** — `um-prod-worker-process`).
+**Guide:** **Staging** — use this for your **non-production** (staging) Linux Web App. For **PROD**, see [PROD — fitness-worker Linux WebJobs](./PROD-FITNESS_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md) (**PROD** — `um-prod-worker-process`).
 
 This guide mirrors [FITNESS_WORKER_WINDOWS_DEPLOYMENT.md](./FITNESS_WORKER_WINDOWS_DEPLOYMENT.md) for **Linux** App Service: a **triggered**, **scheduled** WebJob runs the Go worker in **run-once** mode each time the schedule fires.
 
@@ -8,7 +8,7 @@ This guide mirrors [FITNESS_WORKER_WINDOWS_DEPLOYMENT.md](./FITNESS_WORKER_WINDO
 
 | Topic | Linux |
 |--------|--------|
-| Entry point | Azure expects a script or runnable file at the **ZIP root**. For a compiled Go binary, include **`run.sh`** at the root that executes `./fitness-worker`. |
+| Entry point | Azure expects a script at the **ZIP root** named **`run.sh`**. In this repo the source file is **`src/run-fitness-worker.sh`** — copy it to **`run.sh`** when assembling the zip (see [Step 2](#step-2-build-the-linux-binary-and-create-workerzip)). |
 | Permissions | After unzip on the app, scripts and binaries must be executable: **`chmod +x run.sh fitness-worker`** before you zip (see [Assemble the WebJob folder](#assemble-the-webjob-folder-exact-layout)). |
 | Scheduled reliability | Microsoft documents that **[Always On](https://learn.microsoft.com/en-us/azure/app-service/configure-common?tabs=portal#configure-general-settings)** should be enabled for **scheduled** WebJobs to run reliably, and that **`WEBSITE_SKIP_RUNNING_KUDUAGENT`** must be **`false`** on Linux. **Free F1** does **not** support Always On — schedules may be **unreliable** when the site is cold; use **Basic (B1)** or higher for production cron behavior, or use **Manual** triggers while testing. |
 | Chromium | Built-in Linux stacks do **not** include a full browser. You can try bundling **[Chrome for Testing](https://googlechromelabs.github.io/chrome-for-testing/)** (`linux64`), but missing system libraries on the App Service image is common. If PDF generation fails, prefer **[FITNESS_WORKER_APP_SERVICE_DEPLOYMENT.md](./FITNESS_WORKER_APP_SERVICE_DEPLOYMENT.md)** (Linux container with `apt`-installed Chromium). |
@@ -27,7 +27,7 @@ Do the following **in this order** in [Azure Portal](https://portal.azure.com/) 
 |------|------------|-------------------|
 | 1 | Set **`WEBSITE_SKIP_RUNNING_KUDUAGENT`** = **`false`** (if not already). For reliable schedules, enable **Always On** (requires a tier that supports it, e.g. Basic+). | [Prerequisites](#prerequisites-on-the-app-service) |
 | 2 | Add **Application settings** (DB, Azure Blob, fitness worker vars, optional `CHROMIUM_PATH`). **Save**. | [Step 1](#step-1-application-settings) |
-| 3 | On your dev machine: build **`fitness-worker`** (Linux `amd64`), add **`run.sh`**, **`templates/`**, optional Chromium folder → **`worker.zip`** (correct root layout). | [Step 2](#step-2-build-the-linux-binary-and-create-workerzip) |
+| 3 | On your dev machine: build **`fitness-worker`** (Linux `amd64`), copy **`run-fitness-worker.sh`** → **`run.sh`**, add **`templates/`**, optional Chromium folder → **`worker.zip`** (correct root layout). | [Step 2](#step-2-build-the-linux-binary-and-create-workerzip) |
 | 4 | **WebJobs** → **+ Add** → upload `worker.zip` as **Triggered** + **Scheduled**. | [Step 3](#step-3-add-the-webjob) |
 | 5 | **WebJobs** → your job → **Logs** / **Log stream** / **SSH** or Kudu → fix errors. | [Step 4](#step-4-logs-and-verification) |
 
@@ -100,33 +100,29 @@ cd /mnt/d/Code/MMK_Projects/B2B-Diagnostic-Aggregator/GitHub/B2B-Aggregator-APIs
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o fitness-worker ./cmd/fitness-worker
 ```
 
-### Create `run.sh` (must be at ZIP root)
+### Entry script: `run-fitness-worker.sh` → **`run.sh`** at zip root
 
-Create **`run.sh`** next to `fitness-worker`:
+The checked-in script is **`src/run-fitness-worker.sh`**. Azure WebJobs expect the file at the **ZIP root** to be named **`run.sh`** (that is what gets executed after unzip).
+
+From **`src/`** (or your staging folder):
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
-cd "$(dirname "$0")"
-
-echo "Attempting to install Chromium and necessary shared libraries..."
-# We use || true so that if it's already installed or if updating repos fails,
-# it won't completely crash the script because of the 'set -e' requirement above.
-apt-get update -qq -y || true
-apt-get install -qq -y chromium ca-certificates fonts-liberation libgbm1 libasound2 libatk-bridge2.0-0 libatk1.0-0 libnss3 lsb-release xdg-utils || true
-
-echo "Starting fitness-worker..."
-exec ./fitness-worker
+cp run-fitness-worker.sh run.sh
+chmod +x run.sh
 ```
 
-`cd` to the script directory matches how the worker resolves **`./templates`** and relative **`CHROMIUM_PATH`** via the executable directory (see `resolveAgainstExecutableDir` in `src/internal/config/fitness_worker.go`).
+Keep **`run.sh`** next to **`fitness-worker`** when zipping. Do **not** commit a duplicate `run.sh` if you prefer a single source of truth — only **`run-fitness-worker.sh`** is versioned; **`run.sh`** is a build artifact for the zip.
+
+The script installs Chromium dependencies and runs **`./fitness-worker`**. `cd` to the script directory matches **`./templates`** and **`CHROMIUM_PATH`** (see `resolveAgainstExecutableDir` in `src/internal/config/fitness_worker.go`).
+
+**Automated zip:** `src/deploy-webjob.sh` copies **`run-fitness-worker.sh`** to **`run.sh`** before creating **`fitness-job.zip`**.
 
 ### Assemble the WebJob folder (exact layout)
 
 In one **empty staging folder** (this becomes the **root inside** `worker.zip`):
 
 1. Copy **`fitness-worker`** to the **root** of staging.
-2. Copy **`run.sh`** to the **root** of staging.
+2. Copy **`src/run-fitness-worker.sh`** → staging as **`run.sh`** (or `cp run-fitness-worker.sh run.sh` inside `src/` before collecting files).
 3. Copy **`src/cmd/fitness-worker/templates`** → staging as **`templates/`** (full tree).
 4. *(Optional)* Add unpacked **Chrome for Testing** **`linux64`** tree, e.g. folder **`chrome-linux64/`** with the `chrome` launcher inside (see [Chromium on Linux App Service (WebJob)](#chromium-on-linux-app-service-webjob)).
 
@@ -134,7 +130,7 @@ Set execute bits **before** zipping:
 
 ```bash
 cd /mnt/d/Code/MMK_Projects/B2B-Diagnostic-Aggregator/GitHub/B2B-Aggregator-APIs
-chmod +x run.sh fitness-worker
+chmod +x run.sh fitness-worker   # run.sh was produced from run-fitness-worker.sh
 ```
 
 Expected layout:
@@ -242,7 +238,7 @@ With **Always On** and a tier that allows it, you can use a **Continuous** WebJo
 
 - [ ] **`WEBSITE_SKIP_RUNNING_KUDUAGENT=false`** on the Linux app.
 - [ ] **Always On** enabled if you rely on a **schedule** (requires a supporting SKU).
-- [ ] `worker.zip` root contains **`run.sh`**, **`fitness-worker`**, and **`templates/`** (and optional `chrome-linux64/`).
+- [ ] `worker.zip` root contains **`run.sh`** (from **`run-fitness-worker.sh`**), **`fitness-worker`**, and **`templates/`** (and optional `chrome-linux64/`).
 - [ ] **`chmod +x`** applied to **`run.sh`** and **`fitness-worker`** before zipping.
 - [ ] **`FITNESS_CERT_WORKER_RUN_ONCE=true`** for triggered scheduled batches.
 - [ ] **`CHROMIUM_PATH`** set if the image has no usable browser on `PATH`.
@@ -252,6 +248,7 @@ With **Always On** and a tier that allows it, you can use a **Continuous** WebJo
 
 ## Related docs
 
-- [PROD — Linux WebJobs (`um-prod-worker-process`)](./FITNESS_WORKER_LINUX_WEBJOBS_DEPLOYMENT_PROD.md) — same WebJob flow for **production**.
+- [PROD — Linux WebJobs (`um-prod-worker-process`)](./PROD-FITNESS_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md) — same WebJob flow for **production**.
+- [Staging — email-worker Linux WebJobs](./STAGING-EMAIL_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md) — add a **second** WebJob on the **same** App Service (`email-worker`, ACS, `EMAIL_WORKER_SINGLE_BATCH=true`).
 - [FITNESS_WORKER_WINDOWS_DEPLOYMENT.md](./FITNESS_WORKER_WINDOWS_DEPLOYMENT.md) — Windows WebJob + Chrome for Testing **win64**.
 - [FITNESS_WORKER_APP_SERVICE_DEPLOYMENT.md](./FITNESS_WORKER_APP_SERVICE_DEPLOYMENT.md) — Linux **container** worker with Chromium via `apt`.

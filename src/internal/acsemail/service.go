@@ -30,6 +30,9 @@ type Config struct {
 	ConnectionString string
 	APIVersion       string
 	HTTPClient       *http.Client
+	// SenderDisplayName is shown as the From "friendly name" in many clients when the API honors it.
+	// Some ACS Email setups still require configuring display name on the domain / Mail From in Azure Portal.
+	SenderDisplayName string
 }
 
 type acsConn struct {
@@ -96,9 +99,10 @@ type mailRecipients struct {
 }
 
 type sendEmailRequest struct {
-	SenderAddress string         `json:"senderAddress"`
-	Content       mailContent    `json:"content"`
-	Recipients    mailRecipients `json:"recipients"`
+	SenderAddress       string         `json:"senderAddress"`
+	SenderDisplayName   string         `json:"senderDisplayName,omitempty"`
+	Content             mailContent    `json:"content"`
+	Recipients          mailRecipients `json:"recipients"`
 }
 
 // Service sends email via ACS REST API.
@@ -143,7 +147,8 @@ func (s *Service) SendHTML(ctx context.Context, e domain.OutboxEmail) error {
 	}
 
 	reqBody := sendEmailRequest{
-		SenderAddress: from,
+		SenderAddress:     from,
+		SenderDisplayName: strings.TrimSpace(s.cfg.SenderDisplayName),
 		Content: mailContent{
 			Subject: strings.TrimSpace(e.Subject),
 			HTML:    e.BodyContent,

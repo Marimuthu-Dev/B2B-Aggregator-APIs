@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
 set -e
-
+# Run from the Go module directory: .../B2B-Aggregator-APIs/src
+#
+# WebJobs expect the entry script at zip root to be named run.sh.
+# Source in repo: run-fitness-worker.sh → copy as run.sh into the zip.
 echo "1. Creating fitness-job.zip (excluding chrome-linux64)..."
-rm -f fitness-job.zip
+rm -f run.sh fitness-job.zip
+cp run-fitness-worker.sh run.sh
+chmod +x run.sh
 zip -r fitness-job.zip fitness-worker run.sh settings.job templates/
+rm -f run.sh
 
 echo "2. Deploying WebJob directly to App Service via Az CLI..."
 # We push the zip specifically to the Kudu WebJob continuous folder.

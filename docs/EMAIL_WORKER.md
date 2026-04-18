@@ -36,6 +36,10 @@ The worker does **not** exit on a failed send for one row inside a batch; it log
 
 Because rows are **not** locked when read, **two instances can read the same pending rows**. **`MarkSent`** uses `WHERE … (IsSent = 0 OR IsSent IS NULL)` so only one sender wins. Prefer **one** scheduled WebJob or one continuous process unless you add coordination.
 
+### From display name (e.g. UrMediConnect vs DoNotReply)
+
+Set **`ACS_SENDER_DISPLAY_NAME=UrMediConnect`** so the worker includes **`senderDisplayName`** in the send request. If the inbox still shows **DoNotReply**, open your **Email Communication Service** (or ACS Email) in Azure Portal → **Domains** → your domain → **Mail From addresses** / sender usernames and set the **display name** there (or use Azure CLI to create/update a sender username with `--display-name`). Azure-managed domains often fix the label to **DoNotReply** until you use a **custom verified domain** with a configured sender display name.
+
 ---
 
 ## Environment variables
@@ -60,6 +64,7 @@ Set the same variables you use for **`config.ConnectDatabase`**: at minimum **`D
 | `EMAIL_IDLE_WAIT_SECONDS` | `60` | Used only in **`RunLoop`**: wait when no pending rows. |
 | `EMAIL_SEND_TIMEOUT_SECONDS` | `60` | Per-email send timeout. HTTP client uses this + 5s. |
 | `ACS_EMAIL_API_VERSION` | `2023-03-31` | REST `api-version` if empty default in code. |
+| `ACS_SENDER_DISPLAY_NAME` | *(empty)* | From “friendly name” (e.g. `UrMediConnect`). Sent as `senderDisplayName` in the REST body. If mail still shows **DoNotReply**, set the display name on the **Mail From** address for your domain in **Azure Portal** (ACS Email → Domains) or Azure CLI — some tenants do not honor runtime display name. |
 
 ### Logging (from `LoadConfig`)
 
@@ -164,7 +169,9 @@ flowchart LR
 
 ## Related documentation
 
-- **Linux WebJobs** (zip, `run.sh`, schedules): [STAGING-FITNESS_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md](./STAGING-FITNESS_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md). For email, set **`EMAIL_WORKER_SINGLE_BATCH=true`** on a **Triggered** + **Scheduled** job (same pattern as **`FITNESS_CERT_WORKER_RUN_ONCE=true`** for fitness).
+- **Staging — email-worker Linux WebJobs** (second WebJob on the same App Service): [STAGING-EMAIL_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md](./STAGING-EMAIL_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md)
+- **PROD — email-worker Linux WebJobs:** [PROD-EMAIL_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md](./PROD-EMAIL_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md)
+- **Staging — fitness-worker Linux WebJobs** (reference): [STAGING-FITNESS_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md](./STAGING-FITNESS_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md). For email, set **`EMAIL_WORKER_SINGLE_BATCH=true`** on a **Triggered** + **Scheduled** job (same idea as **`FITNESS_CERT_WORKER_RUN_ONCE=true`** for fitness).
 
 ---
 

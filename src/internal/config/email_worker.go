@@ -14,7 +14,9 @@ type EmailWorkerConfig struct {
 	SingleBatch bool
 	// ACSConnectionString is the Azure Communication Services resource connection string (endpoint + access key).
 	ACSConnectionString string
-	BatchSize           int
+	// ACSSenderDisplayName is the From "friendly name" (e.g. UrMediConnect). May also need Portal Mail From config.
+	ACSSenderDisplayName string
+	BatchSize            int
 	PollInterval        time.Duration
 	IdleWait            time.Duration
 	SendTimeout         time.Duration
@@ -25,9 +27,10 @@ type EmailWorkerConfig struct {
 // Call after godotenv.Load (same pattern as LoadFitnessCertWorkerConfig).
 func LoadEmailWorkerConfig() (EmailWorkerConfig, error) {
 	c := EmailWorkerConfig{
-		SingleBatch:         getEnvAsBool("EMAIL_WORKER_SINGLE_BATCH", false),
-		ACSConnectionString: strings.TrimSpace(getEnv("ACS_CONNECTION_STRING", "")),
-		BatchSize:           getEnvAsInt("EMAIL_BATCH_SIZE", 25),
+		SingleBatch:          getEnvAsBool("EMAIL_WORKER_SINGLE_BATCH", false),
+		ACSConnectionString:  strings.TrimSpace(getEnv("ACS_CONNECTION_STRING", "")),
+		ACSSenderDisplayName: strings.TrimSpace(getEnv("ACS_SENDER_DISPLAY_NAME", "")),
+		BatchSize:            getEnvAsInt("EMAIL_BATCH_SIZE", 25),
 		PollInterval:        time.Duration(getEnvAsInt("EMAIL_POLL_INTERVAL_SECONDS", 120)) * time.Second,
 		IdleWait:            time.Duration(getEnvAsInt("EMAIL_IDLE_WAIT_SECONDS", 60)) * time.Second,
 		SendTimeout:         time.Duration(getEnvAsInt("EMAIL_SEND_TIMEOUT_SECONDS", 60)) * time.Second,

@@ -52,6 +52,7 @@ func main() {
 		slog.String("logDir", appCfg.Log.Dir),
 		slog.Int("logRetentionHours", appCfg.Log.RetentionHours),
 		slog.Bool("singleBatch", wc.SingleBatch),
+		slog.String("senderDisplayName", wc.ACSSenderDisplayName),
 		slog.Int("batchSize", wc.BatchSize),
 		slog.Duration("pollIntervalAfterWork", wc.PollInterval),
 		slog.Duration("idleWaitWhenEmpty", wc.IdleWait),
@@ -79,9 +80,10 @@ func main() {
 
 	httpClient := &http.Client{Timeout: wc.SendTimeout + 5*time.Second}
 	sender, err := acsemail.NewService(acsemail.Config{
-		ConnectionString: wc.ACSConnectionString,
-		APIVersion:       wc.ACSAPIVersion,
-		HTTPClient:       httpClient,
+		ConnectionString:  wc.ACSConnectionString,
+		APIVersion:        wc.ACSAPIVersion,
+		HTTPClient:        httpClient,
+		SenderDisplayName: wc.ACSSenderDisplayName,
 	})
 	if err != nil {
 		log.Fatalf("acs email: %v", err)
