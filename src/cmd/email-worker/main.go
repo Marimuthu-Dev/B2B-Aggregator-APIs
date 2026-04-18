@@ -51,24 +51,31 @@ func main() {
 	logger.Info("email worker starting",
 		slog.String("logDir", appCfg.Log.Dir),
 		slog.Int("logRetentionHours", appCfg.Log.RetentionHours),
+		slog.Bool("singleBatch", wc.SingleBatch),
 		slog.Int("batchSize", wc.BatchSize),
 		slog.Duration("pollIntervalAfterWork", wc.PollInterval),
 		slog.Duration("idleWaitWhenEmpty", wc.IdleWait),
 		slog.Duration("sendTimeout", wc.SendTimeout),
 	)
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-
-	repo, err := repository.NewEmailOutboxRepository(ctx, wc.DBConnString)
+	dbGorm, err := config.ConnectDatabase(appCfg.DB)
 	if err != nil {
 		log.Fatalf("database: %v", err)
 	}
+	sqlDB, err := dbGorm.DB()
+	if err != nil {
+		log.Fatalf("database sql: %v", err)
+	}
 	defer func() {
-		if cerr := repo.Close(); cerr != nil {
+		if cerr := sqlDB.Close(); cerr != nil {
 			logger.Warn("db close", slog.String("error", cerr.Error()))
 		}
 	}()
+
+	repo, err := repository.NewEmailOutboxRepository(context.Background(), sqlDB)
+	if err != nil {
+		log.Fatalf("email outbox repository: %v", err)
+	}
 
 	httpClient := &http.Client{Timeout: wc.SendTimeout + 5*time.Second}
 	sender, err := acsemail.NewService(acsemail.Config{
@@ -85,6 +92,16 @@ func main() {
 		Sender: sender,
 		Config: wc,
 		Log:    logger,
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	if wc.SingleBatch {
+		if _, err := emailworker.RunOnce(ctx, deps); err != nil {
+			log.Fatalf("email worker: %v", err)
+		}
+		return
 	}
 
 	if err := emailworker.RunLoop(ctx, deps); err != nil && err != context.Canceled {

@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
-	"time"
 
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 
@@ -17,30 +16,21 @@ type EmailOutboxRepository struct {
 	db *sql.DB
 }
 
-// NewEmailOutboxRepository opens the DB connection pool.
-func NewEmailOutboxRepository(ctx context.Context, connString string) (*EmailOutboxRepository, error) {
-	db, err := sql.Open("sqlserver", connString)
-	if err != nil {
-		return nil, fmt.Errorf("sql open: %w", err)
+// NewEmailOutboxRepository uses a shared *sql.DB (same pool as config.ConnectDatabase / fitness-worker).
+// The caller owns the pool and must close it; Close on this repository is a no-op.
+func NewEmailOutboxRepository(ctx context.Context, db *sql.DB) (*EmailOutboxRepository, error) {
+	if db == nil {
+		return nil, fmt.Errorf("db is nil")
 	}
-	db.SetConnMaxIdleTime(5 * time.Minute)
-	db.SetConnMaxLifetime(30 * time.Minute)
-	db.SetMaxOpenConns(10)
-
 	if err := db.PingContext(ctx); err != nil {
-		_ = db.Close()
 		return nil, fmt.Errorf("sql ping: %w", err)
 	}
-
 	return &EmailOutboxRepository{db: db}, nil
 }
 
-// Close releases the pool.
+// Close is a no-op; the underlying *sql.DB is owned by the caller (e.g. GORM from ConnectDatabase).
 func (r *EmailOutboxRepository) Close() error {
-	if r == nil || r.db == nil {
-		return nil
-	}
-	return r.db.Close()
+	return nil
 }
 
 // SelectPendingBatch reads up to batchSize rows where IsSent is 0 or NULL, ordered by CreatedOn.

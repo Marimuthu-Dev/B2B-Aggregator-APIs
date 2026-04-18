@@ -7,8 +7,12 @@ import (
 )
 
 // EmailWorkerConfig drives the ACS email outbox background worker.
+// Database connectivity uses the same DB_* settings as the API and fitness-worker (see LoadConfig / ConnectDatabase).
 type EmailWorkerConfig struct {
-	DBConnString        string
+	// SingleBatch runs one batch (SelectPendingBatch + sends) and exits — for App Service WebJobs Triggered + Scheduled.
+	// When false, RunLoop polls until SIGINT/SIGTERM (Continuous WebJob or local dev).
+	SingleBatch bool
+	// ACSConnectionString is the Azure Communication Services resource connection string (endpoint + access key).
 	ACSConnectionString string
 	BatchSize           int
 	PollInterval        time.Duration
@@ -21,16 +25,13 @@ type EmailWorkerConfig struct {
 // Call after godotenv.Load (same pattern as LoadFitnessCertWorkerConfig).
 func LoadEmailWorkerConfig() (EmailWorkerConfig, error) {
 	c := EmailWorkerConfig{
-		DBConnString:        strings.TrimSpace(getEnv("DB_CONN_STRING", "")),
+		SingleBatch:         getEnvAsBool("EMAIL_WORKER_SINGLE_BATCH", false),
 		ACSConnectionString: strings.TrimSpace(getEnv("ACS_CONNECTION_STRING", "")),
 		BatchSize:           getEnvAsInt("EMAIL_BATCH_SIZE", 25),
 		PollInterval:        time.Duration(getEnvAsInt("EMAIL_POLL_INTERVAL_SECONDS", 120)) * time.Second,
 		IdleWait:            time.Duration(getEnvAsInt("EMAIL_IDLE_WAIT_SECONDS", 60)) * time.Second,
 		SendTimeout:         time.Duration(getEnvAsInt("EMAIL_SEND_TIMEOUT_SECONDS", 60)) * time.Second,
 		ACSAPIVersion:       strings.TrimSpace(getEnv("ACS_EMAIL_API_VERSION", "")),
-	}
-	if c.DBConnString == "" {
-		return c, errors.New("DB_CONN_STRING is required")
 	}
 	if c.ACSConnectionString == "" {
 		return c, errors.New("ACS_CONNECTION_STRING is required")
