@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"strings"
 	"time"
 
 	"b2b-diagnostic-aggregator/apis/internal/domain"
@@ -21,6 +22,7 @@ type LeadRequest struct {
 	CityID        int8   `binding:"required"`
 	StateID       int8   `binding:"required"`
 	Pincode       string `binding:"required"`
+	CollectionType string `json:"CollectionType" binding:"required"`
 	LeadStatusID  int8   // omitted or 0 → service uses domain.LeadStatusIDDefault (1)
 	AppointmentAt *time.Time `json:"AppointmentAt"`
 	LabID         *int64     `json:"LabID"`
@@ -51,6 +53,7 @@ type LeadUpdateRequest struct {
 	CityID        *int8   `json:"CityID"`
 	StateID       *int8   `json:"StateID"`
 	Pincode       *string `json:"Pincode"`
+	CollectionType *string `json:"CollectionType"`
 	LeadStatusID  *int8   `json:"LeadStatusID"`
 	AppointmentAt *time.Time `json:"AppointmentAt"`
 	LabID         *int64     `json:"LabID"`
@@ -59,7 +62,7 @@ type LeadUpdateRequest struct {
 func (r LeadUpdateRequest) HasAtLeastOneField() bool {
 	return r.ClientID != nil || r.PatientName != nil || r.Age != nil || r.Gender != nil ||
 		r.PackageID != nil || r.ContactNumber != nil || r.Emailid != nil || r.Address != nil ||
-		r.CityID != nil || r.StateID != nil || r.Pincode != nil || r.LeadStatusID != nil ||
+		r.CityID != nil || r.StateID != nil || r.Pincode != nil || r.CollectionType != nil || r.LeadStatusID != nil ||
 		r.AppointmentAt != nil || r.LabID != nil
 }
 
@@ -77,12 +80,13 @@ func (r LeadRequest) ToDomain() domain.Lead {
 		Address:       r.Address,
 		CityID:        r.CityID,
 		StateID:       r.StateID,
-		Pincode:       r.Pincode,
-		LeadStatusID:  r.LeadStatusID,
-		LabID:         r.LabID,
+		Pincode:        r.Pincode,
+		CollectionType: strings.TrimSpace(r.CollectionType),
+		LeadStatusID:   r.LeadStatusID,
+		LabID:          r.LabID,
 	}
 	if r.AppointmentAt != nil {
-		at := timeutil.FromTime(*r.AppointmentAt)
+		at := timeutil.StoredFromTime(*r.AppointmentAt)
 		l.AppointmentAt = &at
 	}
 	return l

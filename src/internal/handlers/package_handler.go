@@ -9,6 +9,7 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/middleware"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/service"
+	"b2b-diagnostic-aggregator/apis/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -42,10 +43,10 @@ func (h *PackageHandler) GetAll(c *gin.Context) {
 		return
 	}
 	respondData(c, http.StatusOK, packages, "", gin.H{
-		"count":    len(packages),
-		"page":     filter.Page,
-		"pageSize": filter.PageSize,
-		"total":    total,
+		"Count":    len(packages),
+		"Page":     filter.Page,
+		"PageSize": filter.PageSize,
+		"Total":    total,
 	})
 }
 
@@ -148,7 +149,7 @@ func (h *PackageHandler) GetAllWithTestsDetails(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	respondData(c, http.StatusOK, data, "Packages retrieved successfully with test details", gin.H{"count": len(data)})
+	respondData(c, http.StatusOK, data, "Packages retrieved successfully with test details", gin.H{"Count": len(data)})
 }
 
 func (h *PackageHandler) UpdatePackageStatus(c *gin.Context) {
@@ -208,12 +209,43 @@ func (h *PackageHandler) CreatePackageClientMapping(c *gin.Context) {
 }
 
 func (h *PackageHandler) GetAllPackageClientMappings(c *gin.Context) {
-	data, err := h.svc.GetAllPackageClientMappings()
+	userType, typeOK := middleware.GetUserType(c)
+	if !typeOK {
+		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+		return
+	}
+	if userType == utils.UserTypeLab {
+		respondError(c, apperrors.NewForbidden("You are not authorized for this activity.", nil))
+		return
+	}
+
+	userID, idOK := middleware.GetUserID(c)
+	var clientID *int64
+
+	switch userType {
+	case utils.UserTypeClient:
+		if !idOK || userID <= 0 {
+			respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+			return
+		}
+		clientID = &userID
+	case utils.UserTypeEmployee:
+		var query dto.PackageClientMappingListQuery
+		if !middleware.BindQuery(c, &query) {
+			return
+		}
+		clientID = query.ClientID
+	default:
+		respondError(c, apperrors.NewForbidden("You are not authorized for this activity.", nil))
+		return
+	}
+
+	data, err := h.svc.GetAllPackageClientMappings(clientID)
 	if err != nil {
 		respondError(c, err)
 		return
 	}
-	respondData(c, http.StatusOK, data, "Package-Client mappings retrieved successfully", gin.H{"count": len(data)})
+	respondData(c, http.StatusOK, data, "Package-Client mappings retrieved successfully", gin.H{"Count": len(data)})
 }
 
 func (h *PackageHandler) UpdatePackageClientMappingStatus(c *gin.Context) {
@@ -286,7 +318,7 @@ func (h *PackageHandler) GetAllPackageLabMappings(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	respondData(c, http.StatusOK, data, "Package-Lab mappings retrieved successfully", gin.H{"count": len(data)})
+	respondData(c, http.StatusOK, data, "Package-Lab mappings retrieved successfully", gin.H{"Count": len(data)})
 }
 
 func (h *PackageHandler) UpdatePackageLabMappingStatus(c *gin.Context) {

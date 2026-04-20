@@ -15,7 +15,7 @@ func respondData(c *gin.Context, status int, data interface{}, message string, e
 	if message == "" {
 		message = "Success"
 	}
-	body := gin.H{"success": true, "data": data, "message": message, "timestamp": serverTimestamp()}
+	body := gin.H{"Success": true, "Data": data, "Message": message, "Timestamp": serverTimestamp()}
 	for key, value := range extra {
 		body[key] = value
 	}
@@ -24,5 +24,5 @@ func respondData(c *gin.Context, status int, data interface{}, message string, e
 }
 
 func respondMessage(c *gin.Context, status int, message string) {
-	c.JSON(status, gin.H{"success": true, "message": message, "timestamp": serverTimestamp()})
+	c.JSON(status, gin.H{"Success": true, "Message": message, "Timestamp": serverTimestamp()})
 }

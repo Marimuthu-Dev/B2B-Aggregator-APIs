@@ -17,9 +17,9 @@ func RequireDomain() gin.HandlerFunc {
 		}
 		if raw == "" {
 			c.JSON(http.StatusOK, gin.H{
-				"success":   false,
-				"message":   "Domain header is required",
-				"timestamp": time.Now().UTC().Format(time.RFC3339),
+				"Success":   false,
+				"Message":   "Domain header is required",
+				"Timestamp": time.Now().UTC().Format(time.RFC3339),
 			})
 			c.Abort()
 			return

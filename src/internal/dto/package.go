@@ -42,6 +42,12 @@ type PackageLabMappingListQuery struct {
 	IsActive  *bool  `form:"IsActive" binding:"omitempty"`
 }
 
+// PackageClientMappingListQuery is optional filters for GET /packages/client-mapping (employee only).
+// Client users (userType 2) ignore this and are always scoped to their ClientID from the JWT.
+type PackageClientMappingListQuery struct {
+	ClientID *int64 `form:"ClientID" binding:"omitempty,min=1"`
+}
+
 type PackageMappingStatusUpdateRequest struct {
 	IsActive *bool `json:"IsActive" binding:"required"` // pointer so required allows false (validator treats value-type required as "non-zero")
 }

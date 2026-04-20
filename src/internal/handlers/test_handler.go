@@ -24,7 +24,7 @@ func (h *TestHandler) GetAll(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	respondData(c, http.StatusOK, data, "Tests retrieved successfully", gin.H{"count": len(data)})
+	respondData(c, http.StatusOK, data, "Tests retrieved successfully", gin.H{"Count": len(data)})
 }
 
 func (h *TestHandler) GetActive(c *gin.Context) {
@@ -33,7 +33,7 @@ func (h *TestHandler) GetActive(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	respondData(c, http.StatusOK, data, "Active tests retrieved successfully", gin.H{"count": len(data)})
+	respondData(c, http.StatusOK, data, "Active tests retrieved successfully", gin.H{"Count": len(data)})
 }
 
 func (h *TestHandler) GetByID(c *gin.Context) {

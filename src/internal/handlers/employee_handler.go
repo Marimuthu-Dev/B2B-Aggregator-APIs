@@ -25,7 +25,7 @@ func (h *EmployeeHandler) GetAll(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	respondData(c, http.StatusOK, data, "Success", gin.H{"count": len(data)})
+	respondData(c, http.StatusOK, data, "Success", gin.H{"Count": len(data)})
 }
 
 func (h *EmployeeHandler) GetByID(c *gin.Context) {

@@ -1,12 +1,21 @@
 package repository
 
 import (
+	"database/sql"
 	"strings"
 
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 )
+
+func mapLeadToDomainWithOptionalLabName(p persistencemodels.Lead, labName sql.NullString) domain.Lead {
+	d := mapLeadToDomain(p)
+	if labName.Valid {
+		d.LabName = strings.TrimSpace(labName.String)
+	}
+	return d
+}
 
 func mapLeadToDomain(p persistencemodels.Lead) domain.Lead {
 	return domain.Lead{
@@ -23,8 +32,9 @@ func mapLeadToDomain(p persistencemodels.Lead) domain.Lead {
 		CityID:                  p.CityID,
 		StateID:                 p.StateID,
 		Pincode:                 p.Pincode,
+		CollectionType:          p.CollectionType,
 		LeadStatusID:            p.LeadStatusID,
-		AppointmentAt:           timeutil.FromTimePtr(p.AppointmentAt),
+		AppointmentAt:           timeutil.StoredFromTimePtr(p.AppointmentAt),
 		LabID:                   p.LabID,
 		IsFit:                   isFitFromPtr(p.IsFit),
 		IsReportDownloadable:    p.IsReportDownloadable,
@@ -54,8 +64,9 @@ func mapLeadToPersistence(d domain.Lead) persistencemodels.Lead {
 		CityID:                  d.CityID,
 		StateID:                 d.StateID,
 		Pincode:                 d.Pincode,
+		CollectionType:          d.CollectionType,
 		LeadStatusID:            d.LeadStatusID,
-		AppointmentAt:           timeutil.ToTimePtr(d.AppointmentAt),
+		AppointmentAt:           timeutil.StoredToTimePtr(d.AppointmentAt),
 		LabID:                   d.LabID,
 		IsFit:                   isFitToPtr(d.IsFit),
 		IsReportDownloadable:    d.IsReportDownloadable,

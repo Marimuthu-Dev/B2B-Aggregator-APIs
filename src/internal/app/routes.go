@@ -22,9 +22,9 @@ func registerMiddleware(r *gin.Engine, dbReady bool) {
 				return
 			}
 			c.JSON(503, gin.H{
-				"success":   false,
-				"message":   "Database unavailable",
-				"timestamp": time.Now().UTC().Format(time.RFC3339),
+				"Success":   false,
+				"Message":   "Database unavailable",
+				"Timestamp": time.Now().UTC().Format(time.RFC3339),
 			})
 			c.Abort()
 		})
@@ -54,6 +54,7 @@ func registerPublicRoutes(r *gin.Engine, deps routeDeps) {
 		login.POST("", deps.loginHandler.Login)
 		login.POST("/forgot-password", deps.loginHandler.ForgotPasswordReset)
 		login.POST("/forgot-password-key", deps.loginHandler.CreateForgotPasswordKey)
+		login.GET("/forgot-password-key/validate", deps.loginHandler.ValidateForgotPasswordKey)
 		login.GET("/forgot-password-key", deps.loginHandler.GetForgotPasswordKey)
 		login.POST("/change-password", deps.loginHandler.ChangePassword)
 		login.GET("/profile", deps.loginHandler.GetProfile) // public with X-Domain + userId or mobileNumber
@@ -165,7 +166,7 @@ func registerLeadRoutes(api *gin.RouterGroup, handler *handlers.LeadHandler) {
 		leads.PUT("/:id", handler.Update)
 		leads.DELETE("/:id", handler.Delete)
 		leads.POST("/bulk-status", handler.BulkUpdateStatus)
-		leads.POST("/bulk-csv", handler.BulkImportCsv)
+		leads.POST("/bulk-upload", handler.BulkImportCsv)
 		leads.POST("/:id/reports/upload", handler.UploadReport)
 		leads.POST("/:id/reports/approve", handler.ApproveReport)
 		leads.GET("/:id/reports/download-url", handler.GetReportDownloadURL)

@@ -46,11 +46,12 @@ type leadService struct {
 	uow         repository.LeadUnitOfWork
 	clientRepo  repository.ClientRepository
 	packageRepo repository.PackageRepository
+	labRepo     repository.LabRepository
 	blobs       BlobService
 }
 
-func NewLeadService(repo repository.LeadRepository, uow repository.LeadUnitOfWork, clientRepo repository.ClientRepository, packageRepo repository.PackageRepository, blobs BlobService) LeadService {
-	return &leadService{repo: repo, uow: uow, clientRepo: clientRepo, packageRepo: packageRepo, blobs: blobs}
+func NewLeadService(repo repository.LeadRepository, uow repository.LeadUnitOfWork, clientRepo repository.ClientRepository, packageRepo repository.PackageRepository, labRepo repository.LabRepository, blobs BlobService) LeadService {
+	return &leadService{repo: repo, uow: uow, clientRepo: clientRepo, packageRepo: packageRepo, labRepo: labRepo, blobs: blobs}
 }
 
 func (s *leadService) ListLeads(filter repository.LeadListFilter) ([]domain.Lead, int64, error) {
@@ -76,6 +77,11 @@ func (s *leadService) GetLeadByID(id int64) (*domain.LeadDetail, error) {
 			detail.PackageName = pkg.PackageName
 		}
 	}
+	if lead.LabID != nil && *lead.LabID != 0 {
+		if lab, err := s.labRepo.FindByID(*lead.LabID); err == nil && lab != nil {
+			detail.LabName = lab.LabName
+		}
+	}
 	return detail, nil
 }
 
@@ -92,6 +98,11 @@ func (s *leadService) CreateLead(l *domain.Lead, createdBy int64) error {
 	if l.LeadStatusID == 0 {
 		l.LeadStatusID = domain.LeadStatusIDDefault
 	}
+	ct, err := domain.ParseLeadCollectionType(l.CollectionType)
+	if err != nil {
+		return apperrors.NewBadRequest(err.Error(), err)
+	}
+	l.CollectionType = ct
 
 	return s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
 		if err := leadRepo.Create(l); err != nil {
@@ -157,14 +168,34 @@ func (s *leadService) UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUp
 		l.Pincode = *update.Pincode
 	}
 	if update.LeadStatusID != nil {
+		if domain.LeadStatusIDForbiddenForPUTLead(*update.LeadStatusID) {
+			return nil, apperrors.NewBadRequest(
+				"LeadStatusID cannot be set to 8 or higher via this endpoint; use the workflow APIs for report-related statuses",
+				nil,
+			)
+		}
 		l.LeadStatusID = *update.LeadStatusID
 	}
 	if update.AppointmentAt != nil {
-		at := timeutil.FromTime(*update.AppointmentAt)
+		appt := *update.AppointmentAt
+		if appt.Before(time.Now()) {
+			return nil, apperrors.NewBadRequest(
+				"AppointmentAt must be at or after the current time (India Standard Time)",
+				nil,
+			)
+		}
+		at := timeutil.StoredFromTime(appt)
 		l.AppointmentAt = &at
 	}
 	if update.LabID != nil {
 		l.LabID = update.LabID
+	}
+	if update.CollectionType != nil {
+		ct, err := domain.ParseLeadCollectionType(*update.CollectionType)
+		if err != nil {
+			return nil, apperrors.NewBadRequest(err.Error(), err)
+		}
+		l.CollectionType = ct
 	}
 
 	l.LeadID = id
@@ -329,26 +360,36 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 			leadStatusID = domain.LeadStatusIDDefault
 		}
 
+		ctRaw := at(row, "CollectionType")
+		if ctRaw == "" {
+			ctRaw = domain.LeadCollectionCenter
+		}
+		collectionType, errParse := domain.ParseLeadCollectionType(ctRaw)
+		if errParse != nil {
+			return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: CollectionType must be Home or Center", rowIdx+1), errParse)
+		}
+
 		now := time.Now()
 		lead := &domain.Lead{
-			ClientID:      clientID,
-			PatientID:     s.GeneratePatientID(patientName, contactNumber),
-			PatientName:   patientName,
-			Age:           atInt8(row, "Age"),
-			Gender:        at(row, "Gender"),
-			PackageID:     int(packageID),
-			ContactNumber: contactNumber,
-			Emailid:       at(row, "Emailid"),
-			Address:       at(row, "Address"),
-			CityID:        atInt8(row, "CityID"),
-			StateID:       atInt8(row, "StateID"),
-			Pincode:       at(row, "Pincode"),
-			LeadStatusID:  leadStatusID,
-			IsFit:         domain.LeadFitUnfit,
-			CreatedBy:     createdBy,
-			CreatedOn:     timeutil.FromTime(now),
-			LastUpdatedBy: createdBy,
-			LastUpdatedOn: timeutil.FromTime(now),
+			ClientID:       clientID,
+			PatientID:      s.GeneratePatientID(patientName, contactNumber),
+			PatientName:    patientName,
+			Age:            atInt8(row, "Age"),
+			Gender:         at(row, "Gender"),
+			PackageID:      int(packageID),
+			ContactNumber:  contactNumber,
+			Emailid:        at(row, "Emailid"),
+			Address:        at(row, "Address"),
+			CityID:         atInt8(row, "CityID"),
+			StateID:        atInt8(row, "StateID"),
+			Pincode:        at(row, "Pincode"),
+			CollectionType: collectionType,
+			LeadStatusID:   leadStatusID,
+			IsFit:          domain.LeadFitUnfit,
+			CreatedBy:      createdBy,
+			CreatedOn:      timeutil.FromTime(now),
+			LastUpdatedBy:  createdBy,
+			LastUpdatedOn:  timeutil.FromTime(now),
 		}
 
 		err := s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {

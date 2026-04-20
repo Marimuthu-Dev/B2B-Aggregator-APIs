@@ -14,6 +14,8 @@ type ForgotPasswordRepository interface {
 	Create(data *domain.ForgotPassword) error
 	FindLatestValidKey(userID int64, userType string) (*domain.ForgotPassword, error)
 	FindByKey(forgetPasswordKey string, userID int64, userType string) (*domain.ForgotPassword, error)
+	// FindValidByForgetPasswordKey returns a row where the key is unused, not expired (matches tbl_ForgotPassword validity).
+	FindValidByForgetPasswordKey(forgetPasswordKey string) (*domain.ForgotPassword, error)
 	MarkAsUsed(record *domain.ForgotPassword) error
 }
 
@@ -53,6 +55,19 @@ func (r *forgotPasswordRepository) FindByKey(forgetPasswordKey string, userID in
 	now := time.Now().UTC()
 	err := r.db.Where("UserId = ? AND UserType = ? AND ForgetPasswordKey = ? AND ExpiryTimestamp > ? AND IsPasswordChanged = ?",
 		userID, userType, forgetPasswordKey, now, false).
+		First(&p).Error
+	if err != nil {
+		return nil, err
+	}
+	d := mapForgotPasswordToDomain(p)
+	return &d, nil
+}
+
+func (r *forgotPasswordRepository) FindValidByForgetPasswordKey(forgetPasswordKey string) (*domain.ForgotPassword, error) {
+	var p persistencemodels.ForgotPassword
+	now := time.Now().UTC()
+	err := r.db.Where("ForgetPasswordKey = ? AND ExpiryTimestamp > ? AND IsPasswordChanged = ?",
+		forgetPasswordKey, now, false).
 		First(&p).Error
 	if err != nil {
 		return nil, err

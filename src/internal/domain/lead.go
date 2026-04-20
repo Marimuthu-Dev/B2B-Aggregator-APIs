@@ -1,6 +1,29 @@
 package domain
 
-import "b2b-diagnostic-aggregator/apis/internal/timeutil"
+import (
+	"fmt"
+	"strings"
+
+	"b2b-diagnostic-aggregator/apis/internal/timeutil"
+)
+
+// Lead collection site: MediAdmin.tbl_Leads.CollectionType (varchar).
+const (
+	LeadCollectionHome   = "Home"
+	LeadCollectionCenter = "Center"
+)
+
+// ParseLeadCollectionType normalizes input to LeadCollectionHome or LeadCollectionCenter.
+func ParseLeadCollectionType(s string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "home":
+		return LeadCollectionHome, nil
+	case "center":
+		return LeadCollectionCenter, nil
+	default:
+		return "", fmt.Errorf("CollectionType must be Home or Center")
+	}
+}
 
 // Lead fitness / report approval tri-state (MediAdmin.tbl_Leads.IsFit, TINYINT).
 // Values must fit SQL Server tinyint (0–255): 0 = on hold, 1 = fit, 2 = unfit.
@@ -20,7 +43,14 @@ const (
 	// LeadStatusIDClientDownloadNoFitGate is the minimum LeadStatusID at which clients may obtain a report
 	// download URL without IsFit / IsReportDownloadable checks (e.g. post certificate merge, typically 10).
 	LeadStatusIDClientDownloadNoFitGate int8 = 10
+	LeadStatusIDReportDownloaded        int8 = 11
 )
+
+// LeadStatusIDForbiddenForPUTLead is true when id must not be applied via PUT /api/v1/leads/{id}
+// (statuses >= 8 are workflow-only: report pipeline through download/sent).
+func LeadStatusIDForbiddenForPUTLead(id int8) bool {
+	return id >= LeadStatusIDReportUploaded
+}
 
 // LeadStatusIDReportApproval is the LeadStatusID required on the lead row before approve may run (report uploaded).
 const LeadStatusIDReportApproval = LeadStatusIDReportUploaded
@@ -39,15 +69,17 @@ type Lead struct {
 	CityID                  int8
 	StateID                 int8
 	Pincode                 string
+	CollectionType          string `json:"CollectionType"`
 	LeadStatusID            int8
-	AppointmentAt           *timeutil.ISTTime `json:"appointmentAt,omitempty"`
-	LabID                   *int64            `json:"labId,omitempty"`
-	IsFit                   int8              `json:"isFit"`
-	IsReportDownloadable    bool              `json:"isReportDownloadable"`
-	ApprovalRemarks         string            `json:"approvalRemarks,omitempty"`
-	FitUpdatedOn            *timeutil.ISTTime `json:"fitUpdatedOn,omitempty"`
+	AppointmentAt           *timeutil.StoredTime `json:"AppointmentAt"`
+	LabID                   *int64            `json:"LabID,omitempty"`
+	LabName                 string            `json:"LabName,omitempty"`
+	IsFit                   int8              `json:"IsFit"`
+	IsReportDownloadable    bool              `json:"IsReportDownloadable"`
+	ApprovalRemarks         string            `json:"ApprovalRemarks,omitempty"`
+	FitUpdatedOn            *timeutil.ISTTime `json:"FitUpdatedOn,omitempty"`
 	IsFitCertifiedGenerated bool
-	ReportURL               string `json:"reportUrl,omitempty"`
+	ReportURL               string `json:"ReportURL,omitempty"`
 	CreatedBy               int64
 	CreatedOn               timeutil.ISTTime
 	LastUpdatedBy           int64
@@ -57,8 +89,8 @@ type Lead struct {
 // LeadDetail is lead with resolved ClientName and PackageName for API response.
 type LeadDetail struct {
 	Lead
-	ClientName  string `json:"clientName,omitempty"`
-	PackageName string `json:"packageName,omitempty"`
+	ClientName  string `json:"ClientName,omitempty"`
+	PackageName string `json:"PackageName,omitempty"`
 }
 
 type LeadHistory struct {

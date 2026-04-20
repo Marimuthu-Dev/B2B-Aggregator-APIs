@@ -100,8 +100,8 @@ func normalizeMouStatusToken(p string) (string, bool) {
 
 type LabListQuery struct {
 	PaginationQuery
-	CityID   *int8 `form:"cityId" binding:"omitempty,min=1"`
-	StateID  *int8 `form:"stateId" binding:"omitempty,min=1"`
+	CityID   *uint8 `form:"cityId" binding:"omitempty,min=1"`
+	StateID  *uint8 `form:"stateId" binding:"omitempty,min=1"`
 	IsActive *bool `form:"isActive" binding:"omitempty"`
 	MouListQuery
 	Search string `form:"search" binding:"omitempty"`
@@ -109,10 +109,12 @@ type LabListQuery struct {
 
 type LeadListQuery struct {
 	PaginationQuery
-	ClientID  *int64 `form:"clientId" binding:"omitempty,min=1"`
-	LabID     *int64 `form:"labId" binding:"omitempty,min=1"`
-	StatusID  *int8  `form:"statusId" binding:"omitempty,min=1"`
-	PackageID *int   `form:"packageId" binding:"omitempty,min=1"`
+	LeadID           *int64  `form:"leadId" binding:"omitempty,min=1"`
+	ClientID         *int64  `form:"clientId" binding:"omitempty,min=1"`
+	LabID            *int64  `form:"labId" binding:"omitempty,min=1"`
+	StatusID         *int8   `form:"statusId" binding:"omitempty,min=1"`
+	PackageID        *int    `form:"packageId" binding:"omitempty,min=1"`
+	CollectionType   *string `form:"collectionType" binding:"omitempty"`
 }
 
 type PackageListQuery struct {

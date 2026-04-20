@@ -10,9 +10,9 @@ type LoginRequest struct {
 
 // LoginResponse returns user data and tokens
 type LoginResponse struct {
-	User         interface{} `json:"user"`
-	Token        string      `json:"token"`
-	RefreshToken string      `json:"refreshToken"`
+	User         interface{} `json:"User"`
+	Token        string      `json:"Token"`
+	RefreshToken string      `json:"RefreshToken"`
 }
 
 // CreateForgotPasswordKeyRequest creates a forgot-password key for a mobile number
@@ -25,6 +25,11 @@ type CreateForgotPasswordKeyRequest struct {
 type GetForgotPasswordKeyRequest struct {
 	Domain       string `form:"-"`
 	MobileNumber string `form:"mobileNumber" binding:"required"`
+}
+
+// ValidateForgotPasswordKeyRequest validates a forgot-password key (query: forgetPasswordKey only)
+type ValidateForgotPasswordKeyRequest struct {
+	ForgetPasswordKey string `form:"forgetPasswordKey" binding:"required"`
 }
 
 // ForgotPasswordResetRequest resets password using forgot-password key
@@ -50,6 +55,6 @@ type GetProfileRequest struct {
 
 // ForgotPasswordKeyResponse for get-forgot-password-key response
 type ForgotPasswordKeyResponse struct {
-	ForgetPasswordKey string `json:"forgetPasswordKey"`
-	Expiry            string `json:"expiry"` // RFC3339
+	ForgetPasswordKey string `json:"ForgetPasswordKey"`
+	Expiry            string `json:"Expiry"` // RFC3339
 }

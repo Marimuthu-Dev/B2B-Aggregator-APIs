@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"b2b-diagnostic-aggregator/apis/internal/apperrors"
@@ -22,6 +23,7 @@ type LoginService interface {
 	Login(req dto.LoginRequest) (*dto.LoginResponse, error)
 	CreateForgotPasswordRecord(domainName, mobileNumber string) (int, error)
 	GetLatestForgotPasswordKey(domainName, mobileNumber string) (*dto.ForgotPasswordKeyResponse, error)
+	ValidateForgotPasswordKey(forgetPasswordKey string) error
 	ForgotPasswordReset(forgetPasswordKey, newPassword string) (bool, error)
 	ChangePassword(domainName, mobileNumber, oldPassword, newPassword string) (bool, error)
 	GetProfile(domainName string, userID, mobileNumber *string) (interface{}, error)
@@ -238,6 +240,21 @@ func (s *loginService) GetLatestForgotPasswordKey(domainName, mobileNumber strin
 		ForgetPasswordKey: rec.ForgetPasswordKey,
 		Expiry:            rec.ExpiryTimestamp.ToTime().In(timeutil.ISTLocation()).Format(time.RFC3339),
 	}, nil
+}
+
+func (s *loginService) ValidateForgotPasswordKey(forgetPasswordKey string) error {
+	key := strings.TrimSpace(forgetPasswordKey)
+	if key == "" {
+		return apperrors.NewBadRequest("forgetPasswordKey is required", nil)
+	}
+	_, err := s.forgotRepo.FindValidByForgetPasswordKey(key)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return apperrors.NewNotFound("Invalid or expired forgot password key", err)
+		}
+		return err
+	}
+	return nil
 }
 
 func (s *loginService) ForgotPasswordReset(forgetPasswordKey, newPassword string) (bool, error) {

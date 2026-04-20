@@ -55,10 +55,10 @@ func (h *ClientHandler) GetAll(c *gin.Context) {
 		return
 	}
 	respondData(c, http.StatusOK, data, "Success", gin.H{
-		"count":    len(data),
-		"page":     filter.Page,
-		"pageSize": filter.PageSize,
-		"total":    total,
+		"Count":    len(data),
+		"Page":     filter.Page,
+		"PageSize": filter.PageSize,
+		"Total":    total,
 	})
 }
 

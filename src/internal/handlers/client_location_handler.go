@@ -29,7 +29,7 @@ func (h *ClientLocationHandler) GetAllByClientID(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	respondData(c, http.StatusOK, data, "Success", gin.H{"count": len(data)})
+	respondData(c, http.StatusOK, data, "Success", gin.H{"Count": len(data)})
 }
 
 func (h *ClientLocationHandler) GetByID(c *gin.Context) {
