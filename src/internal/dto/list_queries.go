@@ -109,10 +109,11 @@ type LabListQuery struct {
 
 type LeadListQuery struct {
 	PaginationQuery
-	ClientID  *int64 `form:"clientId" binding:"omitempty,min=1"`
-	LabID     *int64 `form:"labId" binding:"omitempty,min=1"`
-	StatusID  *int8  `form:"statusId" binding:"omitempty,min=1"`
-	PackageID *int   `form:"packageId" binding:"omitempty,min=1"`
+	ClientID         *int64  `form:"clientId" binding:"omitempty,min=1"`
+	LabID            *int64  `form:"labId" binding:"omitempty,min=1"`
+	StatusID         *int8   `form:"statusId" binding:"omitempty,min=1"`
+	PackageID        *int    `form:"packageId" binding:"omitempty,min=1"`
+	CollectionType   *string `form:"collectionType" binding:"omitempty"`
 }
 
 type PackageListQuery struct {

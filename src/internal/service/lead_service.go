@@ -98,6 +98,11 @@ func (s *leadService) CreateLead(l *domain.Lead, createdBy int64) error {
 	if l.LeadStatusID == 0 {
 		l.LeadStatusID = domain.LeadStatusIDDefault
 	}
+	ct, err := domain.ParseLeadCollectionType(l.CollectionType)
+	if err != nil {
+		return apperrors.NewBadRequest(err.Error(), err)
+	}
+	l.CollectionType = ct
 
 	return s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
 		if err := leadRepo.Create(l); err != nil {
@@ -184,6 +189,13 @@ func (s *leadService) UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUp
 	}
 	if update.LabID != nil {
 		l.LabID = update.LabID
+	}
+	if update.CollectionType != nil {
+		ct, err := domain.ParseLeadCollectionType(*update.CollectionType)
+		if err != nil {
+			return nil, apperrors.NewBadRequest(err.Error(), err)
+		}
+		l.CollectionType = ct
 	}
 
 	l.LeadID = id
@@ -348,26 +360,36 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 			leadStatusID = domain.LeadStatusIDDefault
 		}
 
+		ctRaw := at(row, "CollectionType")
+		if ctRaw == "" {
+			ctRaw = domain.LeadCollectionCenter
+		}
+		collectionType, errParse := domain.ParseLeadCollectionType(ctRaw)
+		if errParse != nil {
+			return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: CollectionType must be Home or Center", rowIdx+1), errParse)
+		}
+
 		now := time.Now()
 		lead := &domain.Lead{
-			ClientID:      clientID,
-			PatientID:     s.GeneratePatientID(patientName, contactNumber),
-			PatientName:   patientName,
-			Age:           atInt8(row, "Age"),
-			Gender:        at(row, "Gender"),
-			PackageID:     int(packageID),
-			ContactNumber: contactNumber,
-			Emailid:       at(row, "Emailid"),
-			Address:       at(row, "Address"),
-			CityID:        atInt8(row, "CityID"),
-			StateID:       atInt8(row, "StateID"),
-			Pincode:       at(row, "Pincode"),
-			LeadStatusID:  leadStatusID,
-			IsFit:         domain.LeadFitUnfit,
-			CreatedBy:     createdBy,
-			CreatedOn:     timeutil.FromTime(now),
-			LastUpdatedBy: createdBy,
-			LastUpdatedOn: timeutil.FromTime(now),
+			ClientID:       clientID,
+			PatientID:      s.GeneratePatientID(patientName, contactNumber),
+			PatientName:    patientName,
+			Age:            atInt8(row, "Age"),
+			Gender:         at(row, "Gender"),
+			PackageID:      int(packageID),
+			ContactNumber:  contactNumber,
+			Emailid:        at(row, "Emailid"),
+			Address:        at(row, "Address"),
+			CityID:         atInt8(row, "CityID"),
+			StateID:        atInt8(row, "StateID"),
+			Pincode:        at(row, "Pincode"),
+			CollectionType: collectionType,
+			LeadStatusID:   leadStatusID,
+			IsFit:          domain.LeadFitUnfit,
+			CreatedBy:      createdBy,
+			CreatedOn:      timeutil.FromTime(now),
+			LastUpdatedBy:  createdBy,
+			LastUpdatedOn:  timeutil.FromTime(now),
 		}
 
 		err := s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {

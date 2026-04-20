@@ -105,6 +105,9 @@ func (r *leadRepository) leadListJoinedQuery(filter LeadListFilter) *gorm.DB {
 	if filter.PackageID != nil {
 		q = q.Where("l.PackageID = ?", *filter.PackageID)
 	}
+	if filter.CollectionType != nil && *filter.CollectionType != "" {
+		q = q.Where("l.CollectionType = ?", *filter.CollectionType)
+	}
 	return q
 }
 
@@ -120,6 +123,8 @@ func mapLeadSortColumn(sortBy string) string {
 		return "LeadStatusID"
 	case "createdOn":
 		return "CreatedOn"
+	case "collectionType":
+		return "CollectionType"
 	default:
 		return "LeadID"
 	}

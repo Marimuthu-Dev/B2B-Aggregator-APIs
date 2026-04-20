@@ -1,6 +1,29 @@
 package domain
 
-import "b2b-diagnostic-aggregator/apis/internal/timeutil"
+import (
+	"fmt"
+	"strings"
+
+	"b2b-diagnostic-aggregator/apis/internal/timeutil"
+)
+
+// Lead collection site: MediAdmin.tbl_Leads.CollectionType (varchar).
+const (
+	LeadCollectionHome   = "Home"
+	LeadCollectionCenter = "Center"
+)
+
+// ParseLeadCollectionType normalizes input to LeadCollectionHome or LeadCollectionCenter.
+func ParseLeadCollectionType(s string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "home":
+		return LeadCollectionHome, nil
+	case "center":
+		return LeadCollectionCenter, nil
+	default:
+		return "", fmt.Errorf("CollectionType must be Home or Center")
+	}
+}
 
 // Lead fitness / report approval tri-state (MediAdmin.tbl_Leads.IsFit, TINYINT).
 // Values must fit SQL Server tinyint (0–255): 0 = on hold, 1 = fit, 2 = unfit.
@@ -46,6 +69,7 @@ type Lead struct {
 	CityID                  int8
 	StateID                 int8
 	Pincode                 string
+	CollectionType          string `json:"CollectionType"`
 	LeadStatusID            int8
 	AppointmentAt           *timeutil.StoredTime `json:"AppointmentAt"`
 	LabID                   *int64            `json:"LabID,omitempty"`

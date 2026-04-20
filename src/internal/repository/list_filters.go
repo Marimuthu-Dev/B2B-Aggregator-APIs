@@ -35,14 +35,15 @@ type LabListFilter struct {
 }
 
 type LeadListFilter struct {
-	Page      int
-	PageSize  int
-	SortBy    string
-	SortOrder string
-	ClientID  *int64
-	LabID     *int64
-	StatusID  *int8
-	PackageID *int
+	Page             int
+	PageSize         int
+	SortBy           string
+	SortOrder        string
+	ClientID         *int64
+	LabID            *int64
+	StatusID         *int8
+	PackageID        *int
+	CollectionType   *string
 }
 
 type PackageListFilter struct {

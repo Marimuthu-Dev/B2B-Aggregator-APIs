@@ -41,14 +41,15 @@ func (h *LeadHandler) GetAll(c *gin.Context) {
 	}
 	page := query.PaginationQuery.Normalize("createdOn", 0)
 	filter := repository.LeadListFilter{
-		Page:      page.Page,
-		PageSize:  page.PageSize,
-		SortBy:    page.SortBy,
-		SortOrder: page.SortOrder,
-		ClientID:  query.ClientID,
-		LabID:     query.LabID,
-		StatusID:  query.StatusID,
-		PackageID: query.PackageID,
+		Page:             page.Page,
+		PageSize:         page.PageSize,
+		SortBy:           page.SortBy,
+		SortOrder:        page.SortOrder,
+		ClientID:         query.ClientID,
+		LabID:            query.LabID,
+		StatusID:         query.StatusID,
+		PackageID:        query.PackageID,
+		CollectionType:   query.CollectionType,
 	}
 
 	data, total, err := h.svc.ListLeads(filter)
@@ -404,11 +405,38 @@ func leadDetailAccessibleByJWT(c *gin.Context, d *domain.LeadDetail) bool {
 
 // enrichLeadListQueryFromPascalCaseKeys maps LabID / ClientID query keys to the DTO. Gin binds only
 // form-tagged names (labId, clientId); callers using PascalCase would otherwise get no filter.
+// Also normalizes collectionType / CollectionType (Home | Center).
 func enrichLeadListQueryFromPascalCaseKeys(c *gin.Context, q *dto.LeadListQuery) error {
 	if err := mergePositiveInt64Query(c, &q.LabID, "LabID"); err != nil {
 		return err
 	}
-	return mergePositiveInt64Query(c, &q.ClientID, "ClientID")
+	if err := mergePositiveInt64Query(c, &q.ClientID, "ClientID"); err != nil {
+		return err
+	}
+	return mergeLeadCollectionTypeQueryParam(c, q)
+}
+
+func mergeLeadCollectionTypeQueryParam(c *gin.Context, q *dto.LeadListQuery) error {
+	raw := ""
+	if q.CollectionType != nil {
+		raw = strings.TrimSpace(*q.CollectionType)
+	}
+	if raw == "" {
+		raw = strings.TrimSpace(c.Query("collectionType"))
+	}
+	if raw == "" {
+		raw = strings.TrimSpace(c.Query("CollectionType"))
+	}
+	if raw == "" {
+		q.CollectionType = nil
+		return nil
+	}
+	norm, err := domain.ParseLeadCollectionType(raw)
+	if err != nil {
+		return apperrors.NewBadRequest("Invalid query parameter collectionType: use Home or Center", err)
+	}
+	q.CollectionType = &norm
+	return nil
 }
 
 func mergePositiveInt64Query(c *gin.Context, dest **int64, key string) error {
