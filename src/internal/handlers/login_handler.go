@@ -99,7 +99,7 @@ func (h *LoginHandler) CreateForgotPasswordKey(c *gin.Context) {
 		return
 	}
 
-	respondData(c, http.StatusOK, n, "Forgot password key generated successfully", nil)
+	respondData(c, http.StatusOK, n, "Password reset link is been send to your email.", nil)
 }
 
 // GetForgotPasswordKey returns the latest non-expired forgot-password key (query: mobileNumber)
@@ -131,6 +131,25 @@ func (h *LoginHandler) GetForgotPasswordKey(c *gin.Context) {
 	}
 
 	respondData(c, http.StatusOK, result, "Forgot password key fetched successfully", nil)
+}
+
+// ValidateForgotPasswordKey returns 200 if forgetPasswordKey exists, is unused, and not expired; 404 otherwise (query: forgetPasswordKey)
+func (h *LoginHandler) ValidateForgotPasswordKey(c *gin.Context) {
+	var req dto.ValidateForgotPasswordKeyRequest
+	if !middleware.BindQuery(c, &req) {
+		return
+	}
+	req.ForgetPasswordKey = strings.TrimSpace(req.ForgetPasswordKey)
+	if req.ForgetPasswordKey == "" {
+		respondError(c, apperrors.NewBadRequest("forgetPasswordKey is required", nil))
+		return
+	}
+
+	if err := h.svc.ValidateForgotPasswordKey(req.ForgetPasswordKey); err != nil {
+		respondError(c, err)
+		return
+	}
+	respondData(c, http.StatusOK, nil, "Forgot password key is valid", nil)
 }
 
 // ForgotPasswordReset resets password using forgetPasswordKey and new Password

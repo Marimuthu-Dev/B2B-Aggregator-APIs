@@ -27,6 +27,11 @@ type GetForgotPasswordKeyRequest struct {
 	MobileNumber string `form:"mobileNumber" binding:"required"`
 }
 
+// ValidateForgotPasswordKeyRequest validates a forgot-password key (query: forgetPasswordKey only)
+type ValidateForgotPasswordKeyRequest struct {
+	ForgetPasswordKey string `form:"forgetPasswordKey" binding:"required"`
+}
+
 // ForgotPasswordResetRequest resets password using forgot-password key
 type ForgotPasswordResetRequest struct {
 	ForgetPasswordKey string `json:"forgetPasswordKey" binding:"required"`

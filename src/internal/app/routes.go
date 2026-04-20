@@ -54,6 +54,7 @@ func registerPublicRoutes(r *gin.Engine, deps routeDeps) {
 		login.POST("", deps.loginHandler.Login)
 		login.POST("/forgot-password", deps.loginHandler.ForgotPasswordReset)
 		login.POST("/forgot-password-key", deps.loginHandler.CreateForgotPasswordKey)
+		login.GET("/forgot-password-key/validate", deps.loginHandler.ValidateForgotPasswordKey)
 		login.GET("/forgot-password-key", deps.loginHandler.GetForgotPasswordKey)
 		login.POST("/change-password", deps.loginHandler.ChangePassword)
 		login.GET("/profile", deps.loginHandler.GetProfile) // public with X-Domain + userId or mobileNumber
