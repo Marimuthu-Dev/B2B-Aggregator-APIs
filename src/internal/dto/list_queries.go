@@ -109,6 +109,7 @@ type LabListQuery struct {
 
 type LeadListQuery struct {
 	PaginationQuery
+	LeadID           *int64  `form:"leadId" binding:"omitempty,min=1"`
 	ClientID         *int64  `form:"clientId" binding:"omitempty,min=1"`
 	LabID            *int64  `form:"labId" binding:"omitempty,min=1"`
 	StatusID         *int8   `form:"statusId" binding:"omitempty,min=1"`

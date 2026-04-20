@@ -93,6 +93,9 @@ func (r *leadRepository) leadListJoinedQuery(filter LeadListFilter) *gorm.DB {
 	labTable := persistencemodels.Lab{}.TableName()
 	q := r.db.Table(leadTable + " AS l").
 		Joins("LEFT JOIN " + labTable + " AS lm ON l.LabID = lm.LabID")
+	if filter.LeadID != nil {
+		q = q.Where("l.LeadID = ?", *filter.LeadID)
+	}
 	if filter.ClientID != nil {
 		q = q.Where("l.ClientID = ?", *filter.ClientID)
 	}
@@ -125,6 +128,8 @@ func mapLeadSortColumn(sortBy string) string {
 		return "CreatedOn"
 	case "collectionType":
 		return "CollectionType"
+	case "leadId":
+		return "LeadID"
 	default:
 		return "LeadID"
 	}

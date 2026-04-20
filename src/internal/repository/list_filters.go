@@ -39,6 +39,7 @@ type LeadListFilter struct {
 	PageSize         int
 	SortBy           string
 	SortOrder        string
+	LeadID           *int64
 	ClientID         *int64
 	LabID            *int64
 	StatusID         *int8

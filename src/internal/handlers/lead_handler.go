@@ -45,6 +45,7 @@ func (h *LeadHandler) GetAll(c *gin.Context) {
 		PageSize:         page.PageSize,
 		SortBy:           page.SortBy,
 		SortOrder:        page.SortOrder,
+		LeadID:           query.LeadID,
 		ClientID:         query.ClientID,
 		LabID:            query.LabID,
 		StatusID:         query.StatusID,
@@ -403,14 +404,19 @@ func leadDetailAccessibleByJWT(c *gin.Context, d *domain.LeadDetail) bool {
 	}
 }
 
-// enrichLeadListQueryFromPascalCaseKeys maps LabID / ClientID query keys to the DTO. Gin binds only
-// form-tagged names (labId, clientId); callers using PascalCase would otherwise get no filter.
-// Also normalizes collectionType / CollectionType (Home | Center).
+// enrichLeadListQueryFromPascalCaseKeys fills filters from alternate query spellings (PascalCase, lowercase)
+// when Gin did not bind the camelCase form tag. Also normalizes collectionType / CollectionType (Home | Center).
 func enrichLeadListQueryFromPascalCaseKeys(c *gin.Context, q *dto.LeadListQuery) error {
-	if err := mergePositiveInt64Query(c, &q.LabID, "LabID"); err != nil {
+	if err := mergePositiveInt64QueryMulti(c, &q.LeadID, "LeadID", "leadid"); err != nil {
 		return err
 	}
-	if err := mergePositiveInt64Query(c, &q.ClientID, "ClientID"); err != nil {
+	if err := mergePositiveInt64QueryMulti(c, &q.ClientID, "ClientID", "clientid"); err != nil {
+		return err
+	}
+	if err := mergePositiveInt64QueryMulti(c, &q.LabID, "LabID", "labid"); err != nil {
+		return err
+	}
+	if err := mergePositiveIntQueryMulti(c, &q.PackageID, "PackageID", "packageid"); err != nil {
 		return err
 	}
 	return mergeLeadCollectionTypeQueryParam(c, q)
@@ -439,18 +445,42 @@ func mergeLeadCollectionTypeQueryParam(c *gin.Context, q *dto.LeadListQuery) err
 	return nil
 }
 
-func mergePositiveInt64Query(c *gin.Context, dest **int64, key string) error {
+// mergePositiveInt64QueryMulti sets *dest from the first non-empty query key among keys (order preserved).
+func mergePositiveInt64QueryMulti(c *gin.Context, dest **int64, keys ...string) error {
 	if *dest != nil {
 		return nil
 	}
-	raw := strings.TrimSpace(c.Query(key))
-	if raw == "" {
+	for _, key := range keys {
+		raw := strings.TrimSpace(c.Query(key))
+		if raw == "" {
+			continue
+		}
+		id, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || id < 1 {
+			return apperrors.NewBadRequest("Invalid query parameter "+key+": must be a positive integer", err)
+		}
+		*dest = &id
 		return nil
 	}
-	id, err := strconv.ParseInt(raw, 10, 64)
-	if err != nil || id < 1 {
-		return apperrors.NewBadRequest("Invalid query parameter "+key+": must be a positive integer", err)
+	return nil
+}
+
+func mergePositiveIntQueryMulti(c *gin.Context, dest **int, keys ...string) error {
+	if *dest != nil {
+		return nil
 	}
-	*dest = &id
+	for _, key := range keys {
+		raw := strings.TrimSpace(c.Query(key))
+		if raw == "" {
+			continue
+		}
+		n64, err := strconv.ParseInt(raw, 10, 0)
+		if err != nil || n64 < 1 {
+			return apperrors.NewBadRequest("Invalid query parameter "+key+": must be a positive integer", err)
+		}
+		v := int(n64)
+		*dest = &v
+		return nil
+	}
 	return nil
 }
