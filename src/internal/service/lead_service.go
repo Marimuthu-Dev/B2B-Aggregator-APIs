@@ -94,6 +94,7 @@ func (s *leadService) CreateLead(l *domain.Lead, createdBy int64) error {
 	// Default matches legacy BIT false -> UNFIT after migration; create payload does not send approval fields.
 	l.IsFit = domain.LeadFitUnfit
 	l.IsReportDownloadable = false
+	l.IsFitCertificateTobeGenerated = false
 	l.PatientID = s.GeneratePatientID(l.PatientName, l.ContactNumber)
 	if l.LeadStatusID == 0 {
 		l.LeadStatusID = domain.LeadStatusIDDefault
@@ -578,13 +579,14 @@ func (s *leadService) ApproveLeadReport(leadID int64, req *dto.ApproveLeadReques
 	if remarksNorm != "" {
 		remarksPtr = &remarksNorm
 	}
+	certTobe := *req.IsFitCertificateToBeGenerated
 	// Skip DB only when nothing changes; if status is still "uploaded" (8) but decision is FIT, we must run once to set LeadStatusID = 9.
-	same := lead.IsFit == isFit && lead.IsReportDownloadable == req.AllowDownload && strings.TrimSpace(lead.ApprovalRemarks) == remarksNorm
+	same := lead.IsFit == isFit && lead.IsReportDownloadable == req.AllowDownload && lead.IsFitCertificateTobeGenerated == certTobe && strings.TrimSpace(lead.ApprovalRemarks) == remarksNorm
 	if same && !(isFit == domain.LeadFitFit && lead.LeadStatusID == domain.LeadStatusIDReportUploaded) {
 		return nil
 	}
 	return s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
-		n, err := leadRepo.UpdateLeadReportApproval(leadID, userID, isFit, req.AllowDownload, remarksPtr)
+		n, err := leadRepo.UpdateLeadReportApproval(leadID, userID, isFit, req.AllowDownload, certTobe, remarksPtr)
 		if err != nil {
 			return err
 		}

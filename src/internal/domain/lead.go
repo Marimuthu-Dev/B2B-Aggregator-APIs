@@ -56,34 +56,35 @@ func LeadStatusIDForbiddenForPUTLead(id int8) bool {
 const LeadStatusIDReportApproval = LeadStatusIDReportUploaded
 
 type Lead struct {
-	LeadID                  int64
-	ClientID                int64
-	PatientID               string
-	PatientName             string
-	Age                     int8
-	Gender                  string
-	PackageID               int
-	ContactNumber           string
-	Emailid                 string
-	Address                 string
-	CityID                  int8
-	StateID                 int8
-	Pincode                 string
-	CollectionType          string `json:"CollectionType"`
-	LeadStatusID            int8
-	AppointmentAt           *timeutil.StoredTime `json:"AppointmentAt"`
-	LabID                   *int64            `json:"LabID,omitempty"`
-	LabName                 string            `json:"LabName,omitempty"`
-	IsFit                   int8              `json:"IsFit"`
-	IsReportDownloadable    bool              `json:"IsReportDownloadable"`
-	ApprovalRemarks         string            `json:"ApprovalRemarks,omitempty"`
-	FitUpdatedOn            *timeutil.ISTTime `json:"FitUpdatedOn,omitempty"`
-	IsFitCertifiedGenerated bool
-	ReportURL               string `json:"ReportURL,omitempty"`
-	CreatedBy               int64
-	CreatedOn               timeutil.ISTTime
-	LastUpdatedBy           int64
-	LastUpdatedOn           timeutil.ISTTime
+	LeadID                        int64
+	ClientID                      int64
+	PatientID                     string
+	PatientName                   string
+	Age                           int8
+	Gender                        string
+	PackageID                     int
+	ContactNumber                 string
+	Emailid                       string
+	Address                       string
+	CityID                        int8
+	StateID                       int8
+	Pincode                       string
+	CollectionType                string `json:"CollectionType"`
+	LeadStatusID                  int8
+	AppointmentAt                 *timeutil.StoredTime `json:"AppointmentAt"`
+	LabID                         *int64               `json:"LabID,omitempty"`
+	LabName                       string               `json:"LabName,omitempty"`
+	IsFit                         int8                 `json:"IsFit"`
+	IsReportDownloadable          bool                 `json:"IsReportDownloadable"`
+	ApprovalRemarks               string               `json:"ApprovalRemarks,omitempty"`
+	FitUpdatedOn                  *timeutil.ISTTime    `json:"FitUpdatedOn,omitempty"`
+	IsFitCertificateTobeGenerated bool                 `json:"IsFitCertificateTobeGenerated"`
+	IsFitCertifiedGenerated       bool                 `json:"IsFitCertifiedGenerated"`
+	ReportURL                     string               `json:"ReportURL,omitempty"`
+	CreatedBy                     int64
+	CreatedOn                     timeutil.ISTTime
+	LastUpdatedBy                 int64
+	LastUpdatedOn                 timeutil.ISTTime
 }
 
 // LeadDetail is lead with resolved ClientName and PackageName for API response.

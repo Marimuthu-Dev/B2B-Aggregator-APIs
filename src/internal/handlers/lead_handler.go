@@ -41,16 +41,16 @@ func (h *LeadHandler) GetAll(c *gin.Context) {
 	}
 	page := query.PaginationQuery.Normalize("createdOn", 0)
 	filter := repository.LeadListFilter{
-		Page:             page.Page,
-		PageSize:         page.PageSize,
-		SortBy:           page.SortBy,
-		SortOrder:        page.SortOrder,
-		LeadID:           query.LeadID,
-		ClientID:         query.ClientID,
-		LabID:            query.LabID,
-		StatusID:         query.StatusID,
-		PackageID:        query.PackageID,
-		CollectionType:   query.CollectionType,
+		Page:           page.Page,
+		PageSize:       page.PageSize,
+		SortBy:         page.SortBy,
+		SortOrder:      page.SortOrder,
+		LeadID:         query.LeadID,
+		ClientID:       query.ClientID,
+		LabID:          query.LabID,
+		StatusID:       query.StatusID,
+		PackageID:      query.PackageID,
+		CollectionType: query.CollectionType,
 	}
 
 	data, total, err := h.svc.ListLeads(filter)
@@ -225,11 +225,12 @@ func (h *LeadHandler) UploadReport(c *gin.Context) {
 //	      application/json:
 //	        schema:
 //	          type: object
-//	          required: [status]
+//	          required: [status, isFitCertificateToBeGenerated]
 //	          properties:
 //	            status: { type: string, enum: [fit, unfit, hold] }
 //	            remarks: { type: string, maxLength: 250 }
 //	            allowDownload: { type: boolean }
+//	            isFitCertificateToBeGenerated: { type: boolean, description: "Persisted to IsFitCertificateTobeGenerated; whether the fitness certificate pipeline should run for this lead." }
 //	  responses:
 //	    "200":
 //	      description: OK

@@ -28,14 +28,16 @@ type LeadRepository interface {
 	// FindActiveLeadStatusIDByName resolves LeadStatusID from MediAdmin.tbl_LeadStatusMaster (IsActive = 1).
 	FindActiveLeadStatusIDByName(name string) (int8, error)
 	UpdateLeadReportURLAndStatus(leadID int64, reportURL string, statusID int8, userID int64) error
-	// FindLeadsPendingFitCertification returns leads ready for fitness certificate PDF generation (see worker).
+	// FindLeadsPendingFitCertification returns leads ready for fitness certificate PDF generation (IsFitCertificateTobeGenerated = 1) (see worker).
 	FindLeadsPendingFitCertification(limit int, pendingLeadStatusID int8) ([]domain.Lead, error)
+	// FindLeadsPendingReportReadyWithoutCertificate returns approved FIT leads that should skip certificate generation; worker advances them with MarkReportReadyToDownload.
+	FindLeadsPendingReportReadyWithoutCertificate(limit int, pendingLeadStatusID int8) ([]domain.Lead, error)
 	// MarkFitCertificationGenerated sets certification flags and status if the lead still matches pending criteria; logs history. Returns whether a row was updated.
 	MarkFitCertificationGenerated(leadID int64, userID int64, fromLeadStatusID, toLeadStatusID int8) (updated bool, err error)
 	// MarkReportReadyToDownload advances a lead to the downloadable state without generating a certificate; logs history. Returns whether a row was updated.
 	MarkReportReadyToDownload(leadID int64, userID int64, fromLeadStatusID, toLeadStatusID int8) (updated bool, err error)
-	// UpdateLeadReportApproval sets IsFit (0=hold, 1=fit, 2=unfit), download flag, remarks, FitUpdatedOn, and last-updated audit. Only rows with LeadStatusID = 8 (uploaded) match; when IsFit = 1, LeadStatusID is set to 9 (approved). Otherwise LeadStatusID is not changed. remarks nil or empty clears ApprovalRemarks.
-	UpdateLeadReportApproval(leadID int64, lastUpdatedBy int64, isFit int8, allowDownload bool, remarks *string) (rowsAffected int64, err error)
+	// UpdateLeadReportApproval sets IsFit (0=hold, 1=fit, 2=unfit), download flag, IsFitCertificateTobeGenerated, remarks, FitUpdatedOn, and last-updated audit. Only rows with LeadStatusID = 8 (uploaded) match; when IsFit = 1, LeadStatusID is set to 9 (approved). Otherwise LeadStatusID is not changed. remarks nil or empty clears ApprovalRemarks.
+	UpdateLeadReportApproval(leadID int64, lastUpdatedBy int64, isFit int8, allowDownload bool, isFitCertificateTobeGenerated bool, remarks *string) (rowsAffected int64, err error)
 }
 
 type leadRepository struct {
@@ -257,7 +259,22 @@ func (r *leadRepository) FindLeadsPendingFitCertification(limit int, pendingLead
 		limit = 10
 	}
 	var leads []persistencemodels.Lead
-	err := r.db.Where("LeadStatusID = ? AND IsFit = ? AND IsFitCertifiedGenerated = ?", pendingLeadStatusID, domain.LeadFitFit, false).
+	err := r.db.Where("LeadStatusID = ? AND IsFit = ? AND IsFitCertifiedGenerated = ? AND IsFitCertificateTobeGenerated = ?",
+		pendingLeadStatusID, domain.LeadFitFit, false, true).
+		Where("ReportURL IS NOT NULL AND LTRIM(RTRIM(ReportURL)) <> ''").
+		Order("LeadID ASC").
+		Limit(limit).
+		Find(&leads).Error
+	return mapLeadsToDomain(leads), err
+}
+
+func (r *leadRepository) FindLeadsPendingReportReadyWithoutCertificate(limit int, pendingLeadStatusID int8) ([]domain.Lead, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	var leads []persistencemodels.Lead
+	err := r.db.Where("LeadStatusID = ? AND IsFit = ? AND IsFitCertifiedGenerated = ? AND IsFitCertificateTobeGenerated = ?",
+		pendingLeadStatusID, domain.LeadFitFit, false, false).
 		Where("ReportURL IS NOT NULL AND LTRIM(RTRIM(ReportURL)) <> ''").
 		Order("LeadID ASC").
 		Limit(limit).
@@ -270,8 +287,8 @@ func (r *leadRepository) MarkFitCertificationGenerated(leadID int64, userID int6
 	err := r.db.Transaction(func(tx *gorm.DB) error {
 		now := time.Now().UTC()
 		res := tx.Model(&persistencemodels.Lead{}).
-			Where("LeadID = ? AND LeadStatusID = ? AND IsFit = ? AND IsFitCertifiedGenerated = ?",
-				leadID, fromLeadStatusID, domain.LeadFitFit, false).
+			Where("LeadID = ? AND LeadStatusID = ? AND IsFit = ? AND IsFitCertifiedGenerated = ? AND IsFitCertificateTobeGenerated = ?",
+				leadID, fromLeadStatusID, domain.LeadFitFit, false, true).
 			Updates(map[string]interface{}{
 				"IsFitCertifiedGenerated": true,
 				"FitCertifiedGeneratedOn": now,
@@ -327,7 +344,7 @@ func (r *leadRepository) MarkReportReadyToDownload(leadID int64, userID int64, f
 	return updated, err
 }
 
-func (r *leadRepository) UpdateLeadReportApproval(leadID int64, lastUpdatedBy int64, isFit int8, allowDownload bool, remarks *string) (int64, error) {
+func (r *leadRepository) UpdateLeadReportApproval(leadID int64, lastUpdatedBy int64, isFit int8, allowDownload bool, isFitCertificateTobeGenerated bool, remarks *string) (int64, error) {
 	now := time.Now().UTC()
 	var ar sql.NullString
 	if remarks != nil {
@@ -337,12 +354,13 @@ func (r *leadRepository) UpdateLeadReportApproval(leadID int64, lastUpdatedBy in
 		}
 	}
 	updates := map[string]interface{}{
-		"IsFit":                isFit,
-		"IsReportDownloadable": allowDownload,
-		"ApprovalRemarks":      ar,
-		"FitUpdatedOn":         now,
-		"LastUpdatedBy":        lastUpdatedBy,
-		"LastUpdatedOn":        now,
+		"IsFit":                         isFit,
+		"IsReportDownloadable":          allowDownload,
+		"IsFitCertificateTobeGenerated": isFitCertificateTobeGenerated,
+		"ApprovalRemarks":               ar,
+		"FitUpdatedOn":                  now,
+		"LastUpdatedBy":                 lastUpdatedBy,
+		"LastUpdatedOn":                 now,
 		"LeadStatusID": gorm.Expr("CASE WHEN ? = ? THEN ? ELSE LeadStatusID END",
 			isFit, domain.LeadFitFit, domain.LeadStatusIDReportApproved),
 	}

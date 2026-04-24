@@ -62,6 +62,23 @@ func RunOnce(ctx context.Context, d Deps) error {
 		slog.Int("batchSize", d.Config.BatchSize),
 		slog.Int("pendingLeadStatusID", int(d.Config.PendingLeadStatusID)),
 	)
+	readyNoCert, err := d.LeadRepo.FindLeadsPendingReportReadyWithoutCertificate(d.Config.BatchSize, d.Config.PendingLeadStatusID)
+	if err != nil {
+		return fmt.Errorf("find leads pending report without certificate: %w", err)
+	}
+	log.Info("fitness worker batch: report-ready without cert query complete", slog.Int("leadCount", len(readyNoCert)))
+	for _, lead := range readyNoCert {
+		updated, err := d.LeadRepo.MarkReportReadyToDownload(lead.LeadID, d.Config.ActorUserID,
+			d.Config.PendingLeadStatusID, d.Config.DoneLeadStatusID)
+		if err != nil {
+			log.Error("mark report ready to download (no cert requested)", slog.Int64("leadID", lead.LeadID), slog.Any("err", err))
+			continue
+		}
+		if updated {
+			log.Info("report marked ready to download (isFitCertificateTobeGenerated=false)", slog.Int64("leadID", lead.LeadID))
+		}
+	}
+
 	leads, err := d.LeadRepo.FindLeadsPendingFitCertification(d.Config.BatchSize, d.Config.PendingLeadStatusID)
 	if err != nil {
 		return fmt.Errorf("find pending leads: %w", err)
