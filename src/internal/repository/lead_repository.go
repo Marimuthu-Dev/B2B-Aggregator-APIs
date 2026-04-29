@@ -18,8 +18,8 @@ type LeadRepository interface {
 	Create(l *domain.Lead) error
 	Update(l *domain.Lead) error
 	Delete(id int64) error
-	// UpdateStatusForIDs sets status and audit columns; if labID is non-nil, LabID is set on all matching rows.
-	UpdateStatusForIDs(leadIDs []int64, statusID int8, lastUpdatedBy int64, labID *int64) (int64, error)
+	// UpdateStatusForIDs sets status and audit columns; if labID is non-nil, LabID is set; if appointmentAt is non-nil, AppointmentAt is set.
+	UpdateStatusForIDs(leadIDs []int64, statusID int8, lastUpdatedBy int64, labID *int64, appointmentAt *time.Time) (int64, error)
 	FindByClientID(clientID int64) ([]domain.Lead, error)
 	FindByStatus(statusID int8) ([]domain.Lead, error)
 	FindByPackage(packageID int) ([]domain.Lead, error)
@@ -176,7 +176,7 @@ func (r *leadRepository) Delete(id int64) error {
 	return r.db.Delete(&persistencemodels.Lead{}, id).Error
 }
 
-func (r *leadRepository) UpdateStatusForIDs(leadIDs []int64, statusID int8, lastUpdatedBy int64, labID *int64) (int64, error) {
+func (r *leadRepository) UpdateStatusForIDs(leadIDs []int64, statusID int8, lastUpdatedBy int64, labID *int64, appointmentAt *time.Time) (int64, error) {
 	updates := map[string]interface{}{
 		"LeadStatusID":  statusID,
 		"LastUpdatedBy": lastUpdatedBy,
@@ -184,6 +184,9 @@ func (r *leadRepository) UpdateStatusForIDs(leadIDs []int64, statusID int8, last
 	}
 	if labID != nil {
 		updates["LabID"] = *labID
+	}
+	if appointmentAt != nil {
+		updates["AppointmentAt"] = *appointmentAt
 	}
 	result := r.db.Model(&persistencemodels.Lead{}).Where("LeadID IN ?", leadIDs).Updates(updates)
 	return result.RowsAffected, result.Error

@@ -159,7 +159,7 @@ func (h *LeadHandler) BulkUpdateStatus(c *gin.Context) {
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
-	count, err := h.svc.BulkUpdateLeadStatus(req.LeadIDs, req.LeadStatusID, userID, req.LabID)
+	count, err := h.svc.BulkUpdateLeadStatus(req.LeadIDs, req.LeadStatusID, userID, req.LabID, req.AppointmentAt)
 	if err != nil {
 		respondError(c, err)
 		return

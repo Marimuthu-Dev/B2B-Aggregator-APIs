@@ -33,6 +33,8 @@ type BulkUpdateLeadStatusRequest struct {
 	LeadStatusID int8    `json:"leadStatusId" binding:"required"`
 	// LabID when set is applied to every lead in the batch (same as PUT /leads/{id} with LabID).
 	LabID *int64 `json:"LabID,omitempty"`
+	// AppointmentAt when set is applied to every lead; validated like PUT /leads/{id} (not in the past).
+	AppointmentAt *time.Time `json:"AppointmentAt,omitempty"`
 }
 
 // ApproveLeadRequest is the body for POST /api/v1/leads/{id}/reports/approve (report fit / hold / unfit).

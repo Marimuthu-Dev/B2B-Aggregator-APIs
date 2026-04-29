@@ -27,7 +27,7 @@ type LeadService interface {
 	CreateLead(l *domain.Lead, createdBy int64) error
 	UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUpdatedBy int64) (*domain.Lead, error)
 	DeleteLead(id int64, actorID int64) error
-	BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastUpdatedBy int64, labID *int64) (int64, error)
+	BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastUpdatedBy int64, labID *int64, appointmentAt *time.Time) (int64, error)
 	BulkImportFromCSV(csvContent []byte, clientID int64, packageID int, createdBy int64) (int, error)
 	// UploadBloodTestReport validates a PDF, uploads to blob storage, then updates lead + history in one DB transaction.
 	UploadBloodTestReport(ctx context.Context, leadID int64, uploadedBy int64, fh *multipart.FileHeader) (reportURL string, err error)
@@ -254,10 +254,22 @@ func (s *leadService) DeleteLead(id int64, actorID int64) error {
 	})
 }
 
-func (s *leadService) BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastUpdatedBy int64, labID *int64) (int64, error) {
+func (s *leadService) BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastUpdatedBy int64, labID *int64, appointmentAt *time.Time) (int64, error) {
+	var appointmentPersist *time.Time
+	if appointmentAt != nil {
+		appt := *appointmentAt
+		if appt.Before(time.Now()) {
+			return 0, apperrors.NewBadRequest(
+				"AppointmentAt must be at or after the current time (India Standard Time)",
+				nil,
+			)
+		}
+		st := timeutil.StoredFromTime(appt)
+		appointmentPersist = timeutil.StoredToTimePtr(&st)
+	}
 	var affected int64
 	err := s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
-		n, err := leadRepo.UpdateStatusForIDs(leadIDs, statusID, lastUpdatedBy, labID)
+		n, err := leadRepo.UpdateStatusForIDs(leadIDs, statusID, lastUpdatedBy, labID, appointmentPersist)
 		if err != nil {
 			return err
 		}
