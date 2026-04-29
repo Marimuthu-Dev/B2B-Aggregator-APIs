@@ -66,8 +66,8 @@ type Lead struct {
 	ContactNumber                 string
 	Emailid                       string
 	Address                       string
-	CityID                        int8
-	StateID                       int8
+	CityID                        uint8
+	StateID                       uint8
 	Pincode                       string
 	CollectionType                string `json:"CollectionType"`
 	LeadStatusID                  int8

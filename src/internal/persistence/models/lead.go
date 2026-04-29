@@ -13,8 +13,8 @@ type Lead struct {
 	ContactNumber                 string     `gorm:"column:ContactNumber;type:varchar(10);not null"`
 	Emailid                       string     `gorm:"column:EmailID;type:varchar(75);not null"`
 	Address                       string     `gorm:"column:Address;type:varchar(150);not null"`
-	CityID                        int8       `gorm:"column:CityID;not null"`
-	StateID                       int8       `gorm:"column:StateID;not null"`
+	CityID                        uint8      `gorm:"column:CityID;not null"`
+	StateID                       uint8      `gorm:"column:StateID;not null"`
 	Pincode                       string     `gorm:"column:Pincode;type:varchar(6);not null"`
 	CollectionType                string     `gorm:"column:CollectionType;type:varchar(10);not null;default:Center"`
 	LeadStatusID                  int8       `gorm:"column:LeadStatusID;not null"`

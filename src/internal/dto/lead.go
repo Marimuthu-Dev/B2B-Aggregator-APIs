@@ -19,8 +19,8 @@ type LeadRequest struct {
 	ContactNumber  string     `binding:"required"`
 	Emailid        string     `binding:"required"`
 	Address        string     `binding:"required"`
-	CityID         int8       `binding:"required"`
-	StateID        int8       `binding:"required"`
+	CityID         uint8      `binding:"required"`
+	StateID        uint8      `binding:"required"`
 	Pincode        string     `binding:"required"`
 	CollectionType string     `json:"CollectionType" binding:"required"`
 	LeadStatusID   int8       // omitted or 0 → service uses domain.LeadStatusIDDefault (1)
@@ -52,8 +52,8 @@ type LeadUpdateRequest struct {
 	ContactNumber  *string    `json:"ContactNumber"`
 	Emailid        *string    `json:"Emailid"`
 	Address        *string    `json:"Address"`
-	CityID         *int8      `json:"CityID"`
-	StateID        *int8      `json:"StateID"`
+	CityID         *uint8     `json:"CityID"`
+	StateID        *uint8     `json:"StateID"`
 	Pincode        *string    `json:"Pincode"`
 	CollectionType *string    `json:"CollectionType"`
 	LeadStatusID   *int8      `json:"LeadStatusID"`
