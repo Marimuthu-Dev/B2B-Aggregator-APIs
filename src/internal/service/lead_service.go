@@ -27,7 +27,7 @@ type LeadService interface {
 	CreateLead(l *domain.Lead, createdBy int64) error
 	UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUpdatedBy int64) (*domain.Lead, error)
 	DeleteLead(id int64, actorID int64) error
-	BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastUpdatedBy int64) (int64, error)
+	BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastUpdatedBy int64, labID *int64, appointmentAt *time.Time) (int64, error)
 	BulkImportFromCSV(csvContent []byte, clientID int64, packageID int, createdBy int64) (int, error)
 	// UploadBloodTestReport validates a PDF, uploads to blob storage, then updates lead + history in one DB transaction.
 	UploadBloodTestReport(ctx context.Context, leadID int64, uploadedBy int64, fh *multipart.FileHeader) (reportURL string, err error)
@@ -94,6 +94,7 @@ func (s *leadService) CreateLead(l *domain.Lead, createdBy int64) error {
 	// Default matches legacy BIT false -> UNFIT after migration; create payload does not send approval fields.
 	l.IsFit = domain.LeadFitUnfit
 	l.IsReportDownloadable = false
+	l.IsFitCertificateTobeGenerated = false
 	l.PatientID = s.GeneratePatientID(l.PatientName, l.ContactNumber)
 	if l.LeadStatusID == 0 {
 		l.LeadStatusID = domain.LeadStatusIDDefault
@@ -253,10 +254,22 @@ func (s *leadService) DeleteLead(id int64, actorID int64) error {
 	})
 }
 
-func (s *leadService) BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastUpdatedBy int64) (int64, error) {
+func (s *leadService) BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastUpdatedBy int64, labID *int64, appointmentAt *time.Time) (int64, error) {
+	var appointmentPersist *time.Time
+	if appointmentAt != nil {
+		appt := *appointmentAt
+		if appt.Before(time.Now()) {
+			return 0, apperrors.NewBadRequest(
+				"AppointmentAt must be at or after the current time (India Standard Time)",
+				nil,
+			)
+		}
+		st := timeutil.StoredFromTime(appt)
+		appointmentPersist = timeutil.StoredToTimePtr(&st)
+	}
 	var affected int64
 	err := s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
-		n, err := leadRepo.UpdateStatusForIDs(leadIDs, statusID, lastUpdatedBy)
+		n, err := leadRepo.UpdateStatusForIDs(leadIDs, statusID, lastUpdatedBy, labID, appointmentPersist)
 		if err != nil {
 			return err
 		}
@@ -335,6 +348,14 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 		n, _ := strconv.ParseInt(s, 10, 8)
 		return int8(n)
 	}
+	atUint8 := func(row []string, name string) uint8 {
+		s := at(row, name)
+		if s == "" {
+			return 0
+		}
+		n, _ := strconv.ParseUint(s, 10, 8)
+		return uint8(n)
+	}
 
 	requiredCols := []string{"PatientName", "ContactNumber", "Age", "Gender", "Emailid", "Address", "CityID", "StateID", "Pincode"}
 	for _, name := range requiredCols {
@@ -380,8 +401,8 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 			ContactNumber:  contactNumber,
 			Emailid:        at(row, "Emailid"),
 			Address:        at(row, "Address"),
-			CityID:         atInt8(row, "CityID"),
-			StateID:        atInt8(row, "StateID"),
+			CityID:         atUint8(row, "CityID"),
+			StateID:        atUint8(row, "StateID"),
 			Pincode:        at(row, "Pincode"),
 			CollectionType: collectionType,
 			LeadStatusID:   leadStatusID,
@@ -578,13 +599,14 @@ func (s *leadService) ApproveLeadReport(leadID int64, req *dto.ApproveLeadReques
 	if remarksNorm != "" {
 		remarksPtr = &remarksNorm
 	}
+	certTobe := *req.IsFitCertificateToBeGenerated
 	// Skip DB only when nothing changes; if status is still "uploaded" (8) but decision is FIT, we must run once to set LeadStatusID = 9.
-	same := lead.IsFit == isFit && lead.IsReportDownloadable == req.AllowDownload && strings.TrimSpace(lead.ApprovalRemarks) == remarksNorm
+	same := lead.IsFit == isFit && lead.IsReportDownloadable == req.AllowDownload && lead.IsFitCertificateTobeGenerated == certTobe && strings.TrimSpace(lead.ApprovalRemarks) == remarksNorm
 	if same && !(isFit == domain.LeadFitFit && lead.LeadStatusID == domain.LeadStatusIDReportUploaded) {
 		return nil
 	}
 	return s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
-		n, err := leadRepo.UpdateLeadReportApproval(leadID, userID, isFit, req.AllowDownload, remarksPtr)
+		n, err := leadRepo.UpdateLeadReportApproval(leadID, userID, isFit, req.AllowDownload, certTobe, remarksPtr)
 		if err != nil {
 			return err
 		}

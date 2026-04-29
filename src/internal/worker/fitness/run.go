@@ -95,14 +95,32 @@ func processLead(ctx context.Context, d Deps, lead domain.Lead, log *slog.Logger
 		slog.String("clientName", client.ClientName),
 	)
 	if client.ClientTypeID == nil {
+		if !lead.IsFitCertificateTobeGenerated {
+			log.Info("fitness cert: skipping certificate (IsFitCertificateTobeGenerated=false, client has no ClientTypeID)",
+				slog.Int64("leadID", lead.LeadID),
+			)
+			updated, err := d.LeadRepo.MarkReportReadyToDownload(lead.LeadID, d.Config.ActorUserID,
+				d.Config.PendingLeadStatusID, d.Config.DoneLeadStatusID)
+			if err != nil {
+				return fmt.Errorf("mark report ready to download: %w", err)
+			}
+			if !updated {
+				log.Warn("lead no longer matched pending report-ready criteria", slog.Int64("leadID", lead.LeadID))
+				return nil
+			}
+			log.Info("report marked ready to download without certificate generation", slog.Int64("leadID", lead.LeadID))
+			return nil
+		}
 		return fmt.Errorf("client %d has no ClientTypeID; add certificate template after setting type", lead.ClientID)
 	}
 	ctID := *client.ClientTypeID
 	log.Info("fitness cert: client type", slog.Int("clientTypeID", int(ctID)))
-	if !requiresFitnessCertificate(ctID) {
-		log.Info("fitness cert: skipping certificate (client type does not require fitness PDF)",
+	// Skip PDF certificate when (client type is not 1 or 2) OR (IsFitCertificateTobeGenerated is false).
+	if !requiresFitnessCertificate(ctID) || !lead.IsFitCertificateTobeGenerated {
+		log.Info("fitness cert: skipping certificate (client type not 1/2 or IsFitCertificateTobeGenerated=false)",
 			slog.Int64("leadID", lead.LeadID),
 			slog.Int("clientTypeID", int(ctID)),
+			slog.Bool("isFitCertificateTobeGenerated", lead.IsFitCertificateTobeGenerated),
 		)
 		updated, err := d.LeadRepo.MarkReportReadyToDownload(lead.LeadID, d.Config.ActorUserID,
 			d.Config.PendingLeadStatusID, d.Config.DoneLeadStatusID)
