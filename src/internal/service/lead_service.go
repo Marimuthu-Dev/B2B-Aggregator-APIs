@@ -348,13 +348,13 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 		n, _ := strconv.ParseInt(s, 10, 8)
 		return int8(n)
 	}
-	atUint8 := func(row []string, name string) uint8 {
+	atInt32 := func(row []string, name string) int32 {
 		s := at(row, name)
 		if s == "" {
 			return 0
 		}
-		n, _ := strconv.ParseUint(s, 10, 8)
-		return uint8(n)
+		n, _ := strconv.ParseInt(s, 10, 32)
+		return int32(n)
 	}
 
 	requiredCols := []string{"PatientName", "ContactNumber", "Age", "Gender", "Emailid", "Address", "CityID", "StateID", "Pincode"}
@@ -401,8 +401,8 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 			ContactNumber:  contactNumber,
 			Emailid:        at(row, "Emailid"),
 			Address:        at(row, "Address"),
-			CityID:         atUint8(row, "CityID"),
-			StateID:        atUint8(row, "StateID"),
+			CityID:         atInt32(row, "CityID"),
+			StateID:        atInt32(row, "StateID"),
 			Pincode:        at(row, "Pincode"),
 			CollectionType: collectionType,
 			LeadStatusID:   leadStatusID,
