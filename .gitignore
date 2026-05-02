@@ -8,3 +8,4 @@ src/.env
 /src/chrome-win64
 *.exe
 *.zip
+/src/build/App_Data

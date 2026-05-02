@@ -58,6 +58,7 @@ const LeadStatusIDReportApproval = LeadStatusIDReportUploaded
 type Lead struct {
 	LeadID                        int64
 	ClientID                      int64
+	ClientName                    string `json:"ClientName,omitempty"`
 	PatientID                     string
 	PatientName                   string
 	Age                           int8
@@ -87,10 +88,9 @@ type Lead struct {
 	LastUpdatedOn                 timeutil.ISTTime
 }
 
-// LeadDetail is lead with resolved ClientName and PackageName for API response.
+// LeadDetail is lead with resolved PackageName for API response (ClientName is on embedded Lead).
 type LeadDetail struct {
 	Lead
-	ClientName  string `json:"ClientName,omitempty"`
 	PackageName string `json:"PackageName,omitempty"`
 }
 

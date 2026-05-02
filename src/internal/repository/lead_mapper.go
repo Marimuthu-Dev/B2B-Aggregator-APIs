@@ -9,10 +9,13 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 )
 
-func mapLeadToDomainWithOptionalLabName(p persistencemodels.Lead, labName sql.NullString) domain.Lead {
+func mapLeadToDomainWithOptionalLabAndClientName(p persistencemodels.Lead, labName, clientName sql.NullString) domain.Lead {
 	d := mapLeadToDomain(p)
 	if labName.Valid {
 		d.LabName = strings.TrimSpace(labName.String)
+	}
+	if clientName.Valid {
+		d.ClientName = strings.TrimSpace(clientName.String)
 	}
 	return d
 }

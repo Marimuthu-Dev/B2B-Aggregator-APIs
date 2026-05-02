@@ -43,10 +43,11 @@ type leadRepository struct {
 	db *gorm.DB
 }
 
-// leadListScan is tbl_Leads with an optional lab name from LEFT JOIN tbl_LabMaster.
+// leadListScan is tbl_Leads with optional names from LEFT JOINs to lab and client masters.
 type leadListScan struct {
 	persistencemodels.Lead
-	JoinedLabName sql.NullString `gorm:"column:joined_lab_name"`
+	JoinedLabName    sql.NullString `gorm:"column:joined_lab_name"`
+	JoinedClientName sql.NullString `gorm:"column:joined_client_name"`
 }
 
 func NewLeadRepository(db *gorm.DB) LeadRepository {
@@ -73,7 +74,7 @@ func (r *leadRepository) List(filter LeadListFilter) ([]domain.Lead, int64, erro
 
 	var rows []leadListScan
 	err := r.leadListJoinedQuery(filter).
-		Select("l.*, lm.LabName AS joined_lab_name").
+		Select("l.*, lm.LabName AS joined_lab_name, cm.ClientName AS joined_client_name").
 		Order(sortColumn + " " + order).
 		Limit(filter.PageSize).
 		Offset(offset).
@@ -84,7 +85,7 @@ func (r *leadRepository) List(filter LeadListFilter) ([]domain.Lead, int64, erro
 
 	out := make([]domain.Lead, len(rows))
 	for i := range rows {
-		out[i] = mapLeadToDomainWithOptionalLabName(rows[i].Lead, rows[i].JoinedLabName)
+		out[i] = mapLeadToDomainWithOptionalLabAndClientName(rows[i].Lead, rows[i].JoinedLabName, rows[i].JoinedClientName)
 	}
 	return out, total, nil
 }
@@ -92,8 +93,10 @@ func (r *leadRepository) List(filter LeadListFilter) ([]domain.Lead, int64, erro
 func (r *leadRepository) leadListJoinedQuery(filter LeadListFilter) *gorm.DB {
 	leadTable := persistencemodels.Lead{}.TableName()
 	labTable := persistencemodels.Lab{}.TableName()
+	clientTable := persistencemodels.Client{}.TableName()
 	q := r.db.Table(leadTable + " AS l").
-		Joins("LEFT JOIN " + labTable + " AS lm ON l.LabID = lm.LabID")
+		Joins("LEFT JOIN " + labTable + " AS lm ON l.LabID = lm.LabID").
+		Joins("LEFT JOIN " + clientTable + " AS cm ON l.ClientID = cm.ClientID")
 	if filter.LeadID != nil {
 		q = q.Where("l.LeadID = ?", *filter.LeadID)
 	}
