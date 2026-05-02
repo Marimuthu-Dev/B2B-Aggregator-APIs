@@ -33,6 +33,27 @@ const (
 	LeadFitUnfit int8 = 2
 )
 
+// FitnessStatusFromIsFitPtr maps MediAdmin.tbl_Leads.IsFit for read APIs (NULL → "Empty").
+// Legacy -1 is treated as unfit (same as 2).
+func FitnessStatusFromIsFitPtr(p *int8) string {
+	if p == nil {
+		return "Empty"
+	}
+	switch *p {
+	case LeadFitHold:
+		return "On Hold"
+	case LeadFitFit:
+		return "Fit"
+	case LeadFitUnfit:
+		return "UnFit"
+	default:
+		if *p == -1 {
+			return "UnFit"
+		}
+		return ""
+	}
+}
+
 // LeadStatusIDDefault is the initial status for new leads when the client omits LeadStatusID (JSON zero / empty CSV).
 const LeadStatusIDDefault int8 = 1
 
@@ -82,6 +103,7 @@ type Lead struct {
 	LabID                         *int64               `json:"LabID,omitempty"`
 	LabName                       string               `json:"LabName,omitempty"`
 	IsFit                         int8                 `json:"IsFit"`
+	FitnessStatus                 string               `json:"FitnessStatus,omitempty"`
 	IsReportDownloadable          bool                 `json:"IsReportDownloadable"`
 	ApprovalRemarks               string               `json:"ApprovalRemarks,omitempty"`
 	FitUpdatedOn                  *timeutil.ISTTime    `json:"FitUpdatedOn,omitempty"`

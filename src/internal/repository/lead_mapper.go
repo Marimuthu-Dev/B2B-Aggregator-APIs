@@ -40,6 +40,7 @@ func mapLeadToDomain(p persistencemodels.Lead) domain.Lead {
 		AppointmentAt:                 timeutil.StoredFromTimePtr(p.AppointmentAt),
 		LabID:                         p.LabID,
 		IsFit:                         isFitFromPtr(p.IsFit),
+		FitnessStatus:                 domain.FitnessStatusFromIsFitPtr(p.IsFit),
 		IsReportDownloadable:          p.IsReportDownloadable,
 		ApprovalRemarks:               derefString(p.ApprovalRemarks),
 		FitUpdatedOn:                  timeutil.FromTimePtr(p.FitUpdatedOn),
