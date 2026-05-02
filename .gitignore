@@ -9,3 +9,8 @@ src/.env
 *.exe
 *.zip
 /src/build/App_Data
+/build/webjobs-combined
+src/email-worker
+src/fitness-worker
+src/fitness-worker
+/deploy

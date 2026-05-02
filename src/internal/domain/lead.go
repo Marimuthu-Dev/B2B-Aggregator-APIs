@@ -66,7 +66,7 @@ const (
 )
 
 // ParseLeadListFitnessFilter parses optional query param fitnessStatus / FitnessStatus (case-insensitive).
-// Accepted values align with JSON FitnessStatus: Empty, On Hold, Fit, UnFit (also onhold, hold, unfit).
+// Accepted values align with JSON FitnessStatus: Empty, Not Assessed (same as Empty / IsFit NULL), On Hold, Fit, UnFit (also onhold, hold, unfit).
 func ParseLeadListFitnessFilter(s string) (LeadListFitnessFilter, error) {
 	n := strings.TrimSpace(s)
 	if n == "" {
@@ -74,8 +74,9 @@ func ParseLeadListFitnessFilter(s string) (LeadListFitnessFilter, error) {
 	}
 	lower := strings.ToLower(n)
 	compact := strings.ReplaceAll(lower, " ", "")
+	compactNoDash := strings.ReplaceAll(compact, "-", "")
 	switch {
-	case lower == "empty":
+	case lower == "empty" || lower == "not assessed" || compactNoDash == "notassessed":
 		return LeadListFitnessFilterEmpty, nil
 	case compact == "onhold" || lower == "on hold" || lower == "hold":
 		return LeadListFitnessFilterOnHold, nil
@@ -84,7 +85,7 @@ func ParseLeadListFitnessFilter(s string) (LeadListFitnessFilter, error) {
 	case compact == "unfit" || lower == "un fit":
 		return LeadListFitnessFilterUnfit, nil
 	default:
-		return 0, fmt.Errorf(`fitnessStatus must be one of: Empty, On Hold, Fit, UnFit`)
+		return 0, fmt.Errorf(`fitnessStatus must be one of: Empty, Not Assessed, On Hold, Fit, UnFit`)
 	}
 }
 

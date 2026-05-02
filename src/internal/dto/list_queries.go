@@ -117,7 +117,7 @@ type LeadListQuery struct {
 	CollectionType   *string `form:"collectionType" binding:"omitempty"`
 	// Search matches PatientName, ContactNumber, or EmailID (substring, LIKE).
 	Search string `form:"search" binding:"omitempty"`
-	// FitnessStatus filters by tbl_Leads.IsFit (Empty | On Hold | Fit | UnFit); see domain.ParseLeadListFitnessFilter.
+	// FitnessStatus filters by tbl_Leads.IsFit (Empty | Not Assessed | On Hold | Fit | UnFit); see domain.ParseLeadListFitnessFilter.
 	FitnessStatus string `form:"fitnessStatus" binding:"omitempty"`
 	// AppointmentAtFrom / AppointmentAtTo filter by l.AppointmentAt (IST calendar day, YYYY-MM-DD); either or both.
 	AppointmentAtFrom string `form:"appointmentAtFrom" binding:"omitempty"`
