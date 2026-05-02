@@ -95,7 +95,9 @@ type Lead struct {
 	Emailid                       string
 	Address                       string
 	CityID                        int32
+	CityName                      string `json:"CityName,omitempty"`
 	StateID                       int32
+	StateName                     string `json:"StateName,omitempty"`
 	Pincode                       string
 	CollectionType                string `json:"CollectionType"`
 	LeadStatusID                  int8
