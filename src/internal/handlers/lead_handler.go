@@ -40,6 +40,15 @@ func (h *LeadHandler) GetAll(c *gin.Context) {
 		return
 	}
 	page := query.PaginationQuery.Normalize("createdOn", 0)
+	fitnessFilter := domain.LeadListFitnessFilterNone
+	if raw := strings.TrimSpace(query.FitnessStatus); raw != "" {
+		var err error
+		fitnessFilter, err = domain.ParseLeadListFitnessFilter(raw)
+		if err != nil {
+			respondError(c, apperrors.NewBadRequest(err.Error(), err))
+			return
+		}
+	}
 	filter := repository.LeadListFilter{
 		Page:           page.Page,
 		PageSize:       page.PageSize,
@@ -52,6 +61,7 @@ func (h *LeadHandler) GetAll(c *gin.Context) {
 		PackageID:      query.PackageID,
 		CollectionType: query.CollectionType,
 		Search:         query.Search,
+		FitnessStatus:  fitnessFilter,
 	}
 
 	data, total, err := h.svc.ListLeads(filter)
@@ -424,6 +434,11 @@ func enrichLeadListQueryFromPascalCaseKeys(c *gin.Context, q *dto.LeadListQuery)
 	if strings.TrimSpace(q.Search) == "" {
 		if s := strings.TrimSpace(c.Query("Search")); s != "" {
 			q.Search = s
+		}
+	}
+	if strings.TrimSpace(q.FitnessStatus) == "" {
+		if s := strings.TrimSpace(c.Query("FitnessStatus")); s != "" {
+			q.FitnessStatus = s
 		}
 	}
 	return mergeLeadCollectionTypeQueryParam(c, q)

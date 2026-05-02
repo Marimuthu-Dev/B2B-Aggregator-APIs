@@ -54,6 +54,40 @@ func FitnessStatusFromIsFitPtr(p *int8) string {
 	}
 }
 
+// LeadListFitnessFilter selects rows by MediAdmin.tbl_Leads.IsFit for GET /leads list queries.
+type LeadListFitnessFilter int8
+
+const (
+	LeadListFitnessFilterNone LeadListFitnessFilter = 0
+	LeadListFitnessFilterEmpty LeadListFitnessFilter = 1
+	LeadListFitnessFilterOnHold LeadListFitnessFilter = 2
+	LeadListFitnessFilterFit LeadListFitnessFilter = 3
+	LeadListFitnessFilterUnfit LeadListFitnessFilter = 4
+)
+
+// ParseLeadListFitnessFilter parses optional query param fitnessStatus / FitnessStatus (case-insensitive).
+// Accepted values align with JSON FitnessStatus: Empty, On Hold, Fit, UnFit (also onhold, hold, unfit).
+func ParseLeadListFitnessFilter(s string) (LeadListFitnessFilter, error) {
+	n := strings.TrimSpace(s)
+	if n == "" {
+		return LeadListFitnessFilterNone, nil
+	}
+	lower := strings.ToLower(n)
+	compact := strings.ReplaceAll(lower, " ", "")
+	switch {
+	case lower == "empty":
+		return LeadListFitnessFilterEmpty, nil
+	case compact == "onhold" || lower == "on hold" || lower == "hold":
+		return LeadListFitnessFilterOnHold, nil
+	case compact == "fit":
+		return LeadListFitnessFilterFit, nil
+	case compact == "unfit" || lower == "un fit":
+		return LeadListFitnessFilterUnfit, nil
+	default:
+		return 0, fmt.Errorf(`fitnessStatus must be one of: Empty, On Hold, Fit, UnFit`)
+	}
+}
+
 // LeadStatusIDDefault is the initial status for new leads when the client omits LeadStatusID (JSON zero / empty CSV).
 const LeadStatusIDDefault int8 = 1
 

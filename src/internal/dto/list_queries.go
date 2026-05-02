@@ -117,6 +117,8 @@ type LeadListQuery struct {
 	CollectionType   *string `form:"collectionType" binding:"omitempty"`
 	// Search matches PatientName, ContactNumber, or EmailID (substring, LIKE).
 	Search string `form:"search" binding:"omitempty"`
+	// FitnessStatus filters by tbl_Leads.IsFit (Empty | On Hold | Fit | UnFit); see domain.ParseLeadListFitnessFilter.
+	FitnessStatus string `form:"fitnessStatus" binding:"omitempty"`
 }
 
 type PackageListQuery struct {
