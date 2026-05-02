@@ -12,6 +12,7 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/middleware"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/service"
+	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 	"b2b-diagnostic-aggregator/apis/pkg/utils"
 
 	"github.com/gin-gonic/gin"
@@ -49,6 +50,11 @@ func (h *LeadHandler) GetAll(c *gin.Context) {
 			return
 		}
 	}
+	apptMin, apptMax, err := parseLeadListAppointmentAtRange(&query)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
 	filter := repository.LeadListFilter{
 		Page:           page.Page,
 		PageSize:       page.PageSize,
@@ -60,8 +66,10 @@ func (h *LeadHandler) GetAll(c *gin.Context) {
 		StatusID:       query.StatusID,
 		PackageID:      query.PackageID,
 		CollectionType: query.CollectionType,
-		Search:         query.Search,
-		FitnessStatus:  fitnessFilter,
+		Search:                    query.Search,
+		FitnessStatus:             fitnessFilter,
+		AppointmentAtMin: apptMin,
+		AppointmentAtMax: apptMax,
 	}
 
 	data, total, err := h.svc.ListLeads(filter)
@@ -416,6 +424,38 @@ func leadDetailAccessibleByJWT(c *gin.Context, d *domain.LeadDetail) bool {
 	}
 }
 
+// parseLeadListAppointmentAtRange builds IST bounds for l.AppointmentAt: from at 00:00:00, to at 23:59:59.999999999 (inclusive).
+// Dates must be YYYY-MM-DD. Either bound may be omitted.
+func parseLeadListAppointmentAtRange(q *dto.LeadListQuery) (min *time.Time, maxInclusive *time.Time, err error) {
+	fromStr := strings.TrimSpace(q.AppointmentAtFrom)
+	toStr := strings.TrimSpace(q.AppointmentAtTo)
+	if fromStr == "" && toStr == "" {
+		return nil, nil, nil
+	}
+	loc := timeutil.ISTLocation()
+	const layout = "2006-01-02"
+	if fromStr != "" {
+		d, e := time.ParseInLocation(layout, fromStr, loc)
+		if e != nil {
+			return nil, nil, apperrors.NewBadRequest("Invalid appointmentAtFrom: use YYYY-MM-DD (calendar date in India Standard Time)", e)
+		}
+		start := time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, loc)
+		min = &start
+	}
+	if toStr != "" {
+		d, e := time.ParseInLocation(layout, toStr, loc)
+		if e != nil {
+			return nil, nil, apperrors.NewBadRequest("Invalid appointmentAtTo: use YYYY-MM-DD (calendar date in India Standard Time)", e)
+		}
+		end := time.Date(d.Year(), d.Month(), d.Day(), 23, 59, 59, 999999999, loc)
+		maxInclusive = &end
+	}
+	if min != nil && maxInclusive != nil && min.After(*maxInclusive) {
+		return nil, nil, apperrors.NewBadRequest("appointmentAtFrom must be on or before appointmentAtTo", nil)
+	}
+	return min, maxInclusive, nil
+}
+
 // enrichLeadListQueryFromPascalCaseKeys fills filters from alternate query spellings (PascalCase, lowercase)
 // when Gin did not bind the camelCase form tag. Also normalizes collectionType / CollectionType (Home | Center).
 func enrichLeadListQueryFromPascalCaseKeys(c *gin.Context, q *dto.LeadListQuery) error {
@@ -439,6 +479,16 @@ func enrichLeadListQueryFromPascalCaseKeys(c *gin.Context, q *dto.LeadListQuery)
 	if strings.TrimSpace(q.FitnessStatus) == "" {
 		if s := strings.TrimSpace(c.Query("FitnessStatus")); s != "" {
 			q.FitnessStatus = s
+		}
+	}
+	if strings.TrimSpace(q.AppointmentAtFrom) == "" {
+		if s := strings.TrimSpace(c.Query("AppointmentAtFrom")); s != "" {
+			q.AppointmentAtFrom = s
+		}
+	}
+	if strings.TrimSpace(q.AppointmentAtTo) == "" {
+		if s := strings.TrimSpace(c.Query("AppointmentAtTo")); s != "" {
+			q.AppointmentAtTo = s
 		}
 	}
 	return mergeLeadCollectionTypeQueryParam(c, q)

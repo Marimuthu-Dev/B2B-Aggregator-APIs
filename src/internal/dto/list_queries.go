@@ -119,6 +119,9 @@ type LeadListQuery struct {
 	Search string `form:"search" binding:"omitempty"`
 	// FitnessStatus filters by tbl_Leads.IsFit (Empty | On Hold | Fit | UnFit); see domain.ParseLeadListFitnessFilter.
 	FitnessStatus string `form:"fitnessStatus" binding:"omitempty"`
+	// AppointmentAtFrom / AppointmentAtTo filter by l.AppointmentAt (IST calendar day, YYYY-MM-DD); either or both.
+	AppointmentAtFrom string `form:"appointmentAtFrom" binding:"omitempty"`
+	AppointmentAtTo   string `form:"appointmentAtTo" binding:"omitempty"`
 }
 
 type PackageListQuery struct {

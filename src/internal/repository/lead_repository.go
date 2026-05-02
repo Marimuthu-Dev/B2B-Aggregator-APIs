@@ -133,6 +133,12 @@ func (r *leadRepository) leadListJoinedQuery(filter LeadListFilter) *gorm.DB {
 		term := "%" + trimmed + "%"
 		q = q.Where("(l.PatientName LIKE ? OR l.ContactNumber LIKE ? OR l.EmailID LIKE ?)", term, term, term)
 	}
+	if filter.AppointmentAtMin != nil {
+		q = q.Where("l.AppointmentAt IS NOT NULL AND l.AppointmentAt >= ?", *filter.AppointmentAtMin)
+	}
+	if filter.AppointmentAtMax != nil {
+		q = q.Where("l.AppointmentAt IS NOT NULL AND l.AppointmentAt <= ?", *filter.AppointmentAtMax)
+	}
 	switch filter.FitnessStatus {
 	case domain.LeadListFitnessFilterEmpty:
 		q = q.Where("l.IsFit IS NULL")
