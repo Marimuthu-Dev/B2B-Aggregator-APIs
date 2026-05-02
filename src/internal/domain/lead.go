@@ -52,6 +52,12 @@ func LeadStatusIDForbiddenForPUTLead(id int8) bool {
 	return id >= LeadStatusIDReportUploaded
 }
 
+// LeadStatusIDDowngradeForbiddenForPUTLead is true when the lead is already in report workflow (>= 8)
+// but the client tries to set LeadStatusID to a pre-workflow value (< 8) via PUT.
+func LeadStatusIDDowngradeForbiddenForPUTLead(existingLeadStatusID, requestedLeadStatusID int8) bool {
+	return existingLeadStatusID >= LeadStatusIDReportUploaded && requestedLeadStatusID < LeadStatusIDReportUploaded
+}
+
 // LeadStatusIDReportApproval is the LeadStatusID required on the lead row before approve may run (report uploaded).
 const LeadStatusIDReportApproval = LeadStatusIDReportUploaded
 
