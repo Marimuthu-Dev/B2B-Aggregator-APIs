@@ -8,3 +8,9 @@ src/.env
 /src/chrome-win64
 *.exe
 *.zip
+/src/build/App_Data
+/build/webjobs-combined
+src/email-worker
+src/fitness-worker
+src/fitness-worker
+/deploy

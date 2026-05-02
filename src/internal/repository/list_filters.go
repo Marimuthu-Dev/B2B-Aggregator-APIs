@@ -1,6 +1,10 @@
 package repository
 
-import "time"
+import (
+	"time"
+
+	"b2b-diagnostic-aggregator/apis/internal/domain"
+)
 
 // MouExpiryDateRange filters MOUEndDate inclusive; bounds are date-only (UTC midnight). Use only when both are set.
 type MouExpiryDateRange struct {
@@ -45,6 +49,12 @@ type LeadListFilter struct {
 	StatusID         *int8
 	PackageID        *int
 	CollectionType   *string
+	Search           string
+	FitnessStatus    domain.LeadListFitnessFilter
+	// AppointmentAtMin is inclusive lower bound (appointmentAtFrom at 00:00:00 IST); nil = no lower filter.
+	AppointmentAtMin *time.Time
+	// AppointmentAtMax is inclusive upper bound (appointmentAtTo at 23:59:59.999999999 IST); nil = no upper filter.
+	AppointmentAtMax *time.Time
 }
 
 type PackageListFilter struct {

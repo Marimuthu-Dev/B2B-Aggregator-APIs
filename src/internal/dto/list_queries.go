@@ -115,6 +115,13 @@ type LeadListQuery struct {
 	StatusID         *int8   `form:"statusId" binding:"omitempty,min=1"`
 	PackageID        *int    `form:"packageId" binding:"omitempty,min=1"`
 	CollectionType   *string `form:"collectionType" binding:"omitempty"`
+	// Search matches PatientName, ContactNumber, or EmailID (substring, LIKE).
+	Search string `form:"search" binding:"omitempty"`
+	// FitnessStatus filters by tbl_Leads.IsFit (Empty | Not Assessed | On Hold | Fit | UnFit); see domain.ParseLeadListFitnessFilter.
+	FitnessStatus string `form:"fitnessStatus" binding:"omitempty"`
+	// AppointmentAtFrom / AppointmentAtTo filter by l.AppointmentAt (IST calendar day, YYYY-MM-DD); either or both.
+	AppointmentAtFrom string `form:"appointmentAtFrom" binding:"omitempty"`
+	AppointmentAtTo   string `form:"appointmentAtTo" binding:"omitempty"`
 }
 
 type PackageListQuery struct {

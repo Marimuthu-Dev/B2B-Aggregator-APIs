@@ -9,10 +9,19 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 )
 
-func mapLeadToDomainWithOptionalLabName(p persistencemodels.Lead, labName sql.NullString) domain.Lead {
+func mapLeadToDomainWithOptionalJoinedNames(p persistencemodels.Lead, labName, clientName, cityName, stateName sql.NullString) domain.Lead {
 	d := mapLeadToDomain(p)
 	if labName.Valid {
 		d.LabName = strings.TrimSpace(labName.String)
+	}
+	if clientName.Valid {
+		d.ClientName = strings.TrimSpace(clientName.String)
+	}
+	if cityName.Valid {
+		d.CityName = strings.TrimSpace(cityName.String)
+	}
+	if stateName.Valid {
+		d.StateName = strings.TrimSpace(stateName.String)
 	}
 	return d
 }
@@ -37,6 +46,7 @@ func mapLeadToDomain(p persistencemodels.Lead) domain.Lead {
 		AppointmentAt:                 timeutil.StoredFromTimePtr(p.AppointmentAt),
 		LabID:                         p.LabID,
 		IsFit:                         isFitFromPtr(p.IsFit),
+		FitnessStatus:                 domain.FitnessStatusFromIsFitPtr(p.IsFit),
 		IsReportDownloadable:          p.IsReportDownloadable,
 		ApprovalRemarks:               derefString(p.ApprovalRemarks),
 		FitUpdatedOn:                  timeutil.FromTimePtr(p.FitUpdatedOn),

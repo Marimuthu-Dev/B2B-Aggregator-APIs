@@ -33,6 +33,62 @@ const (
 	LeadFitUnfit int8 = 2
 )
 
+// FitnessStatusFromIsFitPtr maps MediAdmin.tbl_Leads.IsFit for read APIs (NULL → "Empty").
+// Legacy -1 is treated as unfit (same as 2).
+func FitnessStatusFromIsFitPtr(p *int8) string {
+	if p == nil {
+		return "Empty"
+	}
+	switch *p {
+	case LeadFitHold:
+		return "On Hold"
+	case LeadFitFit:
+		return "Fit"
+	case LeadFitUnfit:
+		return "UnFit"
+	default:
+		if *p == -1 {
+			return "UnFit"
+		}
+		return ""
+	}
+}
+
+// LeadListFitnessFilter selects rows by MediAdmin.tbl_Leads.IsFit for GET /leads list queries.
+type LeadListFitnessFilter int8
+
+const (
+	LeadListFitnessFilterNone LeadListFitnessFilter = 0
+	LeadListFitnessFilterEmpty LeadListFitnessFilter = 1
+	LeadListFitnessFilterOnHold LeadListFitnessFilter = 2
+	LeadListFitnessFilterFit LeadListFitnessFilter = 3
+	LeadListFitnessFilterUnfit LeadListFitnessFilter = 4
+)
+
+// ParseLeadListFitnessFilter parses optional query param fitnessStatus / FitnessStatus (case-insensitive).
+// Accepted values align with JSON FitnessStatus: Empty, Not Assessed (same as Empty / IsFit NULL), On Hold, Fit, UnFit (also onhold, hold, unfit).
+func ParseLeadListFitnessFilter(s string) (LeadListFitnessFilter, error) {
+	n := strings.TrimSpace(s)
+	if n == "" {
+		return LeadListFitnessFilterNone, nil
+	}
+	lower := strings.ToLower(n)
+	compact := strings.ReplaceAll(lower, " ", "")
+	compactNoDash := strings.ReplaceAll(compact, "-", "")
+	switch {
+	case lower == "empty" || lower == "not assessed" || compactNoDash == "notassessed":
+		return LeadListFitnessFilterEmpty, nil
+	case compact == "onhold" || lower == "on hold" || lower == "hold":
+		return LeadListFitnessFilterOnHold, nil
+	case compact == "fit":
+		return LeadListFitnessFilterFit, nil
+	case compact == "unfit" || lower == "un fit":
+		return LeadListFitnessFilterUnfit, nil
+	default:
+		return 0, fmt.Errorf(`fitnessStatus must be one of: Empty, Not Assessed, On Hold, Fit, UnFit`)
+	}
+}
+
 // LeadStatusIDDefault is the initial status for new leads when the client omits LeadStatusID (JSON zero / empty CSV).
 const LeadStatusIDDefault int8 = 1
 
@@ -52,12 +108,19 @@ func LeadStatusIDForbiddenForPUTLead(id int8) bool {
 	return id >= LeadStatusIDReportUploaded
 }
 
+// LeadStatusIDDowngradeForbiddenForPUTLead is true when the lead is already in report workflow (>= 8)
+// but the client tries to set LeadStatusID to a pre-workflow value (< 8) via PUT.
+func LeadStatusIDDowngradeForbiddenForPUTLead(existingLeadStatusID, requestedLeadStatusID int8) bool {
+	return existingLeadStatusID >= LeadStatusIDReportUploaded && requestedLeadStatusID < LeadStatusIDReportUploaded
+}
+
 // LeadStatusIDReportApproval is the LeadStatusID required on the lead row before approve may run (report uploaded).
 const LeadStatusIDReportApproval = LeadStatusIDReportUploaded
 
 type Lead struct {
 	LeadID                        int64
 	ClientID                      int64
+	ClientName                    string `json:"ClientName,omitempty"`
 	PatientID                     string
 	PatientName                   string
 	Age                           int8
@@ -66,8 +129,10 @@ type Lead struct {
 	ContactNumber                 string
 	Emailid                       string
 	Address                       string
-	CityID                        uint8
-	StateID                       uint8
+	CityID                        int32
+	CityName                      string `json:"CityName,omitempty"`
+	StateID                       int32
+	StateName                     string `json:"StateName,omitempty"`
 	Pincode                       string
 	CollectionType                string `json:"CollectionType"`
 	LeadStatusID                  int8
@@ -75,6 +140,7 @@ type Lead struct {
 	LabID                         *int64               `json:"LabID,omitempty"`
 	LabName                       string               `json:"LabName,omitempty"`
 	IsFit                         int8                 `json:"IsFit"`
+	FitnessStatus                 string               `json:"FitnessStatus,omitempty"`
 	IsReportDownloadable          bool                 `json:"IsReportDownloadable"`
 	ApprovalRemarks               string               `json:"ApprovalRemarks,omitempty"`
 	FitUpdatedOn                  *timeutil.ISTTime    `json:"FitUpdatedOn,omitempty"`
@@ -87,10 +153,9 @@ type Lead struct {
 	LastUpdatedOn                 timeutil.ISTTime
 }
 
-// LeadDetail is lead with resolved ClientName and PackageName for API response.
+// LeadDetail is lead with resolved PackageName for API response (ClientName is on embedded Lead).
 type LeadDetail struct {
 	Lead
-	ClientName  string `json:"ClientName,omitempty"`
 	PackageName string `json:"PackageName,omitempty"`
 }
 
