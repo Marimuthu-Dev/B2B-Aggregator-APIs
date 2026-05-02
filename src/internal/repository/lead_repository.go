@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"strings"
 	"time"
 
 	"b2b-diagnostic-aggregator/apis/internal/domain"
@@ -114,6 +115,10 @@ func (r *leadRepository) leadListJoinedQuery(filter LeadListFilter) *gorm.DB {
 	}
 	if filter.CollectionType != nil && *filter.CollectionType != "" {
 		q = q.Where("l.CollectionType = ?", *filter.CollectionType)
+	}
+	if trimmed := strings.TrimSpace(filter.Search); trimmed != "" {
+		term := "%" + trimmed + "%"
+		q = q.Where("(l.PatientName LIKE ? OR l.ContactNumber LIKE ? OR l.EmailID LIKE ?)", term, term, term)
 	}
 	return q
 }

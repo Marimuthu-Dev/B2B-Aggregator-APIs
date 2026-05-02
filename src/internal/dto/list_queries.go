@@ -115,6 +115,8 @@ type LeadListQuery struct {
 	StatusID         *int8   `form:"statusId" binding:"omitempty,min=1"`
 	PackageID        *int    `form:"packageId" binding:"omitempty,min=1"`
 	CollectionType   *string `form:"collectionType" binding:"omitempty"`
+	// Search matches PatientName, ContactNumber, or EmailID (substring, LIKE).
+	Search string `form:"search" binding:"omitempty"`
 }
 
 type PackageListQuery struct {

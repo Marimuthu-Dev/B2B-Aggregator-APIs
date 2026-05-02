@@ -51,6 +51,7 @@ func (h *LeadHandler) GetAll(c *gin.Context) {
 		StatusID:       query.StatusID,
 		PackageID:      query.PackageID,
 		CollectionType: query.CollectionType,
+		Search:         query.Search,
 	}
 
 	data, total, err := h.svc.ListLeads(filter)
@@ -419,6 +420,11 @@ func enrichLeadListQueryFromPascalCaseKeys(c *gin.Context, q *dto.LeadListQuery)
 	}
 	if err := mergePositiveIntQueryMulti(c, &q.PackageID, "PackageID", "packageid"); err != nil {
 		return err
+	}
+	if strings.TrimSpace(q.Search) == "" {
+		if s := strings.TrimSpace(c.Query("Search")); s != "" {
+			q.Search = s
+		}
 	}
 	return mergeLeadCollectionTypeQueryParam(c, q)
 }

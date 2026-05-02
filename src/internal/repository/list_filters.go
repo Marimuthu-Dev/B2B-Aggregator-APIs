@@ -45,6 +45,7 @@ type LeadListFilter struct {
 	StatusID         *int8
 	PackageID        *int
 	CollectionType   *string
+	Search           string
 }
 
 type PackageListFilter struct {
