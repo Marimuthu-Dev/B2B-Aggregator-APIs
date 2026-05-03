@@ -139,7 +139,7 @@ type Lead struct {
 	AppointmentAt                 *timeutil.StoredTime `json:"AppointmentAt"`
 	LabID                         *int64               `json:"LabID,omitempty"`
 	LabName                       string               `json:"LabName,omitempty"`
-	IsFit                         int8                 `json:"IsFit"`
+	IsFit                         *int8                `json:"IsFit,omitempty"`
 	FitnessStatus                 string               `json:"FitnessStatus,omitempty"`
 	IsReportDownloadable          bool                 `json:"IsReportDownloadable"`
 	ApprovalRemarks               string               `json:"ApprovalRemarks,omitempty"`

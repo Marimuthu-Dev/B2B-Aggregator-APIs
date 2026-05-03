@@ -45,7 +45,7 @@ func mapLeadToDomain(p persistencemodels.Lead) domain.Lead {
 		LeadStatusID:                  p.LeadStatusID,
 		AppointmentAt:                 timeutil.StoredFromTimePtr(p.AppointmentAt),
 		LabID:                         p.LabID,
-		IsFit:                         isFitFromPtr(p.IsFit),
+		IsFit:                         isFitDomainFromDB(p.IsFit),
 		FitnessStatus:                 domain.FitnessStatusFromIsFitPtr(p.IsFit),
 		IsReportDownloadable:          p.IsReportDownloadable,
 		ApprovalRemarks:               derefString(p.ApprovalRemarks),
@@ -79,7 +79,7 @@ func mapLeadToPersistence(d domain.Lead) persistencemodels.Lead {
 		LeadStatusID:                  d.LeadStatusID,
 		AppointmentAt:                 timeutil.StoredToTimePtr(d.AppointmentAt),
 		LabID:                         d.LabID,
-		IsFit:                         isFitToPtr(d.IsFit),
+		IsFit:                         isFitDBFromDomain(d.IsFit),
 		IsReportDownloadable:          d.IsReportDownloadable,
 		ApprovalRemarks:               stringPtrOrNil(d.ApprovalRemarks),
 		FitUpdatedOn:                  timeutil.ToTimePtr(d.FitUpdatedOn),
@@ -115,19 +115,24 @@ func derefString(p *string) string {
 	return strings.TrimSpace(*p)
 }
 
-func isFitFromPtr(p *int8) int8 {
+// isFitDomainFromDB maps DB IsFit to domain: NULL stays nil; legacy -1 → unfit pointer.
+func isFitDomainFromDB(p *int8) *int8 {
 	if p == nil {
-		return domain.LeadFitHold
+		return nil
 	}
-	// Legacy rows may have used -1 for unfit before tinyint-safe encoding.
 	if *p == -1 {
-		return domain.LeadFitUnfit
+		v := domain.LeadFitUnfit
+		return &v
 	}
-	return *p
+	v := *p
+	return &v
 }
 
-func isFitToPtr(v int8) *int8 {
-	x := v
+func isFitDBFromDomain(v *int8) *int8 {
+	if v == nil {
+		return nil
+	}
+	x := *v
 	return &x
 }
 
