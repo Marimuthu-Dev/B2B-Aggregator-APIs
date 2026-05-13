@@ -1,6 +1,8 @@
 package dto
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"b2b-diagnostic-aggregator/apis/internal/domain"
@@ -32,8 +34,29 @@ type ClientRequest struct {
 	IsAcitve                  bool       `binding:"omitempty"`
 	MOUStartDate              *time.Time `json:"MOUStartDate" binding:"omitempty"`
 	MOUEndDate                *time.Time `json:"MOUEndDate" binding:"omitempty"`
-	// Brands optional; each name must be at most 20 characters (MediAdmin.tbl_ClientBrandMapping.BrandName).
-	Brands []string `json:"Brands" binding:"omitempty,dive,max=20"`
+	// Brands optional. JSON null, [], or omitted → no rows in tbl_ClientBrandMapping.
+	// Non-empty names are validated by ValidateClientBrandNames (max length matches BrandName varchar(20)).
+	Brands []string `json:"Brands" binding:"omitempty"`
+}
+
+// ClientBrandNameMaxBytes matches MediAdmin.tbl_ClientBrandMapping.BrandName varchar(20).
+const ClientBrandNameMaxBytes = 20
+
+// ValidateClientBrandNames enforces max length per non-empty brand (after trim). nil or empty slice is valid.
+func ValidateClientBrandNames(names []string) error {
+	if len(names) == 0 {
+		return nil
+	}
+	for _, s := range names {
+		t := strings.TrimSpace(s)
+		if t == "" {
+			continue
+		}
+		if len(t) > ClientBrandNameMaxBytes {
+			return fmt.Errorf("Brands: each non-empty name must be at most %d characters", ClientBrandNameMaxBytes)
+		}
+	}
+	return nil
 }
 
 // ClientUpdateRequest is for PUT; all fields optional. At least one must be set.

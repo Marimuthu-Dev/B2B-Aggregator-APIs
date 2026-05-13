@@ -129,6 +129,10 @@ func (h *ClientHandler) Create(c *gin.Context) {
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
+	if err := dto.ValidateClientBrandNames(req.Brands); err != nil {
+		respondError(c, apperrors.NewBadRequest(err.Error(), err))
+		return
+	}
 	client := req.ToDomain()
 	if err := h.svc.CreateClient(&client, userID, req.Brands); err != nil {
 		respondError(c, err)
