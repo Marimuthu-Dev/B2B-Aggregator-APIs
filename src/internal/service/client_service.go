@@ -21,8 +21,8 @@ type ClientService interface {
 	ListClients(filter repository.ClientListFilter) ([]domain.Client, int64, error)
 	GetClientByID(id int64) (*domain.Client, error)
 	GetClientByContactNumber(contactNumber string) (*domain.Client, error)
-	CreateClient(c *domain.Client, createdBy int64) error
-	CreateClientWithMoU(ctx context.Context, c *domain.Client, createdBy int64, mou *multipart.FileHeader) error
+	CreateClient(c *domain.Client, createdBy int64, brandNames []string) error
+	CreateClientWithMoU(ctx context.Context, c *domain.Client, createdBy int64, mou *multipart.FileHeader, brandNames []string) error
 	UpdateClient(id int64, update *dto.ClientUpdateRequest, lastUpdatedBy int64) (*domain.Client, error)
 	UpdateClientWithMoU(ctx context.Context, id int64, update *dto.ClientUpdateRequest, lastUpdatedBy int64, mou *multipart.FileHeader) (*domain.Client, error)
 	DeleteClient(id int64) error
@@ -61,16 +61,16 @@ func (s *clientService) GetClientByContactNumber(contactNumber string) (*domain.
 	return client, err
 }
 
-func (s *clientService) CreateClient(c *domain.Client, createdBy int64) error {
+func (s *clientService) CreateClient(c *domain.Client, createdBy int64, brandNames []string) error {
 	now := time.Now()
 	c.CreatedBy = createdBy
 	c.CreatedOn = timeutil.FromTime(now)
 	c.LastUpdatedBy = createdBy
 	c.LastUpdatedOn = timeutil.FromTime(now)
-	return s.repo.Create(c)
+	return s.repo.Create(c, brandNames)
 }
 
-func (s *clientService) CreateClientWithMoU(ctx context.Context, c *domain.Client, createdBy int64, mou *multipart.FileHeader) error {
+func (s *clientService) CreateClientWithMoU(ctx context.Context, c *domain.Client, createdBy int64, mou *multipart.FileHeader, brandNames []string) error {
 	if mou != nil {
 		if s.blobs == nil {
 			return apperrors.NewInternal("MoU storage is not configured", nil)
@@ -85,7 +85,7 @@ func (s *clientService) CreateClientWithMoU(ctx context.Context, c *domain.Clien
 	c.CreatedOn = timeutil.FromTime(now)
 	c.LastUpdatedBy = createdBy
 	c.LastUpdatedOn = timeutil.FromTime(now)
-	if err := s.repo.Create(c); err != nil {
+	if err := s.repo.Create(c, brandNames); err != nil {
 		return err
 	}
 	if mou == nil {
@@ -117,6 +117,13 @@ func (s *clientService) CreateClientWithMoU(ctx context.Context, c *domain.Clien
 // rollbackClientAfterFailedMoU deletes the client row so we do not keep a client without a stored MoU
 // when the create+MoU flow failed after insert (upload or URL persistence).
 func (s *clientService) rollbackClientAfterFailedMoU(clientID int64, phase string) {
+	if err := s.repo.DeleteBrandMappingsByClientID(clientID); err != nil {
+		slog.Error("CreateClientWithMoU: rollback delete brand mappings failed",
+			slog.Int64("clientID", clientID),
+			slog.String("phase", phase),
+			slog.Any("err", err),
+		)
+	}
 	if err := s.repo.Delete(clientID); err != nil {
 		slog.Error("CreateClientWithMoU: rollback delete failed — orphaned client row may remain",
 			slog.Int64("clientID", clientID),
@@ -203,6 +210,17 @@ func applyClientUpdatePatch(c *domain.Client, update *dto.ClientUpdateRequest) {
 	}
 }
 
+func brandSyncParams(update *dto.ClientUpdateRequest) (sync bool, names []string) {
+	if update == nil || update.Brands == nil {
+		return false, nil
+	}
+	n := repository.NormalizeClientBrandNames(*update.Brands)
+	if len(n) == 0 {
+		return false, nil
+	}
+	return true, n
+}
+
 func (s *clientService) UpdateClient(id int64, update *dto.ClientUpdateRequest, lastUpdatedBy int64) (*domain.Client, error) {
 	existing, err := s.repo.FindByID(id)
 	if err != nil {
@@ -217,7 +235,8 @@ func (s *clientService) UpdateClient(id int64, update *dto.ClientUpdateRequest, 
 	c.ClientID = id
 	c.LastUpdatedBy = lastUpdatedBy
 	c.LastUpdatedOn = timeutil.FromTime(time.Now())
-	if err := s.repo.Update(&c); err != nil {
+	syncBrands, brandNames := brandSyncParams(update)
+	if err := s.repo.Update(&c, syncBrands, brandNames); err != nil {
 		return nil, err
 	}
 	return &c, nil
@@ -248,6 +267,8 @@ func (s *clientService) UpdateClientWithMoU(ctx context.Context, id int64, updat
 
 	snapshot := *existing
 
+	syncBrands, brandNames := brandSyncParams(update)
+
 	// Multipart/JSON: fields only, no file — single update (same as UpdateClient).
 	if hasFields && !hasFile {
 		c := *existing
@@ -255,7 +276,7 @@ func (s *clientService) UpdateClientWithMoU(ctx context.Context, id int64, updat
 		c.ClientID = id
 		c.LastUpdatedBy = lastUpdatedBy
 		c.LastUpdatedOn = timeutil.FromTime(time.Now())
-		if err := s.repo.Update(&c); err != nil {
+		if err := s.repo.Update(&c, syncBrands, brandNames); err != nil {
 			return nil, err
 		}
 		return &c, nil
@@ -263,14 +284,15 @@ func (s *clientService) UpdateClientWithMoU(ctx context.Context, id int64, updat
 
 	// hasFile == true from here.
 
-	// If both field changes and MoU upload: persist fields first, then upload; on upload/open failure revert row to snapshot.
+	// If both field changes and MoU upload: persist fields first (without brand sync so MoU failure does not leave mappings out of sync),
+	// then upload; on upload/open failure revert row to snapshot. Brand sync runs with the final save after a successful upload.
 	if hasFields {
 		c := *existing
 		applyClientUpdatePatch(&c, update)
 		c.ClientID = id
 		c.LastUpdatedBy = lastUpdatedBy
 		c.LastUpdatedOn = timeutil.FromTime(time.Now())
-		if err := s.repo.Update(&c); err != nil {
+		if err := s.repo.Update(&c, false, nil); err != nil {
 			return nil, err
 		}
 	}
@@ -302,7 +324,7 @@ func (s *clientService) UpdateClientWithMoU(ctx context.Context, id int64, updat
 	out.ClientID = id
 	out.LastUpdatedBy = lastUpdatedBy
 	out.LastUpdatedOn = timeutil.FromTime(time.Now())
-	if err := s.repo.Update(&out); err != nil {
+	if err := s.repo.Update(&out, syncBrands, brandNames); err != nil {
 		slog.Error("UpdateClientWithMoU: save MoU URL failed after successful upload",
 			slog.Int64("clientID", id), slog.String("blobURL", url), slog.Any("err", err))
 		return nil, err
@@ -315,7 +337,7 @@ func (s *clientService) UpdateClientWithMoU(ctx context.Context, id int64, updat
 func (s *clientService) rollbackClientUpdateAfterMoUFailure(clientID int64, snapshot *domain.Client, phase string) {
 	restored := *snapshot
 	restored.ClientID = clientID
-	if err := s.repo.Update(&restored); err != nil {
+	if err := s.repo.Update(&restored, false, nil); err != nil {
 		slog.Error("UpdateClientWithMoU: rollback failed — client row may still reflect partial update",
 			slog.Int64("clientID", clientID), slog.String("phase", phase), slog.Any("err", err))
 		return

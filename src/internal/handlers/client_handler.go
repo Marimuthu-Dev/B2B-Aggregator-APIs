@@ -118,7 +118,7 @@ func (h *ClientHandler) Create(c *gin.Context) {
 			return
 		}
 		client := req.ToDomain()
-		if err := h.svc.CreateClientWithMoU(c.Request.Context(), &client, userID, mou); err != nil {
+		if err := h.svc.CreateClientWithMoU(c.Request.Context(), &client, userID, mou, req.Brands); err != nil {
 			respondError(c, err)
 			return
 		}
@@ -129,8 +129,12 @@ func (h *ClientHandler) Create(c *gin.Context) {
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
+	if err := dto.ValidateClientBrandNames(req.Brands); err != nil {
+		respondError(c, apperrors.NewBadRequest(err.Error(), err))
+		return
+	}
 	client := req.ToDomain()
-	if err := h.svc.CreateClient(&client, userID); err != nil {
+	if err := h.svc.CreateClient(&client, userID, req.Brands); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -173,6 +177,12 @@ func (h *ClientHandler) Update(c *gin.Context) {
 	var req dto.ClientUpdateRequest
 	if !middleware.BindJSON(c, &req) {
 		return
+	}
+	if req.Brands != nil {
+		if err := dto.ValidateClientBrandNames(*req.Brands); err != nil {
+			respondError(c, apperrors.NewBadRequest(err.Error(), err))
+			return
+		}
 	}
 	if !req.HasAtLeastOneField() {
 		respondError(c, apperrors.NewBadRequest("At least one field is required in the payload to update", nil))

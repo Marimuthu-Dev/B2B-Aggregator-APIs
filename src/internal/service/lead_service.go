@@ -91,8 +91,7 @@ func (s *leadService) CreateLead(l *domain.Lead, createdBy int64) error {
 	l.CreatedOn = timeutil.FromTime(now)
 	l.LastUpdatedBy = createdBy
 	l.LastUpdatedOn = timeutil.FromTime(now)
-	// Default matches legacy BIT false -> UNFIT after migration; create payload does not send approval fields.
-	l.IsFit = domain.LeadFitUnfit
+	// IsFit omitted → persisted NULL until report approval; create payload does not send approval fields.
 	l.IsReportDownloadable = false
 	l.IsFitCertificateTobeGenerated = false
 	l.PatientID = s.GeneratePatientID(l.PatientName, l.ContactNumber)
@@ -412,7 +411,6 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 			Pincode:        at(row, "Pincode"),
 			CollectionType: collectionType,
 			LeadStatusID:   leadStatusID,
-			IsFit:          domain.LeadFitUnfit,
 			CreatedBy:      createdBy,
 			CreatedOn:      timeutil.FromTime(now),
 			LastUpdatedBy:  createdBy,
@@ -535,9 +533,12 @@ func (s *leadService) GetLeadReportDownloadURL(ctx context.Context, leadID int64
 			return "", time.Time{}, apperrors.NewNotFound("Lead not found", nil)
 		}
 	}
-	// Client portal: below status 10, FIT may download; HOLD (IsFit=0) only if IsReportDownloadable; UNFIT (IsFit=2) never via flag.
+	// Client portal: below status 10, FIT may download; HOLD (IsFit=0) only if IsReportDownloadable; UNFIT (IsFit=2) never via flag; NULL / not assessed same as forbidden until approved.
 	if jwtUserType == utils.UserTypeClient && lead.LeadStatusID < domain.LeadStatusIDClientDownloadNoFitGate {
-		switch lead.IsFit {
+		if lead.IsFit == nil {
+			return "", time.Time{}, apperrors.NewForbidden("Report download is not allowed for this lead", nil)
+		}
+		switch *lead.IsFit {
 		case domain.LeadFitFit:
 			// ok
 		case domain.LeadFitHold:
@@ -607,7 +608,8 @@ func (s *leadService) ApproveLeadReport(leadID int64, req *dto.ApproveLeadReques
 	}
 	certTobe := *req.IsFitCertificateToBeGenerated
 	// Skip DB only when nothing changes; if status is still "uploaded" (8) but decision is FIT, we must run once to set LeadStatusID = 9.
-	same := lead.IsFit == isFit && lead.IsReportDownloadable == req.AllowDownload && lead.IsFitCertificateTobeGenerated == certTobe && strings.TrimSpace(lead.ApprovalRemarks) == remarksNorm
+	isFitMatches := lead.IsFit != nil && *lead.IsFit == isFit
+	same := isFitMatches && lead.IsReportDownloadable == req.AllowDownload && lead.IsFitCertificateTobeGenerated == certTobe && strings.TrimSpace(lead.ApprovalRemarks) == remarksNorm
 	if same && !(isFit == domain.LeadFitFit && lead.LeadStatusID == domain.LeadStatusIDReportUploaded) {
 		return nil
 	}

@@ -37,9 +37,10 @@ type ClientCreateForm struct {
 	BillingAdderss            *string `form:"BillingAdderss"`
 	BillingPincode            *string `form:"BillingPincode"`
 	ClientTypeID              *int8   `form:"ClientTypeID"`
-	IsAcitve                  bool    `form:"IsAcitve"`
-	MOUStartDate              string  `form:"MOUStartDate"`
-	MOUEndDate                string  `form:"MOUEndDate"`
+	IsAcitve                  bool     `form:"IsAcitve"`
+	MOUStartDate              string   `form:"MOUStartDate"`
+	MOUEndDate                string   `form:"MOUEndDate"`
+	Brands                    []string `form:"Brands"`
 }
 
 const mouFormField = "mou_document"
@@ -56,6 +57,9 @@ func ParseClientMultipartCreate(c *gin.Context) (ClientRequest, *multipart.FileH
 	}
 	req, err := form.toClientRequest()
 	if err != nil {
+		return ClientRequest{}, nil, err
+	}
+	if err := ValidateClientBrandNames(req.Brands); err != nil {
 		return ClientRequest{}, nil, err
 	}
 	fh, err := c.FormFile(mouFormField)
@@ -91,6 +95,7 @@ func (f ClientCreateForm) toClientRequest() (ClientRequest, error) {
 		BillingPincode:            f.BillingPincode,
 		ClientTypeID:              f.ClientTypeID,
 		IsAcitve:                  f.IsAcitve,
+		Brands:                    f.Brands,
 	}
 	if strings.TrimSpace(f.MOUStartDate) != "" {
 		t, err := parseFlexibleMouDate(f.MOUStartDate)
@@ -117,6 +122,11 @@ func ParseClientMultipartUpdate(c *gin.Context) (*ClientUpdateRequest, *multipar
 	req, err := buildClientUpdateRequestFromForm(c)
 	if err != nil {
 		return nil, nil, err
+	}
+	if req.Brands != nil {
+		if err := ValidateClientBrandNames(*req.Brands); err != nil {
+			return nil, nil, err
+		}
 	}
 	fh, err := c.FormFile(mouFormField)
 	if err != nil {
@@ -221,6 +231,10 @@ func buildClientUpdateRequestFromForm(c *gin.Context) (*ClientUpdateRequest, err
 			return nil, fmt.Errorf("MOUEndDate: %w", err)
 		}
 		req.MOUEndDate = t
+	}
+	if bs, ok := vals["Brands"]; ok {
+		cpy := append([]string(nil), bs...)
+		req.Brands = &cpy
 	}
 	return &req, nil
 }
