@@ -118,7 +118,7 @@ func (h *ClientHandler) Create(c *gin.Context) {
 			return
 		}
 		client := req.ToDomain()
-		if err := h.svc.CreateClientWithMoU(c.Request.Context(), &client, userID, mou); err != nil {
+		if err := h.svc.CreateClientWithMoU(c.Request.Context(), &client, userID, mou, req.Brands); err != nil {
 			respondError(c, err)
 			return
 		}
@@ -130,7 +130,7 @@ func (h *ClientHandler) Create(c *gin.Context) {
 		return
 	}
 	client := req.ToDomain()
-	if err := h.svc.CreateClient(&client, userID); err != nil {
+	if err := h.svc.CreateClient(&client, userID, req.Brands); err != nil {
 		respondError(c, err)
 		return
 	}

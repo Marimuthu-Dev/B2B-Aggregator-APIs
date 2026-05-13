@@ -15,7 +15,8 @@ type ClientRepository interface {
 	List(filter ClientListFilter) ([]domain.Client, int64, error)
 	FindByID(id int64) (*domain.Client, error)
 	ExistsByID(id int64) (bool, error)
-	Create(c *domain.Client) error
+	Create(c *domain.Client, brandNames []string) error
+	DeleteBrandMappingsByClientID(clientID int64) error
 	Update(c *domain.Client) error
 	UpdateClientMoUURL(clientID int64, url string) error
 	Delete(id int64) error
@@ -111,13 +112,39 @@ func (r *clientRepository) ExistsByID(id int64) (bool, error) {
 	return count > 0, nil
 }
 
-func (r *clientRepository) Create(c *domain.Client) error {
-	persist := mapClientToPersistence(*c)
-	if err := r.db.Create(&persist).Error; err != nil {
-		return err
-	}
-	*c = mapClientToDomain(persist)
-	return nil
+func (r *clientRepository) Create(c *domain.Client, brandNames []string) error {
+	brands := normalizeClientBrandNames(brandNames)
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		persist := mapClientToPersistence(*c)
+		if err := tx.Create(&persist).Error; err != nil {
+			return err
+		}
+		*c = mapClientToDomain(persist)
+		if len(brands) == 0 {
+			return nil
+		}
+		createdAt := c.CreatedOn.ToTime()
+		updatedAt := c.LastUpdatedOn.ToTime()
+		for _, bn := range brands {
+			row := persistencemodels.ClientBrandMapping{
+				ClientID:      c.ClientID,
+				BrandName:     bn,
+				IsActive:      c.IsAcitve,
+				CreatedBy:     c.CreatedBy,
+				CreatedOn:     createdAt,
+				LastUpdatedBy: c.LastUpdatedBy,
+				LastUpdatedOn: updatedAt,
+			}
+			if err := tx.Create(&row).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (r *clientRepository) DeleteBrandMappingsByClientID(clientID int64) error {
+	return r.db.Where("ClientID = ?", clientID).Delete(&persistencemodels.ClientBrandMapping{}).Error
 }
 
 func (r *clientRepository) Update(c *domain.Client) error {
@@ -168,4 +195,25 @@ func (r *clientRepository) FindByState(stateID int8) ([]domain.Client, error) {
 	var clients []persistencemodels.Client
 	err := r.db.Where("StateID = ?", stateID).Find(&clients).Error
 	return mapClientsToDomain(clients), err
+}
+
+// normalizeClientBrandNames trims, drops empties, and de-duplicates while preserving order.
+func normalizeClientBrandNames(in []string) []string {
+	if len(in) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(in))
+	out := make([]string, 0, len(in))
+	for _, s := range in {
+		t := strings.TrimSpace(s)
+		if t == "" {
+			continue
+		}
+		if _, ok := seen[t]; ok {
+			continue
+		}
+		seen[t] = struct{}{}
+		out = append(out, t)
+	}
+	return out
 }

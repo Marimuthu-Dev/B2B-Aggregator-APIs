@@ -37,12 +37,29 @@ type ClientCreateForm struct {
 	BillingAdderss            *string `form:"BillingAdderss"`
 	BillingPincode            *string `form:"BillingPincode"`
 	ClientTypeID              *int8   `form:"ClientTypeID"`
-	IsAcitve                  bool    `form:"IsAcitve"`
-	MOUStartDate              string  `form:"MOUStartDate"`
-	MOUEndDate                string  `form:"MOUEndDate"`
+	IsAcitve                  bool     `form:"IsAcitve"`
+	MOUStartDate              string   `form:"MOUStartDate"`
+	MOUEndDate                string   `form:"MOUEndDate"`
+	Brands                    []string `form:"Brands"`
 }
 
 const mouFormField = "mou_document"
+
+// clientBrandNameMaxBytes matches MediAdmin.tbl_ClientBrandMapping.BrandName varchar(20).
+const clientBrandNameMaxBytes = 20
+
+func validateClientBrandNames(names []string) error {
+	for _, s := range names {
+		t := strings.TrimSpace(s)
+		if t == "" {
+			continue
+		}
+		if len(t) > clientBrandNameMaxBytes {
+			return fmt.Errorf("Brands: each non-empty name must be at most %d characters", clientBrandNameMaxBytes)
+		}
+	}
+	return nil
+}
 
 // ParseClientMultipartCreate parses multipart create: one text field per property (ClientName, Address, …)
 // plus optional file part mou_document (PDF). No JSON blob field.
@@ -56,6 +73,9 @@ func ParseClientMultipartCreate(c *gin.Context) (ClientRequest, *multipart.FileH
 	}
 	req, err := form.toClientRequest()
 	if err != nil {
+		return ClientRequest{}, nil, err
+	}
+	if err := validateClientBrandNames(req.Brands); err != nil {
 		return ClientRequest{}, nil, err
 	}
 	fh, err := c.FormFile(mouFormField)
@@ -91,6 +111,7 @@ func (f ClientCreateForm) toClientRequest() (ClientRequest, error) {
 		BillingPincode:            f.BillingPincode,
 		ClientTypeID:              f.ClientTypeID,
 		IsAcitve:                  f.IsAcitve,
+		Brands:                    f.Brands,
 	}
 	if strings.TrimSpace(f.MOUStartDate) != "" {
 		t, err := parseFlexibleMouDate(f.MOUStartDate)

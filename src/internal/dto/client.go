@@ -32,6 +32,8 @@ type ClientRequest struct {
 	IsAcitve                  bool       `binding:"omitempty"`
 	MOUStartDate              *time.Time `json:"MOUStartDate" binding:"omitempty"`
 	MOUEndDate                *time.Time `json:"MOUEndDate" binding:"omitempty"`
+	// Brands optional; each name must be at most 20 characters (MediAdmin.tbl_ClientBrandMapping.BrandName).
+	Brands []string `json:"Brands" binding:"omitempty,dive,max=20"`
 }
 
 // ClientUpdateRequest is for PUT; all fields optional. At least one must be set.

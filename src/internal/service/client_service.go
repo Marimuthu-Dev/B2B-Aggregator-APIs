@@ -21,8 +21,8 @@ type ClientService interface {
 	ListClients(filter repository.ClientListFilter) ([]domain.Client, int64, error)
 	GetClientByID(id int64) (*domain.Client, error)
 	GetClientByContactNumber(contactNumber string) (*domain.Client, error)
-	CreateClient(c *domain.Client, createdBy int64) error
-	CreateClientWithMoU(ctx context.Context, c *domain.Client, createdBy int64, mou *multipart.FileHeader) error
+	CreateClient(c *domain.Client, createdBy int64, brandNames []string) error
+	CreateClientWithMoU(ctx context.Context, c *domain.Client, createdBy int64, mou *multipart.FileHeader, brandNames []string) error
 	UpdateClient(id int64, update *dto.ClientUpdateRequest, lastUpdatedBy int64) (*domain.Client, error)
 	UpdateClientWithMoU(ctx context.Context, id int64, update *dto.ClientUpdateRequest, lastUpdatedBy int64, mou *multipart.FileHeader) (*domain.Client, error)
 	DeleteClient(id int64) error
@@ -61,16 +61,16 @@ func (s *clientService) GetClientByContactNumber(contactNumber string) (*domain.
 	return client, err
 }
 
-func (s *clientService) CreateClient(c *domain.Client, createdBy int64) error {
+func (s *clientService) CreateClient(c *domain.Client, createdBy int64, brandNames []string) error {
 	now := time.Now()
 	c.CreatedBy = createdBy
 	c.CreatedOn = timeutil.FromTime(now)
 	c.LastUpdatedBy = createdBy
 	c.LastUpdatedOn = timeutil.FromTime(now)
-	return s.repo.Create(c)
+	return s.repo.Create(c, brandNames)
 }
 
-func (s *clientService) CreateClientWithMoU(ctx context.Context, c *domain.Client, createdBy int64, mou *multipart.FileHeader) error {
+func (s *clientService) CreateClientWithMoU(ctx context.Context, c *domain.Client, createdBy int64, mou *multipart.FileHeader, brandNames []string) error {
 	if mou != nil {
 		if s.blobs == nil {
 			return apperrors.NewInternal("MoU storage is not configured", nil)
@@ -85,7 +85,7 @@ func (s *clientService) CreateClientWithMoU(ctx context.Context, c *domain.Clien
 	c.CreatedOn = timeutil.FromTime(now)
 	c.LastUpdatedBy = createdBy
 	c.LastUpdatedOn = timeutil.FromTime(now)
-	if err := s.repo.Create(c); err != nil {
+	if err := s.repo.Create(c, brandNames); err != nil {
 		return err
 	}
 	if mou == nil {
@@ -117,6 +117,13 @@ func (s *clientService) CreateClientWithMoU(ctx context.Context, c *domain.Clien
 // rollbackClientAfterFailedMoU deletes the client row so we do not keep a client without a stored MoU
 // when the create+MoU flow failed after insert (upload or URL persistence).
 func (s *clientService) rollbackClientAfterFailedMoU(clientID int64, phase string) {
+	if err := s.repo.DeleteBrandMappingsByClientID(clientID); err != nil {
+		slog.Error("CreateClientWithMoU: rollback delete brand mappings failed",
+			slog.Int64("clientID", clientID),
+			slog.String("phase", phase),
+			slog.Any("err", err),
+		)
+	}
 	if err := s.repo.Delete(clientID); err != nil {
 		slog.Error("CreateClientWithMoU: rollback delete failed — orphaned client row may remain",
 			slog.Int64("clientID", clientID),
