@@ -17,7 +17,7 @@ type ClientRepository interface {
 	ExistsByID(id int64) (bool, error)
 	Create(c *domain.Client, brandNames []string) error
 	DeleteBrandMappingsByClientID(clientID int64) error
-	Update(c *domain.Client) error
+	Update(c *domain.Client, syncBrands bool, brandNames []string) error
 	UpdateClientMoUURL(clientID int64, url string) error
 	Delete(id int64) error
 	FindAllActive() ([]domain.Client, error)
@@ -113,7 +113,7 @@ func (r *clientRepository) ExistsByID(id int64) (bool, error) {
 }
 
 func (r *clientRepository) Create(c *domain.Client, brandNames []string) error {
-	brands := normalizeClientBrandNames(brandNames)
+	brands := NormalizeClientBrandNames(brandNames)
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		persist := mapClientToPersistence(*c)
 		if err := tx.Create(&persist).Error; err != nil {
@@ -147,13 +147,22 @@ func (r *clientRepository) DeleteBrandMappingsByClientID(clientID int64) error {
 	return r.db.Where("ClientID = ?", clientID).Delete(&persistencemodels.ClientBrandMapping{}).Error
 }
 
-func (r *clientRepository) Update(c *domain.Client) error {
-	persist := mapClientToPersistence(*c)
-	if err := r.db.Save(&persist).Error; err != nil {
-		return err
-	}
-	*c = mapClientToDomain(persist)
-	return nil
+func (r *clientRepository) Update(c *domain.Client, syncBrands bool, brandNames []string) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		persist := mapClientToPersistence(*c)
+		if err := tx.Save(&persist).Error; err != nil {
+			return err
+		}
+		*c = mapClientToDomain(persist)
+		if !syncBrands {
+			return nil
+		}
+		wanted := NormalizeClientBrandNames(brandNames)
+		if len(wanted) == 0 {
+			return nil
+		}
+		return syncClientBrandMappings(tx, c.ClientID, wanted, c.IsAcitve, c.LastUpdatedBy, c.LastUpdatedOn.ToTime())
+	})
 }
 
 func (r *clientRepository) UpdateClientMoUURL(clientID int64, url string) error {
@@ -197,8 +206,8 @@ func (r *clientRepository) FindByState(stateID int8) ([]domain.Client, error) {
 	return mapClientsToDomain(clients), err
 }
 
-// normalizeClientBrandNames trims, drops empties, and de-duplicates while preserving order.
-func normalizeClientBrandNames(in []string) []string {
+// NormalizeClientBrandNames trims, drops empties, and de-duplicates while preserving order.
+func NormalizeClientBrandNames(in []string) []string {
 	if len(in) == 0 {
 		return nil
 	}

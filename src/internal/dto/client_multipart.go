@@ -123,6 +123,11 @@ func ParseClientMultipartUpdate(c *gin.Context) (*ClientUpdateRequest, *multipar
 	if err != nil {
 		return nil, nil, err
 	}
+	if req.Brands != nil {
+		if err := ValidateClientBrandNames(*req.Brands); err != nil {
+			return nil, nil, err
+		}
+	}
 	fh, err := c.FormFile(mouFormField)
 	if err != nil {
 		if errors.Is(err, http.ErrMissingFile) {
@@ -226,6 +231,10 @@ func buildClientUpdateRequestFromForm(c *gin.Context) (*ClientUpdateRequest, err
 			return nil, fmt.Errorf("MOUEndDate: %w", err)
 		}
 		req.MOUEndDate = t
+	}
+	if bs, ok := vals["Brands"]; ok {
+		cpy := append([]string(nil), bs...)
+		req.Brands = &cpy
 	}
 	return &req, nil
 }

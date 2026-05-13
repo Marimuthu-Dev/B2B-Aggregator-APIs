@@ -178,6 +178,12 @@ func (h *ClientHandler) Update(c *gin.Context) {
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
+	if req.Brands != nil {
+		if err := dto.ValidateClientBrandNames(*req.Brands); err != nil {
+			respondError(c, apperrors.NewBadRequest(err.Error(), err))
+			return
+		}
+	}
 	if !req.HasAtLeastOneField() {
 		respondError(c, apperrors.NewBadRequest("At least one field is required in the payload to update", nil))
 		return

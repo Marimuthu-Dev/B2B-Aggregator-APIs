@@ -210,6 +210,17 @@ func applyClientUpdatePatch(c *domain.Client, update *dto.ClientUpdateRequest) {
 	}
 }
 
+func brandSyncParams(update *dto.ClientUpdateRequest) (sync bool, names []string) {
+	if update == nil || update.Brands == nil {
+		return false, nil
+	}
+	n := repository.NormalizeClientBrandNames(*update.Brands)
+	if len(n) == 0 {
+		return false, nil
+	}
+	return true, n
+}
+
 func (s *clientService) UpdateClient(id int64, update *dto.ClientUpdateRequest, lastUpdatedBy int64) (*domain.Client, error) {
 	existing, err := s.repo.FindByID(id)
 	if err != nil {
@@ -224,7 +235,8 @@ func (s *clientService) UpdateClient(id int64, update *dto.ClientUpdateRequest, 
 	c.ClientID = id
 	c.LastUpdatedBy = lastUpdatedBy
 	c.LastUpdatedOn = timeutil.FromTime(time.Now())
-	if err := s.repo.Update(&c); err != nil {
+	syncBrands, brandNames := brandSyncParams(update)
+	if err := s.repo.Update(&c, syncBrands, brandNames); err != nil {
 		return nil, err
 	}
 	return &c, nil
@@ -255,6 +267,8 @@ func (s *clientService) UpdateClientWithMoU(ctx context.Context, id int64, updat
 
 	snapshot := *existing
 
+	syncBrands, brandNames := brandSyncParams(update)
+
 	// Multipart/JSON: fields only, no file — single update (same as UpdateClient).
 	if hasFields && !hasFile {
 		c := *existing
@@ -262,7 +276,7 @@ func (s *clientService) UpdateClientWithMoU(ctx context.Context, id int64, updat
 		c.ClientID = id
 		c.LastUpdatedBy = lastUpdatedBy
 		c.LastUpdatedOn = timeutil.FromTime(time.Now())
-		if err := s.repo.Update(&c); err != nil {
+		if err := s.repo.Update(&c, syncBrands, brandNames); err != nil {
 			return nil, err
 		}
 		return &c, nil
@@ -270,14 +284,15 @@ func (s *clientService) UpdateClientWithMoU(ctx context.Context, id int64, updat
 
 	// hasFile == true from here.
 
-	// If both field changes and MoU upload: persist fields first, then upload; on upload/open failure revert row to snapshot.
+	// If both field changes and MoU upload: persist fields first (without brand sync so MoU failure does not leave mappings out of sync),
+	// then upload; on upload/open failure revert row to snapshot. Brand sync runs with the final save after a successful upload.
 	if hasFields {
 		c := *existing
 		applyClientUpdatePatch(&c, update)
 		c.ClientID = id
 		c.LastUpdatedBy = lastUpdatedBy
 		c.LastUpdatedOn = timeutil.FromTime(time.Now())
-		if err := s.repo.Update(&c); err != nil {
+		if err := s.repo.Update(&c, false, nil); err != nil {
 			return nil, err
 		}
 	}
@@ -309,7 +324,7 @@ func (s *clientService) UpdateClientWithMoU(ctx context.Context, id int64, updat
 	out.ClientID = id
 	out.LastUpdatedBy = lastUpdatedBy
 	out.LastUpdatedOn = timeutil.FromTime(time.Now())
-	if err := s.repo.Update(&out); err != nil {
+	if err := s.repo.Update(&out, syncBrands, brandNames); err != nil {
 		slog.Error("UpdateClientWithMoU: save MoU URL failed after successful upload",
 			slog.Int64("clientID", id), slog.String("blobURL", url), slog.Any("err", err))
 		return nil, err
@@ -322,7 +337,7 @@ func (s *clientService) UpdateClientWithMoU(ctx context.Context, id int64, updat
 func (s *clientService) rollbackClientUpdateAfterMoUFailure(clientID int64, snapshot *domain.Client, phase string) {
 	restored := *snapshot
 	restored.ClientID = clientID
-	if err := s.repo.Update(&restored); err != nil {
+	if err := s.repo.Update(&restored, false, nil); err != nil {
 		slog.Error("UpdateClientWithMoU: rollback failed — client row may still reflect partial update",
 			slog.Int64("clientID", clientID), slog.String("phase", phase), slog.Any("err", err))
 		return

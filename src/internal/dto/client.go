@@ -84,6 +84,9 @@ type ClientUpdateRequest struct {
 	IsAcitve                  *bool      `json:"IsAcitve"`
 	MOUStartDate              *time.Time `json:"MOUStartDate"`
 	MOUEndDate                *time.Time `json:"MOUEndDate"`
+	// Brands: nil or JSON null (omitted) or [] or only whitespace → do not change tbl_ClientBrandMapping.
+	// Non-empty list → sync: insert missing, leave active matches unchanged, set IsActive=false for names not in list.
+	Brands *[]string `json:"Brands"`
 }
 
 func (r ClientUpdateRequest) HasAtLeastOneField() bool {
@@ -92,7 +95,8 @@ func (r ClientUpdateRequest) HasAtLeastOneField() bool {
 		r.ContactPerson2Name != nil || r.ContactPerson2Number != nil || r.ContactPerson2EmailID != nil || r.ContactPerson2Designation != nil ||
 		r.GSTIN_UIN != nil || r.PANNumber != nil || r.BusinessVertical != nil ||
 		r.BillingName != nil || r.BillingAdderss != nil || r.BillingPincode != nil || r.ClientTypeID != nil || r.IsAcitve != nil ||
-		r.MOUStartDate != nil || r.MOUEndDate != nil
+		r.MOUStartDate != nil || r.MOUEndDate != nil ||
+		(r.Brands != nil && len(*r.Brands) > 0)
 }
 
 type ClientLocationRequest struct {
