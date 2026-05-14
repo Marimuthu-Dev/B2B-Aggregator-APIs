@@ -92,6 +92,23 @@ func (h *ClientHandler) GetMoUDownloadURL(c *gin.Context) {
 	respondData(c, http.StatusOK, data, "Success", nil)
 }
 
+// GetBrandMappings returns active MediAdmin.tbl_ClientBrandMapping rows (UID, BrandName) for the client.
+func (h *ClientHandler) GetBrandMappings(c *gin.Context) {
+	var params dto.IDParam
+	if !middleware.BindUri(c, &params) {
+		return
+	}
+	if !middleware.RequirePositiveID(c, params.ID) {
+		return
+	}
+	data, err := h.svc.GetClientBrandMappingsByClientID(params.ID)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	respondData(c, http.StatusOK, data, "Client brand mappings retrieved successfully", gin.H{"Count": len(data)})
+}
+
 func (h *ClientHandler) GetByContactNumber(c *gin.Context) {
 	var query dto.ContactNumberQuery
 	if !middleware.BindQuery(c, &query) {

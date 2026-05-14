@@ -24,6 +24,7 @@ type ClientRepository interface {
 	FindByContactNumber(contactNumber string) (*domain.Client, error)
 	FindByCity(cityID int8) ([]domain.Client, error)
 	FindByState(stateID int8) ([]domain.Client, error)
+	FindActiveBrandMappingsByClientID(clientID int64) ([]domain.ClientBrandMappingItem, error)
 }
 
 type clientRepository struct {
@@ -198,6 +199,26 @@ func (r *clientRepository) FindByCity(cityID int8) ([]domain.Client, error) {
 	var clients []persistencemodels.Client
 	err := r.db.Where("CityID = ?", cityID).Find(&clients).Error
 	return mapClientsToDomain(clients), err
+}
+
+func (r *clientRepository) FindActiveBrandMappingsByClientID(clientID int64) ([]domain.ClientBrandMappingItem, error) {
+	var rows []struct {
+		UID       int64  `gorm:"column:UID"`
+		BrandName string `gorm:"column:BrandName"`
+	}
+	tbl := persistencemodels.ClientBrandMapping{}.TableName()
+	err := r.db.Table(tbl).
+		Select("UID", "BrandName").
+		Where("IsActive = ? AND ClientID = ?", true, clientID).
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domain.ClientBrandMappingItem, len(rows))
+	for i := range rows {
+		out[i] = domain.ClientBrandMappingItem{UID: rows[i].UID, BrandName: rows[i].BrandName}
+	}
+	return out, nil
 }
 
 func (r *clientRepository) FindByState(stateID int8) ([]domain.Client, error) {
