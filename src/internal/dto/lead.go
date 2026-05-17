@@ -44,6 +44,8 @@ type ApproveLeadRequest struct {
 	AllowDownload bool   `json:"allowDownload"`
 	// IsFitCertificateToBeGenerated is whether a fitness certificate PDF should be generated for this lead (MediAdmin.tbl_Leads.IsFitCertificateTobeGenerated). Pointer + required so JSON must include true or false explicitly.
 	IsFitCertificateToBeGenerated *bool `json:"isFitCertificateToBeGenerated" binding:"required"`
+	// BrandID optional (MediAdmin.tbl_Leads.BrandID → tbl_ClientBrandMapping.UID). null or omitted → column not updated.
+	BrandID *int64 `json:"BrandID" binding:"omitempty"`
 }
 
 // LeadUpdateRequest is for PUT; all fields optional. At least one must be set.

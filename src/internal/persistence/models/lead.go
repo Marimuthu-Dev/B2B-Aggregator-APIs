@@ -19,6 +19,7 @@ type Lead struct {
 	CollectionType                string     `gorm:"column:CollectionType;type:varchar(10);not null;default:Center"`
 	LeadStatusID                  int8       `gorm:"column:LeadStatusID;not null"`
 	LabID                         *int64     `gorm:"column:LabID"`
+	BrandID                       *int64     `gorm:"column:BrandID"`
 	AppointmentAt                 *time.Time `gorm:"column:AppointmentAt"`
 	ReportURL                     *string    `gorm:"column:ReportURL;type:varchar(500)"`
 	IsFit                         *int8      `gorm:"column:IsFit"`

@@ -250,6 +250,7 @@ func (h *LeadHandler) UploadReport(c *gin.Context) {
 //	            remarks: { type: string, maxLength: 250 }
 //	            allowDownload: { type: boolean }
 //	            isFitCertificateToBeGenerated: { type: boolean, description: "Persisted to IsFitCertificateTobeGenerated; whether the fitness certificate pipeline should run for this lead." }
+//	            BrandID: { type: integer, format: int64, nullable: true, description: "Client brand mapping UID (tbl_ClientBrandMapping). null or omitted → BrandID column not updated." }
 //	  responses:
 //	    "200":
 //	      description: OK

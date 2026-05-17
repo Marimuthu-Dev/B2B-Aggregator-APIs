@@ -138,6 +138,7 @@ type Lead struct {
 	LeadStatusID                  int8
 	AppointmentAt                 *timeutil.StoredTime `json:"AppointmentAt"`
 	LabID                         *int64               `json:"LabID,omitempty"`
+	BrandID                       *int64               `json:"BrandID,omitempty"`
 	LabName                       string               `json:"LabName,omitempty"`
 	IsFit                         *int8                `json:"IsFit,omitempty"`
 	FitnessStatus                 string               `json:"FitnessStatus,omitempty"`

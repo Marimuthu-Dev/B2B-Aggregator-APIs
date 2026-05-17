@@ -575,6 +575,17 @@ func parseLeadApprovalStatus(s string) (int8, error) {
 	}
 }
 
+// leadBrandIDUnchanged is true when the request does not ask to change BrandID, or the value matches the lead row.
+func leadBrandIDUnchanged(leadBrandID, reqBrandID *int64) bool {
+	if reqBrandID == nil {
+		return true
+	}
+	if leadBrandID == nil {
+		return false
+	}
+	return *leadBrandID == *reqBrandID
+}
+
 func truncateLeadApprovalRemarks(s string, maxRunes int) string {
 	r := []rune(strings.TrimSpace(s))
 	if len(r) <= maxRunes {
@@ -609,12 +620,12 @@ func (s *leadService) ApproveLeadReport(leadID int64, req *dto.ApproveLeadReques
 	certTobe := *req.IsFitCertificateToBeGenerated
 	// Skip DB only when nothing changes; if status is still "uploaded" (8) but decision is FIT, we must run once to set LeadStatusID = 9.
 	isFitMatches := lead.IsFit != nil && *lead.IsFit == isFit
-	same := isFitMatches && lead.IsReportDownloadable == req.AllowDownload && lead.IsFitCertificateTobeGenerated == certTobe && strings.TrimSpace(lead.ApprovalRemarks) == remarksNorm
+	same := isFitMatches && lead.IsReportDownloadable == req.AllowDownload && lead.IsFitCertificateTobeGenerated == certTobe && strings.TrimSpace(lead.ApprovalRemarks) == remarksNorm && leadBrandIDUnchanged(lead.BrandID, req.BrandID)
 	if same && !(isFit == domain.LeadFitFit && lead.LeadStatusID == domain.LeadStatusIDReportUploaded) {
 		return nil
 	}
 	return s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
-		n, err := leadRepo.UpdateLeadReportApproval(leadID, userID, isFit, req.AllowDownload, certTobe, remarksPtr)
+		n, err := leadRepo.UpdateLeadReportApproval(leadID, userID, isFit, req.AllowDownload, certTobe, remarksPtr, req.BrandID)
 		if err != nil {
 			return err
 		}
