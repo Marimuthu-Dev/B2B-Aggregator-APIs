@@ -103,6 +103,10 @@ func (s *leadService) CreateLead(l *domain.Lead, createdBy int64) error {
 		return apperrors.NewBadRequest(err.Error(), err)
 	}
 	l.CollectionType = ct
+	l.EmpID = strings.TrimSpace(l.EmpID)
+	if err := domain.ValidateLeadEmpID(l.EmpID); err != nil {
+		return apperrors.NewBadRequest(err.Error(), err)
+	}
 
 	return s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
 		if err := leadRepo.Create(l); err != nil {
@@ -166,6 +170,13 @@ func (s *leadService) UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUp
 	}
 	if update.Pincode != nil {
 		l.Pincode = *update.Pincode
+	}
+	if update.EmpID != nil {
+		empID := strings.TrimSpace(*update.EmpID)
+		if err := domain.ValidateLeadEmpID(empID); err != nil {
+			return nil, apperrors.NewBadRequest(err.Error(), err)
+		}
+		l.EmpID = empID
 	}
 	if update.LeadStatusID != nil {
 		if domain.LeadStatusIDDowngradeForbiddenForPUTLead(existing.LeadStatusID, *update.LeadStatusID) {
@@ -395,6 +406,12 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 			return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: CollectionType must be Home or Center", rowIdx+1), errParse)
 		}
 
+		empID := at(row, "EmpID")
+		if err := domain.ValidateLeadEmpID(empID); err != nil {
+			return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: %s", rowIdx+1, err.Error()), err)
+		}
+		empID = strings.TrimSpace(empID)
+
 		now := time.Now()
 		lead := &domain.Lead{
 			ClientID:       clientID,
@@ -409,6 +426,7 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 			CityID:         atInt32(row, "CityID"),
 			StateID:        atInt32(row, "StateID"),
 			Pincode:        at(row, "Pincode"),
+			EmpID:          empID,
 			CollectionType: collectionType,
 			LeadStatusID:   leadStatusID,
 			CreatedBy:      createdBy,

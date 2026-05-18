@@ -22,6 +22,7 @@ type LeadRequest struct {
 	CityID         int32      `binding:"required"`
 	StateID        int32      `binding:"required"`
 	Pincode        string     `binding:"required"`
+	EmpID          string     `json:"EmpID" binding:"omitempty,max=10"`
 	CollectionType string     `json:"CollectionType" binding:"required"`
 	LeadStatusID   int8       // omitted or 0 → service uses domain.LeadStatusIDDefault (1)
 	AppointmentAt  *time.Time `json:"AppointmentAt"`
@@ -61,6 +62,7 @@ type LeadUpdateRequest struct {
 	CityID         *int32     `json:"CityID"`
 	StateID        *int32     `json:"StateID"`
 	Pincode        *string    `json:"Pincode"`
+	EmpID          *string    `json:"EmpID" binding:"omitempty,max=10"`
 	CollectionType *string    `json:"CollectionType"`
 	LeadStatusID   *int8      `json:"LeadStatusID"`
 	AppointmentAt  *time.Time `json:"AppointmentAt"`
@@ -70,7 +72,7 @@ type LeadUpdateRequest struct {
 func (r LeadUpdateRequest) HasAtLeastOneField() bool {
 	return r.ClientID != nil || r.PatientName != nil || r.Age != nil || r.Gender != nil ||
 		r.PackageID != nil || r.ContactNumber != nil || r.Emailid != nil || r.Address != nil ||
-		r.CityID != nil || r.StateID != nil || r.Pincode != nil || r.CollectionType != nil || r.LeadStatusID != nil ||
+		r.CityID != nil || r.StateID != nil || r.Pincode != nil || r.EmpID != nil || r.CollectionType != nil || r.LeadStatusID != nil ||
 		r.AppointmentAt != nil || r.LabID != nil
 }
 
@@ -89,6 +91,7 @@ func (r LeadRequest) ToDomain() domain.Lead {
 		CityID:         r.CityID,
 		StateID:        r.StateID,
 		Pincode:        r.Pincode,
+		EmpID:          strings.TrimSpace(r.EmpID),
 		CollectionType: strings.TrimSpace(r.CollectionType),
 		LeadStatusID:   r.LeadStatusID,
 		LabID:          r.LabID,

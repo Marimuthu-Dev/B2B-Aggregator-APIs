@@ -89,6 +89,17 @@ func ParseLeadListFitnessFilter(s string) (LeadListFitnessFilter, error) {
 	}
 }
 
+// LeadEmpIDMaxLen matches MediAdmin.tbl_Leads.EmpID (varchar(10)).
+const LeadEmpIDMaxLen = 10
+
+// ValidateLeadEmpID returns an error when s exceeds LeadEmpIDMaxLen (empty is allowed).
+func ValidateLeadEmpID(s string) error {
+	if len(strings.TrimSpace(s)) > LeadEmpIDMaxLen {
+		return fmt.Errorf("EmpID must be at most %d characters", LeadEmpIDMaxLen)
+	}
+	return nil
+}
+
 // LeadStatusIDDefault is the initial status for new leads when the client omits LeadStatusID (JSON zero / empty CSV).
 const LeadStatusIDDefault int8 = 1
 
@@ -134,6 +145,7 @@ type Lead struct {
 	StateID                       int32
 	StateName                     string `json:"StateName,omitempty"`
 	Pincode                       string
+	EmpID                         string `json:"EmpID"`
 	CollectionType                string `json:"CollectionType"`
 	LeadStatusID                  int8
 	AppointmentAt                 *timeutil.StoredTime `json:"AppointmentAt"`
