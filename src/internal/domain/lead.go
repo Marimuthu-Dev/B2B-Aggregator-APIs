@@ -11,17 +11,20 @@ import (
 const (
 	LeadCollectionHome   = "Home"
 	LeadCollectionCenter = "Center"
+	LeadCollectionCamp   = "Camp"
 )
 
-// ParseLeadCollectionType normalizes input to LeadCollectionHome or LeadCollectionCenter.
+// ParseLeadCollectionType normalizes input to Home, Center, or Camp.
 func ParseLeadCollectionType(s string) (string, error) {
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "home":
 		return LeadCollectionHome, nil
 	case "center":
 		return LeadCollectionCenter, nil
+	case "camp":
+		return LeadCollectionCamp, nil
 	default:
-		return "", fmt.Errorf("CollectionType must be Home or Center")
+		return "", fmt.Errorf("CollectionType must be Home, Center, or Camp")
 	}
 }
 

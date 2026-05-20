@@ -458,7 +458,7 @@ func parseLeadListAppointmentAtRange(q *dto.LeadListQuery) (min *time.Time, maxI
 }
 
 // enrichLeadListQueryFromPascalCaseKeys fills filters from alternate query spellings (PascalCase, lowercase)
-// when Gin did not bind the camelCase form tag. Also normalizes collectionType / CollectionType (Home | Center).
+// when Gin did not bind the camelCase form tag. Also normalizes collectionType / CollectionType (Home | Center | Camp).
 func enrichLeadListQueryFromPascalCaseKeys(c *gin.Context, q *dto.LeadListQuery) error {
 	if err := mergePositiveInt64QueryMulti(c, &q.LeadID, "LeadID", "leadid"); err != nil {
 		return err
@@ -512,7 +512,7 @@ func mergeLeadCollectionTypeQueryParam(c *gin.Context, q *dto.LeadListQuery) err
 	}
 	norm, err := domain.ParseLeadCollectionType(raw)
 	if err != nil {
-		return apperrors.NewBadRequest("Invalid query parameter collectionType: use Home or Center", err)
+		return apperrors.NewBadRequest("Invalid query parameter collectionType: use Home, Center, or Camp", err)
 	}
 	q.CollectionType = &norm
 	return nil

@@ -403,7 +403,7 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 		}
 		collectionType, errParse := domain.ParseLeadCollectionType(ctRaw)
 		if errParse != nil {
-			return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: CollectionType must be Home or Center", rowIdx+1), errParse)
+			return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: %s", rowIdx+1, errParse.Error()), errParse)
 		}
 
 		empID := at(row, "EmpID")
