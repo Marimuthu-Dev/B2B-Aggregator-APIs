@@ -35,6 +35,7 @@ type PackageLabMappingRequest struct {
 }
 
 // PackageLabMappingListQuery is optional filters for GET /packages/lab-mapping.
+// Lab users (userType 3) ignore LabID and are always scoped to their LabID from the JWT.
 // IsActive: omit to default to active-only (true); send true/false to override.
 type PackageLabMappingListQuery struct {
 	PackageID *int64 `form:"PackageID" binding:"omitempty,min=1"`

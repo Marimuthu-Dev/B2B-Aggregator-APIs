@@ -300,17 +300,41 @@ func (h *PackageHandler) CreatePackageLabMapping(c *gin.Context) {
 }
 
 func (h *PackageHandler) GetAllPackageLabMappings(c *gin.Context) {
+	userType, typeOK := middleware.GetUserType(c)
+	if !typeOK {
+		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+		return
+	}
+
+	userID, idOK := middleware.GetUserID(c)
+
 	var query dto.PackageLabMappingListQuery
 	if !middleware.BindQuery(c, &query) {
 		return
 	}
+
+	var labID *int64
+	switch userType {
+	case utils.UserTypeLab:
+		if !idOK || userID <= 0 {
+			respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+			return
+		}
+		labID = &userID
+	case utils.UserTypeEmployee:
+		labID = query.LabID
+	default:
+		respondError(c, apperrors.NewForbidden("You are not authorized for this activity.", nil))
+		return
+	}
+
 	isActive := true
 	if query.IsActive != nil {
 		isActive = *query.IsActive
 	}
 	filter := repository.PackageLabMappingListFilter{
 		PackageID: query.PackageID,
-		LabID:     query.LabID,
+		LabID:     labID,
 		IsActive:  isActive,
 	}
 	data, err := h.svc.GetAllPackageLabMappings(filter)
