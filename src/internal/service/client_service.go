@@ -30,6 +30,7 @@ type ClientService interface {
 	GetClientsByCity(cityID int8) ([]domain.Client, error)
 	GetClientsByState(stateID int8) ([]domain.Client, error)
 	GetClientMoUDownloadURL(ctx context.Context, clientID int64) (*dto.ClientMoUDownloadURLResponse, error)
+	GetClientBrandMappingsByClientID(clientID int64) ([]domain.ClientBrandMappingItem, error)
 }
 
 type clientService struct {
@@ -59,6 +60,10 @@ func (s *clientService) GetClientByContactNumber(contactNumber string) (*domain.
 		return nil, apperrors.NewNotFound("Client not found", err)
 	}
 	return client, err
+}
+
+func (s *clientService) GetClientBrandMappingsByClientID(clientID int64) ([]domain.ClientBrandMappingItem, error) {
+	return s.repo.FindActiveBrandMappingsByClientID(clientID)
 }
 
 func (s *clientService) CreateClient(c *domain.Client, createdBy int64, brandNames []string) error {

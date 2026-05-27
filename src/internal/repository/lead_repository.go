@@ -36,8 +36,8 @@ type LeadRepository interface {
 	MarkFitCertificationGenerated(leadID int64, userID int64, fromLeadStatusID, toLeadStatusID int8) (updated bool, err error)
 	// MarkReportReadyToDownload advances a lead to the downloadable state without generating a certificate; logs history. Returns whether a row was updated.
 	MarkReportReadyToDownload(leadID int64, userID int64, fromLeadStatusID, toLeadStatusID int8) (updated bool, err error)
-	// UpdateLeadReportApproval sets IsFit (0=hold, 1=fit, 2=unfit), download flag, IsFitCertificateTobeGenerated, remarks, FitUpdatedOn, and last-updated audit. Only rows with LeadStatusID = 8 (uploaded) match; when IsFit = 1, LeadStatusID is set to 9 (approved). Otherwise LeadStatusID is not changed. remarks nil or empty clears ApprovalRemarks.
-	UpdateLeadReportApproval(leadID int64, lastUpdatedBy int64, isFit int8, allowDownload bool, isFitCertificateTobeGenerated bool, remarks *string) (rowsAffected int64, err error)
+	// UpdateLeadReportApproval sets IsFit (0=hold, 1=fit, 2=unfit), download flag, IsFitCertificateTobeGenerated, remarks, FitUpdatedOn, and last-updated audit. Only rows with LeadStatusID = 8 (uploaded) match; when IsFit = 1, LeadStatusID is set to 9 (approved). Otherwise LeadStatusID is not changed. remarks nil or empty clears ApprovalRemarks. brandID nil → BrandID column unchanged.
+	UpdateLeadReportApproval(leadID int64, lastUpdatedBy int64, isFit int8, allowDownload bool, isFitCertificateTobeGenerated bool, remarks *string, brandID *int64) (rowsAffected int64, err error)
 }
 
 type leadRepository struct {
@@ -381,7 +381,7 @@ func (r *leadRepository) MarkReportReadyToDownload(leadID int64, userID int64, f
 	return updated, err
 }
 
-func (r *leadRepository) UpdateLeadReportApproval(leadID int64, lastUpdatedBy int64, isFit int8, allowDownload bool, isFitCertificateTobeGenerated bool, remarks *string) (int64, error) {
+func (r *leadRepository) UpdateLeadReportApproval(leadID int64, lastUpdatedBy int64, isFit int8, allowDownload bool, isFitCertificateTobeGenerated bool, remarks *string, brandID *int64) (int64, error) {
 	now := time.Now().UTC()
 	var ar sql.NullString
 	if remarks != nil {
@@ -400,6 +400,9 @@ func (r *leadRepository) UpdateLeadReportApproval(leadID int64, lastUpdatedBy in
 		"LastUpdatedOn":                 now,
 		"LeadStatusID": gorm.Expr("CASE WHEN ? = ? THEN ? ELSE LeadStatusID END",
 			isFit, domain.LeadFitFit, domain.LeadStatusIDReportApproved),
+	}
+	if brandID != nil {
+		updates["BrandID"] = *brandID
 	}
 	res := r.db.Model(&persistencemodels.Lead{}).Where("LeadID = ? AND LeadStatusID = ?", leadID, domain.LeadStatusIDReportApproval).Updates(updates)
 	if res.Error != nil {

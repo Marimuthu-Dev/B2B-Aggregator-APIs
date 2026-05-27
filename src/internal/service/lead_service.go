@@ -103,6 +103,10 @@ func (s *leadService) CreateLead(l *domain.Lead, createdBy int64) error {
 		return apperrors.NewBadRequest(err.Error(), err)
 	}
 	l.CollectionType = ct
+	l.EmpID = strings.TrimSpace(l.EmpID)
+	if err := domain.ValidateLeadEmpID(l.EmpID); err != nil {
+		return apperrors.NewBadRequest(err.Error(), err)
+	}
 
 	return s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
 		if err := leadRepo.Create(l); err != nil {
@@ -166,6 +170,13 @@ func (s *leadService) UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUp
 	}
 	if update.Pincode != nil {
 		l.Pincode = *update.Pincode
+	}
+	if update.EmpID != nil {
+		empID := strings.TrimSpace(*update.EmpID)
+		if err := domain.ValidateLeadEmpID(empID); err != nil {
+			return nil, apperrors.NewBadRequest(err.Error(), err)
+		}
+		l.EmpID = empID
 	}
 	if update.LeadStatusID != nil {
 		if domain.LeadStatusIDDowngradeForbiddenForPUTLead(existing.LeadStatusID, *update.LeadStatusID) {
@@ -392,8 +403,14 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 		}
 		collectionType, errParse := domain.ParseLeadCollectionType(ctRaw)
 		if errParse != nil {
-			return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: CollectionType must be Home or Center", rowIdx+1), errParse)
+			return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: %s", rowIdx+1, errParse.Error()), errParse)
 		}
+
+		empID := at(row, "EmpID")
+		if err := domain.ValidateLeadEmpID(empID); err != nil {
+			return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: %s", rowIdx+1, err.Error()), err)
+		}
+		empID = strings.TrimSpace(empID)
 
 		now := time.Now()
 		lead := &domain.Lead{
@@ -409,6 +426,7 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 			CityID:         atInt32(row, "CityID"),
 			StateID:        atInt32(row, "StateID"),
 			Pincode:        at(row, "Pincode"),
+			EmpID:          empID,
 			CollectionType: collectionType,
 			LeadStatusID:   leadStatusID,
 			CreatedBy:      createdBy,
@@ -575,6 +593,17 @@ func parseLeadApprovalStatus(s string) (int8, error) {
 	}
 }
 
+// leadBrandIDUnchanged is true when the request does not ask to change BrandID, or the value matches the lead row.
+func leadBrandIDUnchanged(leadBrandID, reqBrandID *int64) bool {
+	if reqBrandID == nil {
+		return true
+	}
+	if leadBrandID == nil {
+		return false
+	}
+	return *leadBrandID == *reqBrandID
+}
+
 func truncateLeadApprovalRemarks(s string, maxRunes int) string {
 	r := []rune(strings.TrimSpace(s))
 	if len(r) <= maxRunes {
@@ -609,12 +638,12 @@ func (s *leadService) ApproveLeadReport(leadID int64, req *dto.ApproveLeadReques
 	certTobe := *req.IsFitCertificateToBeGenerated
 	// Skip DB only when nothing changes; if status is still "uploaded" (8) but decision is FIT, we must run once to set LeadStatusID = 9.
 	isFitMatches := lead.IsFit != nil && *lead.IsFit == isFit
-	same := isFitMatches && lead.IsReportDownloadable == req.AllowDownload && lead.IsFitCertificateTobeGenerated == certTobe && strings.TrimSpace(lead.ApprovalRemarks) == remarksNorm
+	same := isFitMatches && lead.IsReportDownloadable == req.AllowDownload && lead.IsFitCertificateTobeGenerated == certTobe && strings.TrimSpace(lead.ApprovalRemarks) == remarksNorm && leadBrandIDUnchanged(lead.BrandID, req.BrandID)
 	if same && !(isFit == domain.LeadFitFit && lead.LeadStatusID == domain.LeadStatusIDReportUploaded) {
 		return nil
 	}
 	return s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
-		n, err := leadRepo.UpdateLeadReportApproval(leadID, userID, isFit, req.AllowDownload, certTobe, remarksPtr)
+		n, err := leadRepo.UpdateLeadReportApproval(leadID, userID, isFit, req.AllowDownload, certTobe, remarksPtr, req.BrandID)
 		if err != nil {
 			return err
 		}

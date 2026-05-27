@@ -16,9 +16,11 @@ type Lead struct {
 	CityID                        int32      `gorm:"column:CityID;not null"`
 	StateID                       int32      `gorm:"column:StateID;not null"`
 	Pincode                       string     `gorm:"column:Pincode;type:varchar(6);not null"`
+	EmpID                         *string    `gorm:"column:EmpID;type:varchar(10)"`
 	CollectionType                string     `gorm:"column:CollectionType;type:varchar(10);not null;default:Center"`
 	LeadStatusID                  int8       `gorm:"column:LeadStatusID;not null"`
 	LabID                         *int64     `gorm:"column:LabID"`
+	BrandID                       *int64     `gorm:"column:BrandID"`
 	AppointmentAt                 *time.Time `gorm:"column:AppointmentAt"`
 	ReportURL                     *string    `gorm:"column:ReportURL;type:varchar(500)"`
 	IsFit                         *int8      `gorm:"column:IsFit"`
