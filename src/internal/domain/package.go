@@ -57,4 +57,5 @@ type PackageLabMappingView struct {
 	LastUpdatedOn timeutil.ISTTime `json:"LastUpdatedOn"`
 	PackageName   string          `json:"PackageName,omitempty"`
 	LabName       string          `json:"LabName,omitempty"`
+	Tests         []string        `json:"Tests"`
 }

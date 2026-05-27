@@ -442,7 +442,8 @@ func (s *packageService) CreatePackageLabMapping(packageID int64, labID int64, p
 	}
 	existing, _ := s.labMapRepo.FindByPackageAndLab(packageID, labID)
 	if existing != nil {
-		v := mappingToLabView(existing, "", "")
+		testsByPkg, _ := s.repo.FindActiveTestNamesByPackageIDs([]int64{packageID})
+		v := mappingToLabView(existing, "", "", testsForPackage(testsByPkg, packageID))
 		pkg, _ := s.repo.FindByID(packageID)
 		lab, _ := s.labRepo.FindByID(labID)
 		if pkg != nil {
@@ -464,7 +465,8 @@ func (s *packageService) CreatePackageLabMapping(packageID int64, labID int64, p
 	if err := s.labMapRepo.Create(m); err != nil {
 		return nil, err
 	}
-	v := mappingToLabView(m, "", "")
+	testsByPkg, _ := s.repo.FindActiveTestNamesByPackageIDs([]int64{packageID})
+	v := mappingToLabView(m, "", "", testsForPackage(testsByPkg, packageID))
 	pkg, _ := s.repo.FindByID(packageID)
 	lab, _ := s.labRepo.FindByID(labID)
 	if pkg != nil {
@@ -476,9 +478,12 @@ func (s *packageService) CreatePackageLabMapping(packageID int64, labID int64, p
 	return &PackageLabMappingResult{RetVal: 1, Mapping: v, Message: "Package-Lab mapping created successfully"}, nil
 }
 
-func mappingToLabView(m *persistencemodels.PackageLabMapping, pkgName, labName string) *domain.PackageLabMappingView {
+func mappingToLabView(m *persistencemodels.PackageLabMapping, pkgName, labName string, tests []string) *domain.PackageLabMappingView {
 	if m == nil {
 		return nil
+	}
+	if tests == nil {
+		tests = []string{}
 	}
 	return &domain.PackageLabMappingView{
 		PackageLabID:  m.PackageLabID,
@@ -492,11 +497,24 @@ func mappingToLabView(m *persistencemodels.PackageLabMapping, pkgName, labName s
 		LastUpdatedOn: timeutil.FromTime(m.LastUpdatedOn),
 		PackageName:   pkgName,
 		LabName:       labName,
+		Tests:         tests,
 	}
+}
+
+func uniquePackageIDsFromLabMappingRows(rows []repository.PackageLabMappingWithNames) []int64 {
+	ids := make([]int64, len(rows))
+	for i := range rows {
+		ids[i] = rows[i].PackageID
+	}
+	return uniqueInt64s(ids)
 }
 
 func (s *packageService) GetAllPackageLabMappings(filter repository.PackageLabMappingListFilter) ([]domain.PackageLabMappingView, error) {
 	rows, err := s.labMapRepo.FindAllWithLabAndPackageNames(filter)
+	if err != nil {
+		return nil, err
+	}
+	testsByPkg, err := s.repo.FindActiveTestNamesByPackageIDs(uniquePackageIDsFromLabMappingRows(rows))
 	if err != nil {
 		return nil, err
 	}
@@ -514,7 +532,7 @@ func (s *packageService) GetAllPackageLabMappings(filter repository.PackageLabMa
 			LastUpdatedBy: row.LastUpdatedBy,
 			LastUpdatedOn: row.LastUpdatedOn,
 		}
-		out = append(out, *mappingToLabView(&m, row.PackageName, row.LabName))
+		out = append(out, *mappingToLabView(&m, row.PackageName, row.LabName, testsForPackage(testsByPkg, row.PackageID)))
 	}
 	return out, nil
 }
@@ -527,7 +545,8 @@ func (s *packageService) UpdatePackageLabMappingStatus(id int64, isActive bool, 
 	if isActive {
 		pkg, _ := s.repo.FindByID(m.PackageID)
 		if pkg != nil && !pkg.IsActive {
-			v := mappingToLabView(m, "", "")
+			testsByPkg, _ := s.repo.FindActiveTestNamesByPackageIDs([]int64{m.PackageID})
+			v := mappingToLabView(m, "", "", testsForPackage(testsByPkg, m.PackageID))
 			pkg2, _ := s.repo.FindByID(m.PackageID)
 			lab, _ := s.labRepo.FindByID(m.LabID)
 			if pkg2 != nil {
@@ -548,7 +567,8 @@ func (s *packageService) UpdatePackageLabMappingStatus(id int64, isActive bool, 
 	if err := s.labMapRepo.Update(m); err != nil {
 		return nil, err
 	}
-	v := mappingToLabView(m, "", "")
+	testsByPkg, _ := s.repo.FindActiveTestNamesByPackageIDs([]int64{m.PackageID})
+	v := mappingToLabView(m, "", "", testsForPackage(testsByPkg, m.PackageID))
 	pkg, _ := s.repo.FindByID(m.PackageID)
 	lab, _ := s.labRepo.FindByID(m.LabID)
 	if pkg != nil {
