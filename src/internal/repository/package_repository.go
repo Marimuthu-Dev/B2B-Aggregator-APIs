@@ -22,6 +22,8 @@ type PackageRepository interface {
 	SearchByName(searchTerm string) ([]domain.Package, error)
 	CreateWithTests(p *domain.Package, testIDs []int64) error
 	FindAllPackageTestMappings() ([]persistencemodels.PackageTestMapping, error)
+	// FindActiveTestNamesByPackageIDs returns active test names per package (mapping + test both active).
+	FindActiveTestNamesByPackageIDs(packageIDs []int64) (map[int64][]string, error)
 	FindPackagesByExactTestIds(testIDs []int64) ([]int64, error)
 	UpdatePackageStatusCascade(packageID int64, isActive bool, lastUpdatedBy int64) (testCount, clientCount, labCount int, err error)
 }
@@ -169,6 +171,35 @@ func (r *packageRepository) FindAllPackageTestMappings() ([]persistencemodels.Pa
 	var out []persistencemodels.PackageTestMapping
 	err := r.db.Find(&out).Error
 	return out, err
+}
+
+type packageActiveTestNameRow struct {
+	PackageID int64  `gorm:"column:PackageID"`
+	TestName  string `gorm:"column:TestName"`
+}
+
+func (r *packageRepository) FindActiveTestNamesByPackageIDs(packageIDs []int64) (map[int64][]string, error) {
+	out := make(map[int64][]string)
+	if len(packageIDs) == 0 {
+		return out, nil
+	}
+	ptm := (&persistencemodels.PackageTestMapping{}).TableName()
+	tm := (&persistencemodels.Test{}).TableName()
+	var rows []packageActiveTestNameRow
+	err := r.db.Table(ptm + " AS A").
+		Select("A.PackageID, B.TestName").
+		Joins("INNER JOIN " + tm + " AS B ON A.TestID = B.TestID").
+		Where("A.IsActive = ? AND B.IsActive = ?", true, true).
+		Where("A.PackageID IN ?", packageIDs).
+		Order("A.PackageID, B.TestName").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.PackageID] = append(out[row.PackageID], row.TestName)
+	}
+	return out, nil
 }
 
 func (r *packageRepository) FindPackagesByExactTestIds(testIDs []int64) ([]int64, error) {

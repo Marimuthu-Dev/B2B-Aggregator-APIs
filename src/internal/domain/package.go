@@ -41,6 +41,7 @@ type PackageClientMappingView struct {
 	LastUpdatedOn   timeutil.ISTTime `json:"LastUpdatedOn"`
 	PackageName     string    `json:"PackageName,omitempty"`
 	ClientName      string    `json:"ClientName,omitempty"`
+	Tests           []string  `json:"Tests"`
 }
 
 // PackageLabMappingView is package-lab mapping with names for list response.
