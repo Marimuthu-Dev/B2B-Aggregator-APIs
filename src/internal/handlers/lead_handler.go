@@ -66,6 +66,7 @@ func (h *LeadHandler) GetAll(c *gin.Context) {
 		StatusID:       query.StatusID,
 		PackageID:      query.PackageID,
 		CollectionType: query.CollectionType,
+		StoreID:          query.StoreID,
 		Search:                    query.Search,
 		FitnessStatus:             fitnessFilter,
 		AppointmentAtMin: apptMin,
@@ -475,6 +476,13 @@ func enrichLeadListQueryFromPascalCaseKeys(c *gin.Context, q *dto.LeadListQuery)
 	if strings.TrimSpace(q.Search) == "" {
 		if s := strings.TrimSpace(c.Query("Search")); s != "" {
 			q.Search = s
+		}
+	}
+	if q.StoreID == nil {
+		if s := strings.TrimSpace(c.Query("StoreID")); s != "" {
+			q.StoreID = &s
+		} else if s := strings.TrimSpace(c.Query("storeid")); s != "" {
+			q.StoreID = &s
 		}
 	}
 	if strings.TrimSpace(q.FitnessStatus) == "" {

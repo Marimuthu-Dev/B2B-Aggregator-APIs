@@ -23,6 +23,7 @@ type LeadRequest struct {
 	StateID        int32      `binding:"required"`
 	Pincode        string     `binding:"required"`
 	EmpID          string     `json:"EmpID" binding:"omitempty,max=10"`
+	StoreID        string     `json:"StoreID" binding:"omitempty,max=15"`
 	CollectionType string     `json:"CollectionType" binding:"required"`
 	LeadStatusID   int8       // omitted or 0 → service uses domain.LeadStatusIDDefault (1)
 	AppointmentAt  *time.Time `json:"AppointmentAt"`
@@ -92,6 +93,7 @@ func (r LeadRequest) ToDomain() domain.Lead {
 		StateID:        r.StateID,
 		Pincode:        r.Pincode,
 		EmpID:          strings.TrimSpace(r.EmpID),
+		StoreID:        strings.TrimSpace(r.StoreID),
 		CollectionType: strings.TrimSpace(r.CollectionType),
 		LeadStatusID:   r.LeadStatusID,
 		LabID:          r.LabID,

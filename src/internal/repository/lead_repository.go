@@ -129,9 +129,14 @@ func (r *leadRepository) leadListJoinedQuery(filter LeadListFilter) *gorm.DB {
 	if filter.CollectionType != nil && *filter.CollectionType != "" {
 		q = q.Where("l.CollectionType = ?", *filter.CollectionType)
 	}
+	if filter.StoreID != nil {
+		if storeID := strings.TrimSpace(*filter.StoreID); storeID != "" {
+			q = q.Where("l.StoreID = ?", storeID)
+		}
+	}
 	if trimmed := strings.TrimSpace(filter.Search); trimmed != "" {
 		term := "%" + trimmed + "%"
-		q = q.Where("(l.PatientName LIKE ? OR l.ContactNumber LIKE ? OR l.EmailID LIKE ?)", term, term, term)
+		q = q.Where("(l.PatientName LIKE ? OR l.ContactNumber LIKE ? OR l.EmailID LIKE ? OR l.StoreID LIKE ?)", term, term, term, term)
 	}
 	if filter.AppointmentAtMin != nil {
 		q = q.Where("l.AppointmentAt IS NOT NULL AND l.AppointmentAt >= ?", *filter.AppointmentAtMin)

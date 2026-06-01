@@ -107,6 +107,10 @@ func (s *leadService) CreateLead(l *domain.Lead, createdBy int64) error {
 	if err := domain.ValidateLeadEmpID(l.EmpID); err != nil {
 		return apperrors.NewBadRequest(err.Error(), err)
 	}
+	l.StoreID = strings.TrimSpace(l.StoreID)
+	if err := domain.ValidateLeadStoreID(l.StoreID); err != nil {
+		return apperrors.NewBadRequest(err.Error(), err)
+	}
 
 	return s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
 		if err := leadRepo.Create(l); err != nil {
@@ -412,6 +416,12 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 		}
 		empID = strings.TrimSpace(empID)
 
+		storeID := at(row, "StoreID")
+		if err := domain.ValidateLeadStoreID(storeID); err != nil {
+			return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: %s", rowIdx+1, err.Error()), err)
+		}
+		storeID = strings.TrimSpace(storeID)
+
 		now := time.Now()
 		lead := &domain.Lead{
 			ClientID:       clientID,
@@ -427,6 +437,7 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 			StateID:        atInt32(row, "StateID"),
 			Pincode:        at(row, "Pincode"),
 			EmpID:          empID,
+			StoreID:        storeID,
 			CollectionType: collectionType,
 			LeadStatusID:   leadStatusID,
 			CreatedBy:      createdBy,

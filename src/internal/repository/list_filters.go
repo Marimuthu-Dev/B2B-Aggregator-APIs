@@ -49,6 +49,7 @@ type LeadListFilter struct {
 	StatusID         *int8
 	PackageID        *int
 	CollectionType   *string
+	StoreID          *string
 	Search           string
 	FitnessStatus    domain.LeadListFitnessFilter
 	// AppointmentAtMin is inclusive lower bound (appointmentAtFrom at 00:00:00 IST); nil = no lower filter.
