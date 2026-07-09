@@ -12,8 +12,9 @@ type Employee struct {
 	MobileNumber   string
 	CompanyEmailID string
 	Designation    string
-	Department     string
-	CreatedBy      int64
+	Department        string
+	IsPriceViewAccess bool
+	CreatedBy         int64
 	CreatedOn      timeutil.ISTTime
 	LastUpdatedBy  int64
 	LastUpdatedOn  timeutil.ISTTime

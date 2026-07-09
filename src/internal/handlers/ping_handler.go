@@ -35,6 +35,6 @@ func Ping(c *gin.Context) {
 		"Current TimeStamp": currentTS,
 		"IST TimeStamp":     istTS,
 		"Last Build Pushed": "01-Jun-2026 22:00:00",
-		"Latest commit":     "StoreID Added in Lead API.",
+		"Latest commit":     "Price access view flag added.",
 	})
 }

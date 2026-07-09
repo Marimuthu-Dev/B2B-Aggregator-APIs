@@ -53,8 +53,8 @@ func (r *employeeRepository) FindByMobileNumber(mobileNumber string) (*domain.Em
 	d := mapEmployeeToDomain(m)
 
 	// Console log: print DB record details (excluding mobile number)
-	fmt.Printf("Employee DB record: UID=%d FullName=%s Address=%s CityID=%d StateID=%d Pincode=%s CompanyEmailID=%s Designation=%s Department=%s CreatedBy=%d CreatedOn=%v LastUpdatedBy=%d LastUpdatedOn=%v\n",
-		d.UID, d.FullName, d.Address, d.CityID, d.StateID, d.Pincode, d.CompanyEmailID, d.Designation, d.Department, d.CreatedBy, d.CreatedOn.ToTime(), d.LastUpdatedBy, d.LastUpdatedOn.ToTime())
+	fmt.Printf("Employee DB record: UID=%d FullName=%s Address=%s CityID=%d StateID=%d Pincode=%s CompanyEmailID=%s Designation=%s Department=%s IsPriceViewAccess=%v CreatedBy=%d CreatedOn=%v LastUpdatedBy=%d LastUpdatedOn=%v\n",
+		d.UID, d.FullName, d.Address, d.CityID, d.StateID, d.Pincode, d.CompanyEmailID, d.Designation, d.Department, d.IsPriceViewAccess, d.CreatedBy, d.CreatedOn.ToTime(), d.LastUpdatedBy, d.LastUpdatedOn.ToTime())
 
 	return &d, nil
 }
@@ -100,8 +100,9 @@ func mapEmployeeToDomain(p persistencemodels.Employee) domain.Employee {
 		MobileNumber:   p.MobileNumber,
 		CompanyEmailID: p.CompanyEmailID,
 		Designation:    p.Designation,
-		Department:     p.Department,
-		CreatedBy:      p.CreatedBy,
+		Department:        p.Department,
+		IsPriceViewAccess: p.IsPriceViewAccess,
+		CreatedBy:         p.CreatedBy,
 		CreatedOn:      timeutil.FromTime(p.CreatedOn),
 		LastUpdatedBy:  p.LastUpdatedBy,
 		LastUpdatedOn:  timeutil.FromTime(p.LastUpdatedOn),
@@ -119,8 +120,9 @@ func mapEmployeeToPersistence(d domain.Employee) persistencemodels.Employee {
 		MobileNumber:   d.MobileNumber,
 		CompanyEmailID: d.CompanyEmailID,
 		Designation:    d.Designation,
-		Department:     d.Department,
-		CreatedBy:      d.CreatedBy,
+		Department:        d.Department,
+		IsPriceViewAccess: d.IsPriceViewAccess,
+		CreatedBy:         d.CreatedBy,
 		CreatedOn:      d.CreatedOn.ToTime(),
 		LastUpdatedBy:  d.LastUpdatedBy,
 		LastUpdatedOn:  d.LastUpdatedOn.ToTime(),
