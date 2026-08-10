@@ -14,5 +14,5 @@ type Package struct {
 }
 
 func (Package) TableName() string {
-	return "MediAdmin.tbl_PackageMaster"
+	return Table("tbl_PackageMaster")
 }

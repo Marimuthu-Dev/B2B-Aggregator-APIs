@@ -14,5 +14,5 @@ type Test struct {
 }
 
 func (Test) TableName() string {
-	return "MediAdmin.tbl_TestMaster"
+	return Table("tbl_TestMaster")
 }

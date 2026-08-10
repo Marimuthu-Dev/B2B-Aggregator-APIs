@@ -17,5 +17,5 @@ type ClientLocation struct {
 }
 
 func (ClientLocation) TableName() string {
-	return "MediAdmin.tbl_ClientLocationMaster"
+	return Table("tbl_ClientLocationMaster")
 }

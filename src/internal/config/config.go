@@ -61,10 +61,11 @@ type DBConfig struct {
 	User                   string
 	Password               string
 	Database               string
-	PoolMax                int // max open connections to the database
-	PoolMin                int // max idle connections kept in the pool (reuse)
-	IdleTimeout            int // max time a connection can be idle before closed (ms)
-	ConnMaxLifetime        int // max time a connection may be reused (ms); 0 = no limit
+	Schema                 string // SQL Server schema prefix (DB_SCHEMA); e.g. MediAdmin
+	PoolMax                int    // max open connections to the database
+	PoolMin                int    // max idle connections kept in the pool (reuse)
+	IdleTimeout            int    // max time a connection can be idle before closed (ms)
+	ConnMaxLifetime        int    // max time a connection may be reused (ms); 0 = no limit
 	Encrypt                bool
 	TrustServerCertificate bool
 }
@@ -94,6 +95,11 @@ func LoadConfig() *Config {
 	_ = godotenv.Load("../.env")
 	_ = godotenv.Load("../../.env")
 
+	dbSchema := strings.TrimSpace(getEnv("DB_SCHEMA", "MediAdmin"))
+	if dbSchema == "" {
+		dbSchema = "MediAdmin"
+	}
+
 	return &Config{
 		Environment: getEnv("ENVIRONMENT", "development"),
 		Port:        getEnvAsInt("PORT", 8080),
@@ -103,6 +109,7 @@ func LoadConfig() *Config {
 			User:                   getEnv("DB_USER", ""),
 			Password:               getEnv("DB_PASSWORD", ""),
 			Database:               getEnv("DB_DATABASE_NAME", ""),
+			Schema:                 dbSchema,
 			PoolMax:                getEnvAsInt("DB_POOL_MAX", 25),
 			PoolMin:                getEnvAsInt("DB_POOL_MIN", 5),
 			IdleTimeout:            getEnvAsInt("DB_IDLE_TIMEOUT", 30000),

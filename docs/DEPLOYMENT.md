@@ -265,6 +265,7 @@ In the Azure Portal, application settings are under **Configuration** (the label
 | `PORT` | `8080` | Yes (Azure may set this; app reads it) |
 | `DB_SERVER` | `um-staging-server-database.database.windows.net:1433` | Yes (or your DB server) |
 | `DB_DATABASE_NAME` | `um-staging-DB` | Yes (or your DB name) |
+| `DB_SCHEMA` | `MediAdmin` | Optional (default `MediAdmin`) — SQL Server schema prefix for all tables |
 | `DB_USER` | `dev_admin` | Yes (or your DB user) |
 | `DB_PASSWORD` | *Your database password* | **Yes** – never put in code |
 | `DB_ENCRYPT` | `true` | Yes |

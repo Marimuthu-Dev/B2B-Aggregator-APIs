@@ -284,7 +284,7 @@ func (r *leadRepository) FindByEmail(email string) ([]domain.Lead, error) {
 
 func (r *leadRepository) FindActiveLeadStatusIDByName(name string) (int8, error) {
 	var statusID int8
-	err := r.db.Table("MediAdmin.tbl_LeadStatusMaster").
+	err := r.db.Table(persistencemodels.Table("tbl_LeadStatusMaster")).
 		Select("LeadStatusID").
 		Where("LeadStatusName = ? AND IsActive = ?", name, true).
 		Take(&statusID).Error

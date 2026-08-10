@@ -15,5 +15,5 @@ type ClientBrandMapping struct {
 }
 
 func (ClientBrandMapping) TableName() string {
-	return "MediAdmin.tbl_ClientBrandMapping"
+	return Table("tbl_ClientBrandMapping")
 }

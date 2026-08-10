@@ -201,8 +201,13 @@ Optional overrides:
 If the deploy script fails with a message like "Run 'az acr update -n umproductionacr --admin-enabled true'", run this once (replace names if needed):
 
 ```bash
-az acr update --name umproductionacr --resource-group um-prod-rg-appservice --admin-enabled true
+az acr update --name umproductionacr --resource-group rm-prod-rg-appservice --admin-enabled true
 ```
+
+```bash
+az acr update --name medproductionacr --resource-group med-prod-rg-appservice --admin-enabled true
+```
+
 
 Then run the deploy script again.
 
@@ -275,6 +280,7 @@ In the Azure Portal, application settings are under **Configuration** (the label
 | `PORT` | `8080` | Yes (Azure may set this; app reads it) |
 | `DB_SERVER` | `um-prod-server-database.database.windows.net:1433` | Yes (your prod SQL endpoint) |
 | `DB_DATABASE_NAME` | `um-prod-DB` | Yes |
+| `DB_SCHEMA` | `MediAdmin` | Optional (default `MediAdmin`) — SQL Server schema prefix for all tables |
 | `DB_USER` | *Production SQL user* | Yes |
 | `DB_PASSWORD` | *Production database password* | **Yes** – never put in code |
 | `DB_ENCRYPT` | `true` | Yes |

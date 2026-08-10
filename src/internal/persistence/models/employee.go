@@ -21,5 +21,5 @@ type Employee struct {
 }
 
 func (Employee) TableName() string {
-	return "MediAdmin.tbl_EmployeeMaster"
+	return Table("tbl_EmployeeMaster")
 }

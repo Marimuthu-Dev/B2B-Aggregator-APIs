@@ -38,13 +38,13 @@ func GetUserTypeFromDomain(domain string) int {
 	domain = normalizeLoginDomain(domain)
 	var userType int
 	switch domain {
-	case "1", "employee", "um-staging-ops-web.azurewebsites.net", "um-prod-web.azurewebsites.net", "ops.urmediconnect.com":
+	case "1", "employee", "um-staging-ops-web.azurewebsites.net", "um-prod-web.azurewebsites.net", "ops.urmediconnect.com", "ops.medlyfehealth.com":
 		userType = UserTypeEmployee
-	case "2", "client", "um-staging-client-web.azurewebsites.net", "client.urmediconnect.com":
+	case "2", "client", "um-staging-client-web.azurewebsites.net", "client.urmediconnect.com", "client.medlyfehealth.com":
 		userType = UserTypeClient
-	case "3", "lab", "um-staging-lab-web.azurewebsites.net", "lab.urmediconnect.com":
+	case "3", "lab", "um-staging-lab-web.azurewebsites.net", "lab.urmediconnect.com", "lab.medlyfehealth.com":
 		userType = UserTypeLab
-	default:
+	default:	
 		userType = 0 // invalid domain, same as Node.js
 	}
 	fmt.Printf("[LOGIN] Utils.GetUserTypeFromDomain: domain=%q -> userType=%d\n", domain, userType)

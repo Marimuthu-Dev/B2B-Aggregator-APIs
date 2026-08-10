@@ -35,5 +35,5 @@ type Client struct {
 }
 
 func (Client) TableName() string {
-	return "MediAdmin.tbl_ClientMaster"
+	return Table("tbl_ClientMaster")
 }

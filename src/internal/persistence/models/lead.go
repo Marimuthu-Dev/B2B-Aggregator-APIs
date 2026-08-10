@@ -38,7 +38,7 @@ type Lead struct {
 }
 
 func (Lead) TableName() string {
-	return "MediAdmin.tbl_Leads"
+	return Table("tbl_Leads")
 }
 
 type LeadHistory struct {
@@ -50,5 +50,5 @@ type LeadHistory struct {
 }
 
 func (LeadHistory) TableName() string {
-	return "MediAdmin.tbl_LeadsHistory"
+	return Table("tbl_LeadsHistory")
 }

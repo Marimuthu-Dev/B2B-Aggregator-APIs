@@ -117,6 +117,14 @@ az webapp deployment source config-zip \
   --src build/worker-combined.zip
 ```
 
+```bash
+cd /mnt/d/Code/MMK_Projects/B2B-Diagnostic-Aggregator/GitHub/B2B-Aggregator-APIs
+az webapp deployment source config-zip \
+  --resource-group med-prod-rg-appservice \
+  --name med-prod-worker-process \
+  --src build/worker-combined.zip
+```
+
 3. **Use the deploy script** (`./scripts/deploy-all-workers.sh --deploy`), which passes an **absolute** path to Azure CLI.
 
 Microsoft recommends **`az webapp deploy`** instead of the deprecated `config-zip` (same `wwwroot` replace behavior for `type zip`):
@@ -126,6 +134,16 @@ cd /mnt/d/Code/MMK_Projects/B2B-Diagnostic-Aggregator/GitHub/B2B-Aggregator-APIs
 az webapp deploy \
   --resource-group um-prod-rg-appservice \
   --name um-prod-worker-process \
+  --src-path build/worker-combined.zip \
+  --type zip
+```
+
+
+```bash
+cd /mnt/d/Code/MMK_Projects/B2B-Diagnostic-Aggregator/GitHub/B2B-Aggregator-APIs
+az webapp deploy \
+  --resource-group med-prod-rg-appservice \
+  --name med-prod-worker-process \
   --src-path build/worker-combined.zip \
   --type zip
 ```

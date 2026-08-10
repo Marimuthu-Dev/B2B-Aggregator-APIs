@@ -37,5 +37,5 @@ type Lab struct {
 }
 
 func (Lab) TableName() string {
-	return "MediAdmin.tbl_LabMaster"
+	return Table("tbl_LabMaster")
 }

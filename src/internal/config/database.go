@@ -3,7 +3,10 @@ package config
 import (
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
+
+	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 
 	"gorm.io/driver/sqlserver"
 	"gorm.io/gorm"
@@ -11,6 +14,13 @@ import (
 )
 
 func ConnectDatabase(c DBConfig) (*gorm.DB, error) {
+	// Apply per-client SQL Server schema (DB_SCHEMA) before any GORM TableName() use.
+	schema := strings.TrimSpace(c.Schema)
+	if schema == "" {
+		schema = persistencemodels.DefaultSchema
+	}
+	persistencemodels.SetSchema(schema)
+
 	// URL-encode user and password so special characters (e.g. @ in password) don't break the DSN
 	userInfo := url.UserPassword(c.User, c.Password)
 	dsn := fmt.Sprintf("sqlserver://%s@%s?database=%s&encrypt=%t&trustServerCertificate=%t",
