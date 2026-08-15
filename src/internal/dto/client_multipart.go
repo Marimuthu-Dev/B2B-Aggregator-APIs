@@ -96,7 +96,7 @@ func (f ClientCreateForm) toClientRequest() (ClientRequest, error) {
 		BillingPincode:            f.BillingPincode,
 		ClientTypeID:              f.ClientTypeID,
 		IsAcitve:                  f.IsAcitve,
-		IsStoreLoginEnabled:       f.IsStoreLoginEnabled,
+		IsStoreLoginEnabled:       boolPtr(f.IsStoreLoginEnabled),
 		Brands:                    f.Brands,
 	}
 	if strings.TrimSpace(f.MOUStartDate) != "" {
@@ -283,4 +283,8 @@ func stringPtr(s string) *string {
 		return &p
 	}
 	return &s
+}
+
+func boolPtr(v bool) *bool {
+	return &v
 }

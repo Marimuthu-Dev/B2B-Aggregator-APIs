@@ -32,7 +32,8 @@ type ClientRequest struct {
 	BillingPincode            *string    `binding:"omitempty"`
 	ClientTypeID              *int8      `json:"ClientTypeID" binding:"omitempty"`
 	IsAcitve                  bool       `binding:"omitempty"`
-	IsStoreLoginEnabled       bool       `json:"IsStoreLoginEnabled" binding:"omitempty"`
+	// IsStoreLoginEnabled omitted or JSON null on POST → persisted as false.
+	IsStoreLoginEnabled       *bool      `json:"IsStoreLoginEnabled" binding:"omitempty"`
 	MOUStartDate              *time.Time `json:"MOUStartDate" binding:"omitempty"`
 	MOUEndDate                *time.Time `json:"MOUEndDate" binding:"omitempty"`
 	// Brands optional. JSON null, [], or omitted → no rows in tbl_ClientBrandMapping.
@@ -83,6 +84,7 @@ type ClientUpdateRequest struct {
 	BillingPincode            *string    `json:"BillingPincode"`
 	ClientTypeID              *int8      `json:"ClientTypeID"`
 	IsAcitve                  *bool      `json:"IsAcitve"`
+	// IsStoreLoginEnabled omitted or JSON null on PUT → column is not updated.
 	IsStoreLoginEnabled       *bool      `json:"IsStoreLoginEnabled"`
 	MOUStartDate              *time.Time `json:"MOUStartDate"`
 	MOUEndDate                *time.Time `json:"MOUEndDate"`
@@ -161,10 +163,17 @@ func (r ClientRequest) ToDomain() domain.Client {
 		BillingPincode:            r.BillingPincode,
 		ClientTypeID:              r.ClientTypeID,
 		IsAcitve:                  r.IsAcitve,
-		IsStoreLoginEnabled:       r.IsStoreLoginEnabled,
+		IsStoreLoginEnabled:       boolFromOptional(r.IsStoreLoginEnabled, false),
 		MOUStartDate:              timeutil.FromTimePtr(r.MOUStartDate),
 		MOUEndDate:                timeutil.FromTimePtr(r.MOUEndDate),
 	}
+}
+
+func boolFromOptional(v *bool, defaultVal bool) bool {
+	if v == nil {
+		return defaultVal
+	}
+	return *v
 }
 
 // ClientMoUDownloadURLResponse is returned by GET /api/v1/clients/:id/mou/download-url (SAS link for viewing the PDF).
