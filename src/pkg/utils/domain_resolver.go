@@ -7,12 +7,29 @@ import (
 	"strings"
 )
 
-// UserType constants matching Node.js (1=employee, 2=client, 3=lab)
+// UserType constants matching Node.js (1=employee, 2=client, 3=lab) plus store (4).
 const (
 	UserTypeEmployee = 1
 	UserTypeClient   = 2
 	UserTypeLab      = 3
+	UserTypeStore    = 4
 )
+
+// UserTypeToLoginString is the tbl_Login.UserType value (numeric string).
+func UserTypeToLoginString(userType int) string {
+	switch userType {
+	case UserTypeEmployee:
+		return "1"
+	case UserTypeClient:
+		return "2"
+	case UserTypeLab:
+		return "3"
+	case UserTypeStore:
+		return "4"
+	default:
+		return ""
+	}
+}
 
 // normalizeLoginDomain trims, lowercases, extracts host from full URLs, strips ports, and trailing dots.
 func normalizeLoginDomain(raw string) string {
@@ -60,6 +77,8 @@ func UserTypeToString(userType int) string {
 		return "client"
 	case UserTypeLab:
 		return "lab"
+	case UserTypeStore:
+		return "store"
 	default:
 		return ""
 	}

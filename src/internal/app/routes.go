@@ -43,6 +43,7 @@ type routeDeps struct {
 	clientLocationHandler *handlers.ClientLocationHandler
 	employeeHandler       *handlers.EmployeeHandler
 	labHandler            *handlers.LabHandler
+	storeHandler          *handlers.StoreHandler
 	leadHandler           *handlers.LeadHandler
 	testHandler           *handlers.TestHandler
 }
@@ -72,6 +73,7 @@ func registerProtectedRoutes(r *gin.Engine, jwtSecret string, deps routeDeps) {
 		registerClientLocationRoutes(api, deps.clientLocationHandler)
 		registerEmployeeRoutes(api, deps.employeeHandler)
 		registerLabRoutes(api, deps.labHandler)
+		registerStoreRoutes(api, deps.storeHandler)
 		registerLeadRoutes(api, deps.leadHandler)
 		registerTestRoutes(api, deps.testHandler)
 	}
@@ -153,6 +155,18 @@ func registerLabRoutes(api *gin.RouterGroup, handler *handlers.LabHandler) {
 		labs.POST("/", handler.Create)
 		labs.PUT("/:id", handler.Update)
 		labs.DELETE("/:id", handler.Delete)
+	}
+}
+
+func registerStoreRoutes(api *gin.RouterGroup, handler *handlers.StoreHandler) {
+	stores := api.Group("/stores")
+	{
+		stores.GET("", handler.GetAll)
+		stores.GET("/", handler.GetAll)
+		stores.GET("/:id", handler.GetByID)
+		stores.POST("", handler.Create)
+		stores.POST("/", handler.Create)
+		stores.PUT("/:id", handler.Update)
 	}
 }
 

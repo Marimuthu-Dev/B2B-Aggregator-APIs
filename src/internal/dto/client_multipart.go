@@ -38,6 +38,7 @@ type ClientCreateForm struct {
 	BillingPincode            *string `form:"BillingPincode"`
 	ClientTypeID              *int8   `form:"ClientTypeID"`
 	IsAcitve                  bool     `form:"IsAcitve"`
+	IsStoreLoginEnabled       bool     `form:"IsStoreLoginEnabled"`
 	MOUStartDate              string   `form:"MOUStartDate"`
 	MOUEndDate                string   `form:"MOUEndDate"`
 	Brands                    []string `form:"Brands"`
@@ -95,6 +96,7 @@ func (f ClientCreateForm) toClientRequest() (ClientRequest, error) {
 		BillingPincode:            f.BillingPincode,
 		ClientTypeID:              f.ClientTypeID,
 		IsAcitve:                  f.IsAcitve,
+		IsStoreLoginEnabled:       f.IsStoreLoginEnabled,
 		Brands:                    f.Brands,
 	}
 	if strings.TrimSpace(f.MOUStartDate) != "" {
@@ -216,6 +218,11 @@ func buildClientUpdateRequestFromForm(c *gin.Context) (*ClientUpdateRequest, err
 	if v, ok := firstFormValue(vals, "IsAcitve"); ok {
 		if b, err := strconv.ParseBool(v); err == nil {
 			req.IsAcitve = &b
+		}
+	}
+	if v, ok := firstFormValue(vals, "IsStoreLoginEnabled"); ok {
+		if b, err := strconv.ParseBool(v); err == nil {
+			req.IsStoreLoginEnabled = &b
 		}
 	}
 	if v, ok := firstFormValue(vals, "MOUStartDate"); ok && strings.TrimSpace(v) != "" {

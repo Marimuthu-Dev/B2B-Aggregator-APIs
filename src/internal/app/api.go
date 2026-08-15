@@ -58,7 +58,8 @@ func Run() error {
 
 	// Initialize Services
 	packageSvc := service.NewPackageService(packageRepo, testRepo, packageClientMapRepo, packageLabMapRepo, clientRepo, labRepo)
-	loginSvc := service.NewLoginService(loginRepo, forgotPasswordRepo, clientRepo, employeeRepo, labRepo, cfg.JWT)
+	storeRepo := repository.NewStoreRepository(db)
+	loginSvc := service.NewLoginService(loginRepo, forgotPasswordRepo, clientRepo, employeeRepo, labRepo, storeRepo, cfg.JWT)
 	var blobSvc service.BlobService
 	ab := cfg.AzureBlob
 	blobConfigured := strings.TrimSpace(ab.ConnectionString) != "" ||
@@ -71,21 +72,23 @@ func Run() error {
 			blobSvc = bs
 		}
 	}
-	clientSvc := service.NewClientService(clientRepo, blobSvc)
+	clientSvc := service.NewClientService(clientRepo, blobSvc, storeRepo)
 	clientLocationSvc := service.NewClientLocationService(clientLocationRepo)
 	employeeSvc := service.NewEmployeeService(employeeRepo)
 	labSvc := service.NewLabService(labRepo, blobSvc)
-	leadSvc := service.NewLeadService(leadRepo, leadUow, clientRepo, packageRepo, labRepo, blobSvc)
+	storeSvc := service.NewStoreService(storeRepo, clientRepo)
+	leadSvc := service.NewLeadService(leadRepo, leadUow, clientRepo, packageRepo, labRepo, storeRepo, blobSvc)
 	testSvc := service.NewTestService(testRepo)
 
 	// Initialize Handlers
-	packageHandler := handlers.NewPackageHandler(packageSvc)
+	packageHandler := handlers.NewPackageHandler(packageSvc, storeSvc)
 	loginHandler := handlers.NewLoginHandler(loginSvc)
 	clientHandler := handlers.NewClientHandler(clientSvc)
 	clientLocationHandler := handlers.NewClientLocationHandler(clientLocationSvc)
 	employeeHandler := handlers.NewEmployeeHandler(employeeSvc)
 	labHandler := handlers.NewLabHandler(labSvc)
-	leadHandler := handlers.NewLeadHandler(leadSvc)
+	storeHandler := handlers.NewStoreHandler(storeSvc)
+	leadHandler := handlers.NewLeadHandler(leadSvc, storeSvc)
 	testHandler := handlers.NewTestHandler(testSvc)
 
 	// Initialize Gin
@@ -101,6 +104,7 @@ func Run() error {
 		clientLocationHandler: clientLocationHandler,
 		employeeHandler:       employeeHandler,
 		labHandler:            labHandler,
+		storeHandler:          storeHandler,
 		leadHandler:    leadHandler,
 		testHandler:   testHandler,
 	})

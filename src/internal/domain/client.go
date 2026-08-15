@@ -25,6 +25,7 @@ type Client struct {
 	BillingPincode            *string
 	ClientTypeID              *int8
 	IsAcitve                  bool
+	IsStoreLoginEnabled       bool
 	MOUStartDate              *timeutil.ISTTime
 	MOUEndDate                *timeutil.ISTTime
 	MoUDocumentURL            *string

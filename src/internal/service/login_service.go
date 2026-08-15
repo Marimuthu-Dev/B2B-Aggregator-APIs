@@ -35,6 +35,7 @@ type loginService struct {
 	clientRepo   repository.ClientRepository
 	employeeRepo repository.EmployeeRepository
 	labRepo      repository.LabRepository
+	storeRepo    repository.StoreRepository
 	jwtSecret    string
 	accessTTL    time.Duration
 	refreshTTL   time.Duration
@@ -46,6 +47,7 @@ func NewLoginService(
 	clientRepo repository.ClientRepository,
 	employeeRepo repository.EmployeeRepository,
 	labRepo repository.LabRepository,
+	storeRepo repository.StoreRepository,
 	jwtCfg config.JWTConfig,
 ) LoginService {
 	accessTTL, err := time.ParseDuration(jwtCfg.ExpiresIn)
@@ -62,6 +64,7 @@ func NewLoginService(
 		clientRepo:   clientRepo,
 		employeeRepo: employeeRepo,
 		labRepo:      labRepo,
+		storeRepo:    storeRepo,
 		jwtSecret:    jwtCfg.Secret,
 		accessTTL:    accessTTL,
 		refreshTTL:   refreshTTL,
@@ -81,12 +84,30 @@ func (s *loginService) resolveUserByMobileNumber(domainName, mobileNumber string
 	case utils.UserTypeClient:
 		fmt.Println("[LOGIN] Service.resolveUserByMobileNumber: resolving client by contact number")
 		client, err := s.clientRepo.FindByContactNumber(mobileNumber)
-		if err != nil {
-			fmt.Printf("[LOGIN] Service.resolveUserByMobileNumber: client not found: %v\n", err)
+		if err == nil && client != nil {
+			fmt.Printf("[LOGIN] Service.resolveUserByMobileNumber: client found ClientID=%d\n", client.ClientID)
+			return client.ClientID, utils.UserTypeClient, client, nil
+		}
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			fmt.Printf("[LOGIN] Service.resolveUserByMobileNumber: client lookup error: %v\n", err)
 			return 0, 0, nil, apperrors.NewNotFound("User not found", err)
 		}
-		fmt.Printf("[LOGIN] Service.resolveUserByMobileNumber: client found ClientID=%d\n", client.ClientID)
-		return client.ClientID, utils.UserTypeClient, client, nil
+		fmt.Println("[LOGIN] Service.resolveUserByMobileNumber: client not found, trying store")
+		store, storeErr := s.storeRepo.FindByContactNumber(mobileNumber)
+		if storeErr != nil {
+			fmt.Printf("[LOGIN] Service.resolveUserByMobileNumber: store not found: %v\n", storeErr)
+			return 0, 0, nil, apperrors.NewNotFound("User not found", storeErr)
+		}
+		if !store.IsActive {
+			return 0, 0, nil, apperrors.NewUnauthorized("Invalid credentials", errors.New("store inactive"))
+		}
+		parent, parentErr := s.clientRepo.FindByID(store.ClientID)
+		if parentErr != nil || parent == nil || !parent.IsStoreLoginEnabled || !parent.IsAcitve {
+			return 0, 0, nil, apperrors.NewUnauthorized("Invalid credentials", errors.New("store login disabled"))
+		}
+		store.ClientName = parent.ClientName
+		fmt.Printf("[LOGIN] Service.resolveUserByMobileNumber: store found StoreID=%d ClientID=%d\n", store.StoreID, store.ClientID)
+		return store.StoreID, utils.UserTypeStore, store, nil
 	case utils.UserTypeEmployee:
 		fmt.Println("[LOGIN] Service.resolveUserByMobileNumber: resolving employee by mobile number")
 		employee, err := s.employeeRepo.FindByMobileNumber(mobileNumber)
@@ -145,6 +166,8 @@ func (s *loginService) Login(req dto.LoginRequest) (*dto.LoginResponse, error) {
 			userType = utils.UserTypeClient
 		case "3", "lab", "um-staging-lab-web.azurewebsites.net", "lab.urmediconnect.com":
 			userType = utils.UserTypeLab
+		case "4", "store":
+			userType = utils.UserTypeStore
 		}
 		userData = login
 		fmt.Printf("[LOGIN] Service.Login: found login userID=%d userTypeStr=%s\n", userID, userTypeStr)
@@ -185,6 +208,7 @@ func (s *loginService) Login(req dto.LoginRequest) (*dto.LoginResponse, error) {
 	fmt.Println("[LOGIN] Service.Login: success")
 	return &dto.LoginResponse{
 		User:         userData,
+		UserType:     userType,
 		Token:        accessToken,
 		RefreshToken: refreshToken,
 	}, nil
@@ -319,10 +343,20 @@ func (s *loginService) GetProfile(domainName string, userIDStr, mobileNumber *st
 		if userType == utils.UserTypeClient {
 			id, _ := strconv.ParseInt(*userIDStr, 10, 64)
 			client, err := s.clientRepo.FindByID(id)
-			if err != nil {
+			if err == nil && client != nil {
+				return client, nil
+			}
+			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 				return nil, apperrors.NewNotFound("Profile not found", err)
 			}
-			return client, nil
+			store, storeErr := s.storeRepo.FindByID(id)
+			if storeErr != nil {
+				return nil, apperrors.NewNotFound("Profile not found", storeErr)
+			}
+			if parent, pErr := s.clientRepo.FindByID(store.ClientID); pErr == nil && parent != nil {
+				store.ClientName = parent.ClientName
+			}
+			return store, nil
 		}
 		if userType == utils.UserTypeLab {
 			id, _ := strconv.ParseInt(*userIDStr, 10, 64)

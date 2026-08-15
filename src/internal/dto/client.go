@@ -32,6 +32,7 @@ type ClientRequest struct {
 	BillingPincode            *string    `binding:"omitempty"`
 	ClientTypeID              *int8      `json:"ClientTypeID" binding:"omitempty"`
 	IsAcitve                  bool       `binding:"omitempty"`
+	IsStoreLoginEnabled       bool       `json:"IsStoreLoginEnabled" binding:"omitempty"`
 	MOUStartDate              *time.Time `json:"MOUStartDate" binding:"omitempty"`
 	MOUEndDate                *time.Time `json:"MOUEndDate" binding:"omitempty"`
 	// Brands optional. JSON null, [], or omitted → no rows in tbl_ClientBrandMapping.
@@ -82,6 +83,7 @@ type ClientUpdateRequest struct {
 	BillingPincode            *string    `json:"BillingPincode"`
 	ClientTypeID              *int8      `json:"ClientTypeID"`
 	IsAcitve                  *bool      `json:"IsAcitve"`
+	IsStoreLoginEnabled       *bool      `json:"IsStoreLoginEnabled"`
 	MOUStartDate              *time.Time `json:"MOUStartDate"`
 	MOUEndDate                *time.Time `json:"MOUEndDate"`
 	// Brands: nil or JSON null (omitted) or [] or only whitespace → do not change tbl_ClientBrandMapping.
@@ -95,7 +97,7 @@ func (r ClientUpdateRequest) HasAtLeastOneField() bool {
 		r.ContactPerson2Name != nil || r.ContactPerson2Number != nil || r.ContactPerson2EmailID != nil || r.ContactPerson2Designation != nil ||
 		r.GSTIN_UIN != nil || r.PANNumber != nil || r.BusinessVertical != nil ||
 		r.BillingName != nil || r.BillingAdderss != nil || r.BillingPincode != nil || r.ClientTypeID != nil || r.IsAcitve != nil ||
-		r.MOUStartDate != nil || r.MOUEndDate != nil ||
+		r.MOUStartDate != nil || r.MOUEndDate != nil || r.IsStoreLoginEnabled != nil ||
 		(r.Brands != nil && len(*r.Brands) > 0)
 }
 
@@ -159,6 +161,7 @@ func (r ClientRequest) ToDomain() domain.Client {
 		BillingPincode:            r.BillingPincode,
 		ClientTypeID:              r.ClientTypeID,
 		IsAcitve:                  r.IsAcitve,
+		IsStoreLoginEnabled:       r.IsStoreLoginEnabled,
 		MOUStartDate:              timeutil.FromTimePtr(r.MOUStartDate),
 		MOUEndDate:                timeutil.FromTimePtr(r.MOUEndDate),
 	}

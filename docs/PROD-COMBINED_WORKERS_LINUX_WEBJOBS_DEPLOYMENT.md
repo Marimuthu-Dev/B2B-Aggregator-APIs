@@ -39,7 +39,8 @@ App_Data/
         run.sh                 # from src/run-fitness-worker.sh
         fitness-worker         # Linux amd64 binary
         templates/             # required for fitness-worker (HTML templates)
-        chrome-linux64/        # optional; only if you bundle Chrome for Testing
+        chrome-linux64/        # required for HTML→PDF (Chrome for Testing linux64)
+        chrome-linux-deps/     # required on App Service Code (bundled .so libs; no root apt)
       email-worker-job/
         run.sh                 # from src/run-email-worker.sh
         email-worker           # Linux amd64 binary
@@ -66,38 +67,87 @@ Configure **`um-prod-worker-process`** exactly as the two single-job guides desc
 
 Go module root is **`src/`** (where `go.mod` lives).
 
+
+
+
 ### Option B — Manual commands
 
-```bash
+Run in **WSL/bash on your laptop** (repo on `/mnt/d/...`). Do **not** run this in Azure Kudu SSH or plain Windows PowerShell — there is no `src/templates` or local `chrome-linux64` there.
+
+**Easier:** from repo root run `./scripts/deploy-all-workers.sh` (same layout).
+
+Option A (recommended)
+```
+cd /mnt/d/Code/MMK_Projects/B2B-Diagnostic-Aggregator/GitHub/B2B-Aggregator-APIs
+./scripts/deploy-all-workers.sh
+```
+
+Option B (manual) — preflight first
+
+```
 cd /mnt/d/Code/MMK_Projects/B2B-Diagnostic-Aggregator/GitHub/B2B-Aggregator-APIs/src
+pwd
+ls templates chrome-linux64/chrome chrome-linux-deps
+
+```
+
+```bash
+# WSL/bash — repo root
+REPO_ROOT="/mnt/d/Code/MMK_Projects/B2B-Diagnostic-Aggregator/GitHub/B2B-Aggregator-APIs"
+SRC="$REPO_ROOT/src"
+cd "$SRC"
+
+# Preflight (must all succeed)
+ls -la templates/certificate_1.html chrome-linux64/chrome run-fitness-worker.sh
+ls -d chrome-linux-deps/usr chrome-linux-deps/lib 2>/dev/null || ls -d chrome-linux-deps/usr
+# If chrome-linux-deps missing: (cd "$REPO_ROOT" && ./scripts/bundle-chrome-linux-deps.sh)
 
 # Binaries
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o fitness-worker ./cmd/fitness-worker
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o email-worker   ./cmd/email-worker
 
-REPO_ROOT="$(cd .. && pwd)"
 BUILD="$REPO_ROOT/build/webjobs-combined"
 rm -rf "$BUILD"
 FITNESS_JOB="$BUILD/App_Data/jobs/triggered/fitness-worker-job"
 EMAIL_JOB="$BUILD/App_Data/jobs/triggered/email-worker-job"
 mkdir -p "$FITNESS_JOB" "$EMAIL_JOB"
 
-# Fitness job: binary + run.sh + templates (and optional Chromium tree)
-cp fitness-worker run-fitness-worker.sh "$FITNESS_JOB/"
+# Fitness job: binary + run.sh + templates + Chromium + deps
+cp "$SRC/fitness-worker" "$SRC/run-fitness-worker.sh" "$FITNESS_JOB/"
 mv "$FITNESS_JOB/run-fitness-worker.sh" "$FITNESS_JOB/run.sh"
-cp -r templates "$FITNESS_JOB/"
-# Optional: cp -r /path/to/chrome-linux64 "$FITNESS_JOB/"
+cp -r "$SRC/templates" "$FITNESS_JOB/"
+if [ ! -f "$SRC/chrome-linux64/chrome" ]; then
+  echo "ERROR: $SRC/chrome-linux64/chrome missing."
+  exit 1
+fi
+cp -a "$SRC/chrome-linux64" "$FITNESS_JOB/"
+if [ ! -d "$SRC/chrome-linux-deps/usr" ] && [ ! -d "$SRC/chrome-linux-deps/lib" ]; then
+  echo "ERROR: $SRC/chrome-linux-deps missing. Run: $REPO_ROOT/scripts/bundle-chrome-linux-deps.sh"
+  exit 1
+fi
+cp -a "$SRC/chrome-linux-deps" "$FITNESS_JOB/"
 
-# Email job: binary + run.sh only
-cp email-worker run-email-worker.sh "$EMAIL_JOB/"
+# Email job
+cp "$SRC/email-worker" "$SRC/run-email-worker.sh" "$EMAIL_JOB/"
 mv "$EMAIL_JOB/run-email-worker.sh" "$EMAIL_JOB/run.sh"
 
-chmod +x "$FITNESS_JOB/run.sh" "$FITNESS_JOB/fitness-worker" "$EMAIL_JOB/run.sh" "$EMAIL_JOB/email-worker"
+chmod +x "$FITNESS_JOB/run.sh" "$FITNESS_JOB/fitness-worker" "$FITNESS_JOB/chrome-linux64/chrome" \
+  "$EMAIL_JOB/run.sh" "$EMAIL_JOB/email-worker"
 
 mkdir -p "$REPO_ROOT/build"
 cd "$BUILD"
 zip -r "$REPO_ROOT/build/worker-combined.zip" App_Data
 ```
+
+**Before zip deploy:** confirm the fitness job folder (or zip) contains `chrome-linux64/chrome` **and** `chrome-linux-deps/` (shared libraries). App Service Kudu users are **not root** — `apt install chromium` will always fail with Permission denied; do not rely on apt on the server.
+
+App setting on the worker app:
+
+| Setting | Value |
+|--------|--------|
+| `CHROMIUM_PATH` | `./chrome-linux64/chrome` |
+
+`scripts/deploy-all-workers.sh` copies `src/chrome-linux64` and `src/chrome-linux-deps` when present. Build deps with `./scripts/bundle-chrome-linux-deps.sh` (once, or when Chrome libs change).
 
 ---
 
@@ -241,7 +291,8 @@ curl -X POST -u '{user}:{pass}' \
 
 - [ ] **`WEBSITE_SKIP_RUNNING_KUDUAGENT=false`**, **Always On** (supported SKU) on the worker app.
 - [ ] All **fitness** and **email** application settings present ([fitness](./PROD-FITNESS_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md), [email](./PROD-EMAIL_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md)).
-- [ ] Combined zip contains **both** job folders; fitness folder includes **`templates/`**.
+- [ ] Combined zip contains **both** job folders; fitness folder includes **`templates/`** and **`chrome-linux64/chrome`**.
+- [ ] App setting **`CHROMIUM_PATH=./chrome-linux64/chrome`** on the worker app.
 - [ ] **`chmod +x`** on both `run.sh` files and both binaries before zipping (the script does this).
 - [ ] **`FITNESS_CERT_WORKER_RUN_ONCE=true`** and **`EMAIL_WORKER_SINGLE_BATCH=true`** for scheduled batch runs.
 - [ ] **`ACS_CONNECTION_STRING`** uses `endpoint=...;accesskey=...`.

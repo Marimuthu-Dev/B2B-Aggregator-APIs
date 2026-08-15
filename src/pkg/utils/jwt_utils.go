@@ -22,6 +22,8 @@ func (c *JWTClaims) Role() string {
 		return "client"
 	case 3:
 		return "lab"
+	case 4:
+		return "store"
 	default:
 		return ""
 	}

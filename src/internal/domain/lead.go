@@ -161,6 +161,7 @@ type Lead struct {
 	Pincode                       string
 	EmpID                         string `json:"EmpID"`
 	StoreID                       string `json:"StoreID"`
+	StoreMasterID                 *int64 `json:"StoreMasterID,omitempty"`
 	CollectionType                string `json:"CollectionType"`
 	LeadStatusID                  int8
 	AppointmentAt                 *timeutil.StoredTime `json:"AppointmentAt"`

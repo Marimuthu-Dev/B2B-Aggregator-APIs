@@ -11,6 +11,7 @@ import (
 
 type LoginRepository interface {
 	FindByUserID(userID int64) (*domain.Login, error)
+	Create(l *domain.Login) error
 	Authenticate(userID int64, encryptedPassword, userType string) (bool, error)
 	UpdatePassword(userID int64, newPassword string) error
 	ChangePassword(userID int64, oldEncryptedPassword, newEncryptedPassword string) (int64, error)
@@ -22,6 +23,21 @@ type loginRepository struct {
 
 func NewLoginRepository(db *gorm.DB) LoginRepository {
 	return &loginRepository{db: db}
+}
+
+func (r *loginRepository) Create(l *domain.Login) error {
+	row := persistencemodels.Login{
+		UserID:        l.UserID,
+		Pwd:           l.Pwd,
+		UserType:      l.UserType,
+		CreatedOn:     l.CreatedOn.ToTime(),
+		LastUpdatedOn: l.LastUpdatedOn.ToTime(),
+	}
+	if err := r.db.Create(&row).Error; err != nil {
+		return err
+	}
+	l.RecordID = row.RecordID
+	return nil
 }
 
 func (r *loginRepository) FindByUserID(userID int64) (*domain.Login, error) {

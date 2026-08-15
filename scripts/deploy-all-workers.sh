@@ -44,6 +44,39 @@ cp "$SRC/fitness-worker" "$SRC/run-fitness-worker.sh" "$FITNESS_JOB/"
 mv "$FITNESS_JOB/run-fitness-worker.sh" "$FITNESS_JOB/run.sh"
 cp -r "$SRC/templates" "$FITNESS_JOB/"
 
+# Bundle Chrome for Testing when present (required for HTML→PDF on App Service).
+# Place unpacked linux64 tree at src/chrome-linux64/ with a `chrome` binary inside.
+# Set App Setting CHROMIUM_PATH=./chrome-linux64/chrome on the worker app.
+CHROME_SRC="${CHROME_LINUX64_DIR:-$SRC/chrome-linux64}"
+if [ -x "$CHROME_SRC/chrome" ] || [ -f "$CHROME_SRC/chrome" ]; then
+  echo "Including Chromium from $CHROME_SRC"
+  cp -a "$CHROME_SRC" "$FITNESS_JOB/chrome-linux64"
+  chmod +x "$FITNESS_JOB/chrome-linux64/chrome" || true
+else
+  echo "WARNING: $CHROME_SRC/chrome not found — fitness PDF generation will fail on App Service."
+  echo "         Download Chrome for Testing linux64 and unpack to src/chrome-linux64/"
+fi
+
+# Shared libraries for Chrome (App Service has no apt root). Build with:
+#   ./scripts/bundle-chrome-linux-deps.sh
+CHROME_DEPS="${CHROME_LINUX_DEPS_DIR:-$SRC/chrome-linux-deps}"
+if [ -d "$CHROME_DEPS/usr" ] || [ -d "$CHROME_DEPS/lib" ]; then
+  echo "Including Chrome deps from $CHROME_DEPS"
+  cp -a "$CHROME_DEPS" "$FITNESS_JOB/chrome-linux-deps"
+  # Never ship these — they require newer GLIBC than App Service WebJob hosts provide.
+  find "$FITNESS_JOB/chrome-linux-deps" \( \
+    -name 'libselinux.so*' -o -name 'libsystemd.so*' -o -name 'libudev.so*' \
+  \) -delete 2>/dev/null || true
+  if find "$FITNESS_JOB/chrome-linux-deps" \( -name 'libselinux.so*' -o -name 'libsystemd.so*' -o -name 'libudev.so*' \) | grep -q .; then
+    echo "ERROR: dangerous libs still present under chrome-linux-deps"
+    exit 1
+  fi
+  echo "chrome-linux-deps sanitized (no libselinux/libsystemd/libudev)"
+else
+  echo "WARNING: $CHROME_DEPS not found — Chrome may fail with missing .so on App Service."
+  echo "         Run: ./scripts/bundle-chrome-linux-deps.sh"
+fi
+
 cp "$SRC/email-worker" "$SRC/run-email-worker.sh" "$EMAIL_JOB/"
 mv "$EMAIL_JOB/run-email-worker.sh" "$EMAIL_JOB/run.sh"
 

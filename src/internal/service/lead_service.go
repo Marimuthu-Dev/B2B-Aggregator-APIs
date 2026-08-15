@@ -47,11 +47,12 @@ type leadService struct {
 	clientRepo  repository.ClientRepository
 	packageRepo repository.PackageRepository
 	labRepo     repository.LabRepository
+	storeRepo   repository.StoreRepository
 	blobs       BlobService
 }
 
-func NewLeadService(repo repository.LeadRepository, uow repository.LeadUnitOfWork, clientRepo repository.ClientRepository, packageRepo repository.PackageRepository, labRepo repository.LabRepository, blobs BlobService) LeadService {
-	return &leadService{repo: repo, uow: uow, clientRepo: clientRepo, packageRepo: packageRepo, labRepo: labRepo, blobs: blobs}
+func NewLeadService(repo repository.LeadRepository, uow repository.LeadUnitOfWork, clientRepo repository.ClientRepository, packageRepo repository.PackageRepository, labRepo repository.LabRepository, storeRepo repository.StoreRepository, blobs BlobService) LeadService {
+	return &leadService{repo: repo, uow: uow, clientRepo: clientRepo, packageRepo: packageRepo, labRepo: labRepo, storeRepo: storeRepo, blobs: blobs}
 }
 
 func (s *leadService) ListLeads(filter repository.LeadListFilter) ([]domain.Lead, int64, error) {
@@ -110,6 +111,9 @@ func (s *leadService) CreateLead(l *domain.Lead, createdBy int64) error {
 	l.StoreID = strings.TrimSpace(l.StoreID)
 	if err := domain.ValidateLeadStoreID(l.StoreID); err != nil {
 		return apperrors.NewBadRequest(err.Error(), err)
+	}
+	if err := s.validateLeadStoreMasterID(l.ClientID, l.StoreMasterID); err != nil {
+		return err
 	}
 
 	return s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
@@ -211,12 +215,23 @@ func (s *leadService) UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUp
 	if update.LabID != nil {
 		l.LabID = update.LabID
 	}
+	if update.StoreMasterID != nil {
+		if *update.StoreMasterID <= 0 {
+			l.StoreMasterID = nil
+		} else {
+			l.StoreMasterID = update.StoreMasterID
+		}
+	}
 	if update.CollectionType != nil {
 		ct, err := domain.ParseLeadCollectionType(*update.CollectionType)
 		if err != nil {
 			return nil, apperrors.NewBadRequest(err.Error(), err)
 		}
 		l.CollectionType = ct
+	}
+
+	if err := s.validateLeadStoreMasterID(l.ClientID, l.StoreMasterID); err != nil {
+		return nil, err
 	}
 
 	l.LeadID = id
@@ -422,6 +437,18 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 		}
 		storeID = strings.TrimSpace(storeID)
 
+		var storeMasterID *int64
+		if raw := strings.TrimSpace(at(row, "StoreMasterID")); raw != "" {
+			id, parseErr := strconv.ParseInt(raw, 10, 64)
+			if parseErr != nil || id < 1 {
+				return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: StoreMasterID must be a positive integer", rowIdx+1), parseErr)
+			}
+			if err := s.validateLeadStoreMasterID(clientID, &id); err != nil {
+				return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: %s", rowIdx+1, err.Error()), err)
+			}
+			storeMasterID = &id
+		}
+
 		now := time.Now()
 		lead := &domain.Lead{
 			ClientID:       clientID,
@@ -438,6 +465,7 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 			Pincode:        at(row, "Pincode"),
 			EmpID:          empID,
 			StoreID:        storeID,
+			StoreMasterID:  storeMasterID,
 			CollectionType: collectionType,
 			LeadStatusID:   leadStatusID,
 			CreatedBy:      createdBy,
@@ -562,8 +590,16 @@ func (s *leadService) GetLeadReportDownloadURL(ctx context.Context, leadID int64
 			return "", time.Time{}, apperrors.NewNotFound("Lead not found", nil)
 		}
 	}
+	if jwtUserType == utils.UserTypeStore {
+		if jwtUserID <= 0 {
+			return "", time.Time{}, apperrors.NewUnauthorized("Authentication required", nil)
+		}
+		if lead.StoreMasterID == nil || *lead.StoreMasterID != jwtUserID {
+			return "", time.Time{}, apperrors.NewNotFound("Lead not found", nil)
+		}
+	}
 	// Client portal: below status 10, FIT may download; HOLD (IsFit=0) only if IsReportDownloadable; UNFIT (IsFit=2) never via flag; NULL / not assessed same as forbidden until approved.
-	if jwtUserType == utils.UserTypeClient && lead.LeadStatusID < domain.LeadStatusIDClientDownloadNoFitGate {
+	if (jwtUserType == utils.UserTypeClient || jwtUserType == utils.UserTypeStore) && lead.LeadStatusID < domain.LeadStatusIDClientDownloadNoFitGate {
 		if lead.IsFit == nil {
 			return "", time.Time{}, apperrors.NewForbidden("Report download is not allowed for this lead", nil)
 		}
@@ -667,4 +703,27 @@ func (s *leadService) ApproveLeadReport(leadID int64, req *dto.ApproveLeadReques
 			CreatedBy: userID,
 		})
 	})
+}
+
+func (s *leadService) validateLeadStoreMasterID(clientID int64, storeMasterID *int64) error {
+	if storeMasterID == nil {
+		return nil
+	}
+	if *storeMasterID < 1 {
+		return apperrors.NewBadRequest("StoreMasterID must be a positive integer", nil)
+	}
+	if s.storeRepo == nil {
+		return apperrors.NewInternal("Store lookup is not configured", nil)
+	}
+	store, err := s.storeRepo.FindByID(*storeMasterID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return apperrors.NewBadRequest("StoreMasterID does not match an existing store", err)
+		}
+		return err
+	}
+	if store.ClientID != clientID {
+		return apperrors.NewBadRequest("StoreMasterID does not belong to this client", nil)
+	}
+	return nil
 }

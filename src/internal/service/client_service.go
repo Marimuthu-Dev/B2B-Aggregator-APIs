@@ -34,12 +34,13 @@ type ClientService interface {
 }
 
 type clientService struct {
-	repo  repository.ClientRepository
-	blobs BlobService
+	repo      repository.ClientRepository
+	blobs     BlobService
+	storeRepo repository.StoreRepository
 }
 
-func NewClientService(repo repository.ClientRepository, blobs BlobService) ClientService {
-	return &clientService{repo: repo, blobs: blobs}
+func NewClientService(repo repository.ClientRepository, blobs BlobService, storeRepo repository.StoreRepository) ClientService {
+	return &clientService{repo: repo, blobs: blobs, storeRepo: storeRepo}
 }
 
 func (s *clientService) ListClients(filter repository.ClientListFilter) ([]domain.Client, int64, error) {
@@ -67,6 +68,9 @@ func (s *clientService) GetClientBrandMappingsByClientID(clientID int64) ([]doma
 }
 
 func (s *clientService) CreateClient(c *domain.Client, createdBy int64, brandNames []string) error {
+	if err := s.ensureClientMobileNotUsedByStore(c.ContactPerson1Number); err != nil {
+		return err
+	}
 	now := time.Now()
 	c.CreatedBy = createdBy
 	c.CreatedOn = timeutil.FromTime(now)
@@ -83,6 +87,9 @@ func (s *clientService) CreateClientWithMoU(ctx context.Context, c *domain.Clien
 		if err := s.blobs.ValidatePDF(mou); err != nil {
 			return apperrors.NewBadRequest(err.Error(), err)
 		}
+	}
+	if err := s.ensureClientMobileNotUsedByStore(c.ContactPerson1Number); err != nil {
+		return err
 	}
 
 	now := time.Now()
@@ -207,6 +214,9 @@ func applyClientUpdatePatch(c *domain.Client, update *dto.ClientUpdateRequest) {
 	if update.IsAcitve != nil {
 		c.IsAcitve = *update.IsAcitve
 	}
+	if update.IsStoreLoginEnabled != nil {
+		c.IsStoreLoginEnabled = *update.IsStoreLoginEnabled
+	}
 	if update.MOUStartDate != nil {
 		c.MOUStartDate = timeutil.FromTimePtr(update.MOUStartDate)
 	}
@@ -237,6 +247,9 @@ func (s *clientService) UpdateClient(id int64, update *dto.ClientUpdateRequest, 
 
 	c := *existing
 	applyClientUpdatePatch(&c, update)
+	if err := s.ensureClientMobileNotUsedByStore(c.ContactPerson1Number); err != nil {
+		return nil, err
+	}
 	c.ClientID = id
 	c.LastUpdatedBy = lastUpdatedBy
 	c.LastUpdatedOn = timeutil.FromTime(time.Now())
@@ -278,6 +291,9 @@ func (s *clientService) UpdateClientWithMoU(ctx context.Context, id int64, updat
 	if hasFields && !hasFile {
 		c := *existing
 		applyClientUpdatePatch(&c, update)
+		if err := s.ensureClientMobileNotUsedByStore(c.ContactPerson1Number); err != nil {
+			return nil, err
+		}
 		c.ClientID = id
 		c.LastUpdatedBy = lastUpdatedBy
 		c.LastUpdatedOn = timeutil.FromTime(time.Now())
@@ -294,6 +310,9 @@ func (s *clientService) UpdateClientWithMoU(ctx context.Context, id int64, updat
 	if hasFields {
 		c := *existing
 		applyClientUpdatePatch(&c, update)
+		if err := s.ensureClientMobileNotUsedByStore(c.ContactPerson1Number); err != nil {
+			return nil, err
+		}
 		c.ClientID = id
 		c.LastUpdatedBy = lastUpdatedBy
 		c.LastUpdatedOn = timeutil.FromTime(time.Now())
@@ -394,4 +413,19 @@ func (s *clientService) GetClientMoUDownloadURL(ctx context.Context, clientID in
 		return nil, apperrors.NewInternal("Failed to generate download link", err)
 	}
 	return &dto.ClientMoUDownloadURLResponse{URL: urlStr, ExpiresAt: exp}, nil
+}
+
+func (s *clientService) ensureClientMobileNotUsedByStore(mobile string) error {
+	mobile = strings.TrimSpace(mobile)
+	if mobile == "" || s.storeRepo == nil {
+		return nil
+	}
+	taken, err := s.storeRepo.ExistsByContactNumber(mobile, 0)
+	if err != nil {
+		return err
+	}
+	if taken {
+		return apperrors.NewBadRequest("ContactPerson1Number is already used by a store login", nil)
+	}
+	return nil
 }
