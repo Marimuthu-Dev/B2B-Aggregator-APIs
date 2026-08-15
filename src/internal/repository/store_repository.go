@@ -104,7 +104,8 @@ func (r *storeRepository) ExistsByContactNumber(contactNumber string, excludeSto
 		q = q.Where("StoreID <> ?", excludeStoreID)
 	}
 	var count int64
-	if err := q.Limit(1).Count(&count).Error; err != nil {
+	// Do not use Limit() with Count(): SQL Server rejects ORDER BY StoreID on an aggregate.
+	if err := q.Count(&count).Error; err != nil {
 		return false, err
 	}
 	return count > 0, nil
@@ -116,7 +117,7 @@ func (r *storeRepository) ExistsByEmailID(emailID string, excludeStoreID int64) 
 		q = q.Where("StoreID <> ?", excludeStoreID)
 	}
 	var count int64
-	if err := q.Limit(1).Count(&count).Error; err != nil {
+	if err := q.Count(&count).Error; err != nil {
 		return false, err
 	}
 	return count > 0, nil
