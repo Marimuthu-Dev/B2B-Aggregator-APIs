@@ -14,3 +14,7 @@ src/email-worker
 src/fitness-worker
 src/fitness-worker
 /deploy
+docs/STORE_LOGIN_PLAN.md
+Database/med-prod-DB.sql
+/src/chrome-linux-deps
+/src/chrome-linux64
