@@ -93,21 +93,10 @@ func (s *loginService) resolveUserByMobileNumber(domainName, mobileNumber string
 			return 0, 0, nil, apperrors.NewNotFound("User not found", err)
 		}
 		fmt.Println("[LOGIN] Service.resolveUserByMobileNumber: client not found, trying store")
-		store, storeErr := s.storeRepo.FindByContactNumber(mobileNumber)
-		if storeErr != nil {
-			fmt.Printf("[LOGIN] Service.resolveUserByMobileNumber: store not found: %v\n", storeErr)
-			return 0, 0, nil, apperrors.NewNotFound("User not found", storeErr)
-		}
-		if !store.IsActive {
-			return 0, 0, nil, apperrors.NewUnauthorized("Invalid credentials", errors.New("store inactive"))
-		}
-		parent, parentErr := s.clientRepo.FindByID(store.ClientID)
-		if parentErr != nil || parent == nil || !parent.IsStoreLoginEnabled || !parent.IsAcitve {
-			return 0, 0, nil, apperrors.NewUnauthorized("Invalid credentials", errors.New("store login disabled"))
-		}
-		store.ClientName = parent.ClientName
-		fmt.Printf("[LOGIN] Service.resolveUserByMobileNumber: store found StoreID=%d ClientID=%d\n", store.StoreID, store.ClientID)
-		return store.StoreID, utils.UserTypeStore, store, nil
+		return s.resolveStoreByMobileNumber(mobileNumber)
+	case utils.UserTypeStore:
+		fmt.Println("[LOGIN] Service.resolveUserByMobileNumber: resolving store by contact number")
+		return s.resolveStoreByMobileNumber(mobileNumber)
 	case utils.UserTypeEmployee:
 		fmt.Println("[LOGIN] Service.resolveUserByMobileNumber: resolving employee by mobile number")
 		employee, err := s.employeeRepo.FindByMobileNumber(mobileNumber)
@@ -130,6 +119,24 @@ func (s *loginService) resolveUserByMobileNumber(domainName, mobileNumber string
 		fmt.Printf("[LOGIN] Service.resolveUserByMobileNumber: unknown userType=%d, invalid domain\n", userType)
 		return 0, 0, nil, apperrors.NewBadRequest("Invalid domain", nil)
 	}
+}
+
+func (s *loginService) resolveStoreByMobileNumber(mobileNumber string) (int64, int, interface{}, error) {
+	store, err := s.storeRepo.FindByContactNumber(mobileNumber)
+	if err != nil {
+		fmt.Printf("[LOGIN] Service.resolveStoreByMobileNumber: store not found: %v\n", err)
+		return 0, 0, nil, apperrors.NewNotFound("User not found", err)
+	}
+	if !store.IsActive {
+		return 0, 0, nil, apperrors.NewUnauthorized("Invalid credentials", errors.New("store inactive"))
+	}
+	parent, parentErr := s.clientRepo.FindByID(store.ClientID)
+	if parentErr != nil || parent == nil || !parent.IsStoreLoginEnabled || !parent.IsAcitve {
+		return 0, 0, nil, apperrors.NewUnauthorized("Invalid credentials", errors.New("store login disabled"))
+	}
+	store.ClientName = parent.ClientName
+	fmt.Printf("[LOGIN] Service.resolveStoreByMobileNumber: store found StoreID=%d ClientID=%d\n", store.StoreID, store.ClientID)
+	return store.StoreID, utils.UserTypeStore, store, nil
 }
 
 func (s *loginService) Login(req dto.LoginRequest) (*dto.LoginResponse, error) {
@@ -365,6 +372,17 @@ func (s *loginService) GetProfile(domainName string, userIDStr, mobileNumber *st
 				return nil, apperrors.NewNotFound("Profile not found", err)
 			}
 			return lab, nil
+		}
+		if userType == utils.UserTypeStore {
+			id, _ := strconv.ParseInt(*userIDStr, 10, 64)
+			store, err := s.storeRepo.FindByID(id)
+			if err != nil {
+				return nil, apperrors.NewNotFound("Profile not found", err)
+			}
+			if parent, pErr := s.clientRepo.FindByID(store.ClientID); pErr == nil && parent != nil {
+				store.ClientName = parent.ClientName
+			}
+			return store, nil
 		}
 		return nil, apperrors.NewBadRequest("Employee profile not supported", nil)
 	}

@@ -47,8 +47,8 @@ func normalizeLoginDomain(raw string) string {
 	return strings.TrimSuffix(s, ".")
 }
 
-// GetUserTypeFromDomain returns userType (1=employee, 2=client, 3=lab) from domain string.
-// Accepts short names (employee, client, lab), numeric ("1","2","3"), staging URLs, or prod hostnames.
+// GetUserTypeFromDomain returns userType (1=employee, 2=client, 3=lab, 4=store) from domain string.
+// Accepts short names (employee, client, lab, store), numeric ("1","2","3","4"), staging URLs, or prod hostnames.
 // Full URLs (e.g. https://ops.urmediconnect.com) and host:port are normalized to the hostname.
 // Returns 0 for invalid/unknown domain (matches Node.js getUserTypeFromDomain).
 func GetUserTypeFromDomain(domain string) int {
@@ -61,7 +61,9 @@ func GetUserTypeFromDomain(domain string) int {
 		userType = UserTypeClient
 	case "3", "lab", "um-staging-lab-web.azurewebsites.net", "lab.urmediconnect.com", "lab.medlyfehealth.com":
 		userType = UserTypeLab
-	default:	
+	case "4", "store", "store.urmediconnect.com", "store.medlyfehealth.com":
+		userType = UserTypeStore
+	default:
 		userType = 0 // invalid domain, same as Node.js
 	}
 	fmt.Printf("[LOGIN] Utils.GetUserTypeFromDomain: domain=%q -> userType=%d\n", domain, userType)
