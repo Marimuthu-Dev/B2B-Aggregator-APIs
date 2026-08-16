@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"b2b-diagnostic-aggregator/apis/internal/timeutil"
@@ -112,6 +113,17 @@ func ValidateLeadStoreID(s string) error {
 		return fmt.Errorf("StoreID must be at most %d characters", LeadStoreIDMaxLen)
 	}
 	return nil
+}
+
+// LeadBelongsToStore is true when StoreMasterID or varchar StoreID matches the store JWT userId.
+func LeadBelongsToStore(storeID int64, storeMasterID *int64, storeIDText string) bool {
+	if storeID <= 0 {
+		return false
+	}
+	if storeMasterID != nil && *storeMasterID == storeID {
+		return true
+	}
+	return strings.TrimSpace(storeIDText) == strconv.FormatInt(storeID, 10)
 }
 
 // LeadStatusIDDefault is the initial status for new leads when the client omits LeadStatusID (JSON zero / empty CSV).

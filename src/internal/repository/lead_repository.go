@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"strconv"
 	"strings"
 	"time"
 
@@ -129,13 +130,18 @@ func (r *leadRepository) leadListJoinedQuery(filter LeadListFilter) *gorm.DB {
 	if filter.CollectionType != nil && *filter.CollectionType != "" {
 		q = q.Where("l.CollectionType = ?", *filter.CollectionType)
 	}
-	if filter.StoreID != nil {
-		if storeID := strings.TrimSpace(*filter.StoreID); storeID != "" {
-			q = q.Where("l.StoreID = ?", storeID)
+	if filter.RestrictToStoreID != nil {
+		sid := strconv.FormatInt(*filter.RestrictToStoreID, 10)
+		q = q.Where("(l.StoreMasterID = ? OR l.StoreID = ?)", *filter.RestrictToStoreID, sid)
+	} else {
+		if filter.StoreID != nil {
+			if storeID := strings.TrimSpace(*filter.StoreID); storeID != "" {
+				q = q.Where("l.StoreID = ?", storeID)
+			}
 		}
-	}
-	if filter.StoreMasterID != nil {
-		q = q.Where("l.StoreMasterID = ?", *filter.StoreMasterID)
+		if filter.StoreMasterID != nil {
+			q = q.Where("l.StoreMasterID = ?", *filter.StoreMasterID)
+		}
 	}
 	if trimmed := strings.TrimSpace(filter.Search); trimmed != "" {
 		term := "%" + trimmed + "%"

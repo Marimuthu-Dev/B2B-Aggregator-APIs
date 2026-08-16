@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"b2b-diagnostic-aggregator/apis/internal/apperrors"
+	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
 	"b2b-diagnostic-aggregator/apis/internal/middleware"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
@@ -31,11 +32,15 @@ func (h *StoreHandler) GetAll(c *gin.Context) {
 		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
 		return
 	}
+	var storeID *int64
 	switch userType {
 	case utils.UserTypeEmployee:
 		// unscoped; optional clientId from query
 	case utils.UserTypeClient:
 		query.ClientID = &userID
+	case utils.UserTypeStore:
+		query.ClientID = nil
+		storeID = &userID
 	default:
 		respondError(c, apperrors.NewForbidden("You are not authorized for this activity.", nil))
 		return
@@ -48,6 +53,7 @@ func (h *StoreHandler) GetAll(c *gin.Context) {
 		SortBy:    page.SortBy,
 		SortOrder: page.SortOrder,
 		ClientID:  query.ClientID,
+		StoreID:   storeID,
 		IsActive:  query.IsActive,
 		Search:    query.Search,
 	}
@@ -77,7 +83,7 @@ func (h *StoreHandler) GetByID(c *gin.Context) {
 		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
 		return
 	}
-	if userType != utils.UserTypeEmployee && userType != utils.UserTypeClient {
+	if userType != utils.UserTypeEmployee && userType != utils.UserTypeClient && userType != utils.UserTypeStore {
 		respondError(c, apperrors.NewForbidden("You are not authorized for this activity.", nil))
 		return
 	}
@@ -86,7 +92,7 @@ func (h *StoreHandler) GetByID(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	if !storeReadableByCaller(userType, userID, data.ClientID) {
+	if !storeReadableByCaller(userType, userID, data) {
 		respondError(c, apperrors.NewNotFound("Store not found", nil))
 		return
 	}
@@ -154,12 +160,17 @@ func storeCaller(c *gin.Context) (userType int, userID int64, ok bool) {
 	return userType, userID, idOK && typeOK && userID > 0
 }
 
-func storeReadableByCaller(userType int, userID, clientID int64) bool {
+func storeReadableByCaller(userType int, userID int64, store *domain.Store) bool {
+	if store == nil {
+		return false
+	}
 	switch userType {
 	case utils.UserTypeEmployee:
 		return true
 	case utils.UserTypeClient:
-		return clientID == userID
+		return store.ClientID == userID
+	case utils.UserTypeStore:
+		return store.StoreID == userID
 	default:
 		return false
 	}

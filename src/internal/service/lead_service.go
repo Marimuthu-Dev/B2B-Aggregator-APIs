@@ -594,7 +594,7 @@ func (s *leadService) GetLeadReportDownloadURL(ctx context.Context, leadID int64
 		if jwtUserID <= 0 {
 			return "", time.Time{}, apperrors.NewUnauthorized("Authentication required", nil)
 		}
-		if lead.StoreMasterID == nil || *lead.StoreMasterID != jwtUserID {
+		if !domain.LeadBelongsToStore(jwtUserID, lead.StoreMasterID, lead.StoreID) {
 			return "", time.Time{}, apperrors.NewNotFound("Lead not found", nil)
 		}
 	}

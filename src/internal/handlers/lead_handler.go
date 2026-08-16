@@ -69,6 +69,7 @@ func (h *LeadHandler) GetAll(c *gin.Context) {
 		CollectionType: query.CollectionType,
 		StoreID:          query.StoreID,
 		StoreMasterID:    query.StoreMasterID,
+		RestrictToStoreID: storeIDFromJWT(c),
 		Search:                    query.Search,
 		FitnessStatus:             fitnessFilter,
 		AppointmentAtMin: apptMin,
@@ -399,8 +400,20 @@ func applyLeadListScopeFromJWT(c *gin.Context, q *dto.LeadListQuery) {
 	case utils.UserTypeLab:
 		q.LabID = &userID
 	case utils.UserTypeStore:
+		q.ClientID = nil
+		q.LabID = nil
 		q.StoreMasterID = &userID
+		sid := strconv.FormatInt(userID, 10)
+		q.StoreID = &sid
 	}
+}
+
+func storeIDFromJWT(c *gin.Context) *int64 {
+	id, ok := middleware.GetStoreID(c)
+	if !ok || id <= 0 {
+		return nil
+	}
+	return &id
 }
 
 // requireLeadListJWTSatisfied ensures client/lab callers always have a forced filter (no unscoped list).
@@ -419,7 +432,7 @@ func requireLeadListJWTSatisfied(c *gin.Context, q *dto.LeadListQuery) error {
 			return apperrors.NewUnauthorized("Authentication required", nil)
 		}
 	case utils.UserTypeStore:
-		if q.StoreMasterID == nil {
+		if q.StoreID == nil && q.StoreMasterID == nil {
 			return apperrors.NewUnauthorized("Authentication required", nil)
 		}
 	}
@@ -447,7 +460,7 @@ func leadDetailAccessibleByJWT(c *gin.Context, d *domain.LeadDetail) bool {
 		}
 		return *d.LabID == userID
 	case utils.UserTypeStore:
-		return d.StoreMasterID != nil && *d.StoreMasterID == userID
+		return domain.LeadBelongsToStore(userID, d.StoreMasterID, d.StoreID)
 	default:
 		return false
 	}
@@ -579,6 +592,7 @@ func (h *LeadHandler) applyLeadCreateScopeFromJWT(c *gin.Context, lead *domain.L
 		lead.ClientID = store.ClientID
 		sid := store.StoreID
 		lead.StoreMasterID = &sid
+		lead.StoreID = strconv.FormatInt(store.StoreID, 10)
 		return nil
 	default:
 		return apperrors.NewForbidden("You are not authorized for this activity.", nil)

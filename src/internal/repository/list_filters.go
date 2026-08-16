@@ -51,6 +51,8 @@ type LeadListFilter struct {
 	CollectionType   *string
 	StoreID          *string
 	StoreMasterID    *int64
+	// RestrictToStoreID is set from a store JWT (userType 4). Matches StoreMasterID or StoreID varchar.
+	RestrictToStoreID *int64
 	Search           string
 	FitnessStatus    domain.LeadListFitnessFilter
 	// AppointmentAtMin is inclusive lower bound (appointmentAtFrom at 00:00:00 IST); nil = no lower filter.

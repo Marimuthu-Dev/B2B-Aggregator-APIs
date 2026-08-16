@@ -9,6 +9,7 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/middleware"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/service"
+	"b2b-diagnostic-aggregator/apis/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -22,6 +23,10 @@ func NewClientHandler(svc service.ClientService) *ClientHandler {
 }
 
 func (h *ClientHandler) GetAll(c *gin.Context) {
+	if userType, ok := middleware.GetUserType(c); ok && userType == utils.UserTypeStore {
+		respondError(c, apperrors.NewForbidden("You are not authorized for this activity.", nil))
+		return
+	}
 	var query dto.ClientListQuery
 	if !middleware.BindQuery(c, &query) {
 		return

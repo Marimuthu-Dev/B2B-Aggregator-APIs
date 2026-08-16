@@ -15,6 +15,7 @@ type StoreListFilter struct {
 	SortBy    string
 	SortOrder string
 	ClientID  *int64
+	StoreID   *int64
 	IsActive  *bool
 	Search    string
 }
@@ -125,6 +126,9 @@ func (r *storeRepository) ExistsByEmailID(emailID string, excludeStoreID int64) 
 
 func (r *storeRepository) List(filter StoreListFilter) ([]domain.Store, int64, error) {
 	query := r.db.Model(&persistencemodels.Store{})
+	if filter.StoreID != nil {
+		query = query.Where("StoreID = ?", *filter.StoreID)
+	}
 	if filter.ClientID != nil {
 		query = query.Where("ClientID = ?", *filter.ClientID)
 	}
