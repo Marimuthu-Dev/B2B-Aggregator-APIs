@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Welcome to MedLyfe</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f7f8;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f7f8;">
+    <tr>
+      <td align="center" style="padding:24px 12px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background-color:#ffffff;border-collapse:collapse;">
+          <tr>
+            <td style="height:6px;background-color:#0b6e99;font-size:0;line-height:0;">&nbsp;</td>
+          </tr>
+          <tr>
+            <td style="padding:20px 32px 12px 32px;background-color:#ffffff;">
+              <img src="{{.LogoURL}}" alt="MedLyfe" width="220" style="display:block;border:0;height:auto;max-width:220px;">
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 32px 24px 32px;background-color:#0b6e99;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="padding:28px 8px 8px 8px;">
+                    <p style="margin:0 0 8px 0;font-size:11px;letter-spacing:1.5px;color:#d7eef8;font-weight:bold;text-transform:uppercase;">Greetings from MedLyfe</p>
+                    <h1 style="margin:0;font-size:22px;line-height:1.35;color:#ffffff;font-weight:bold;">Welcome to our upgraded portal</h1>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 8px 24px 8px;">
+                    <p style="margin:0;font-size:14px;line-height:1.6;color:#ffffff;">Designed for seamless medical booking and report sharing. Going forward, all bookings and reports will be managed through the portal.</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px 32px 8px 32px;background-color:#ffffff;">
+              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.5;color:#1a2b3c;">Dear Vendor Partner,</p>
+              <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#334155;">We are pleased to welcome you to our upgraded <strong style="color:#0b6e99;">MedLyfe Portal</strong>{{if .ClientName}} for <strong style="color:#0b6e99;">{{.ClientName}}</strong>{{end}}. Please start using the portal for all applicable bookings and report uploads.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 32px 16px 32px;background-color:#ffffff;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f3f8fb;border:1px solid #cfe0ea;border-collapse:collapse;">
+                <tr>
+                  <td colspan="2" style="padding:14px 16px 6px 16px;font-size:13px;font-weight:bold;color:#0b6e99;letter-spacing:0.4px;text-transform:uppercase;">Login details</td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 16px;font-size:13px;color:#64748b;width:38%;">Username</td>
+                  <td style="padding:8px 16px;font-size:13px;color:#1a2b3c;font-weight:bold;">{{.Username}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 16px;font-size:12px;color:#64748b;">&nbsp;</td>
+                  <td style="padding:0 16px 8px 16px;font-size:12px;color:#64748b;">Registered mobile number (contact person 1)</td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 16px 16px 16px;font-size:13px;color:#64748b;vertical-align:middle;">Password</td>
+                  <td style="padding:8px 16px 16px 16px;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td style="border-radius:4px;background-color:#0b6e99;">
+                          <a href="{{.GeneratePasswordURL}}" style="display:inline-block;padding:10px 18px;font-size:13px;font-weight:bold;color:#ffffff;text-decoration:none;">Click to generate password</a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 32px 28px 32px;background-color:#ffffff;">
+              <p style="margin:0 0 12px 0;font-size:15px;line-height:1.6;color:#334155;">Home page:</p>
+              <p style="margin:0 0 16px 0;font-size:14px;line-height:1.5;"><a href="{{.PortalURL}}" style="color:#0b6e99;font-weight:bold;text-decoration:none;">{{.PortalURL}}</a></p>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="border-radius:4px;background-color:#12344a;">
+                    <a href="{{.PortalURL}}" style="display:inline-block;padding:12px 22px;font-size:14px;font-weight:bold;color:#ffffff;text-decoration:none;">Open portal</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:20px 0 0 0;font-size:15px;line-height:1.6;color:#334155;">For any assistance, please feel free to reach out to our team.</p>
+              <p style="margin:16px 0 0 0;font-size:15px;line-height:1.6;color:#334155;">Welcome aboard, and we look forward to a smooth and successful association.</p>
+              <p style="margin:20px 0 0 0;font-size:15px;line-height:1.6;color:#1a2b3c;">Best regards,<br><strong>Team MedLyfe</strong></p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 32px;background-color:#12344a;">
+              <p style="margin:0 0 8px 0;font-size:13px;font-weight:bold;color:#ffffff;">MedLyfe</p>
+              <p style="margin:0 0 4px 0;font-size:12px;line-height:1.5;color:#c5d4de;">Phone: {{.SupportPhone}}</p>
+              <p style="margin:0 0 4px 0;font-size:12px;line-height:1.5;color:#c5d4de;">Email: <a href="mailto:{{.SupportEmail}}" style="color:#7ec8e8;text-decoration:none;">{{.SupportEmail}}</a></p>
+              <p style="margin:12px 0 0 0;font-size:11px;line-height:1.5;color:#8aa0af;">&copy; {{.Year}} MedLyfe. All rights reserved.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

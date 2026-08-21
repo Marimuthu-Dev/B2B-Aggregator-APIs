@@ -72,7 +72,15 @@ func Run() error {
 			blobSvc = bs
 		}
 	}
-	clientSvc := service.NewClientService(clientRepo, blobSvc, storeRepo)
+	var emailOutbox *repository.EmailOutboxRepository
+	if db != nil {
+		if sqlDB, sqlErr := db.DB(); sqlErr != nil {
+			log.Printf("Email outbox disabled (sql.DB): %v", sqlErr)
+		} else {
+			emailOutbox = repository.NewEmailOutboxRepositoryFromSQL(sqlDB)
+		}
+	}
+	clientSvc := service.NewClientService(clientRepo, blobSvc, storeRepo, emailOutbox, cfg.Email, cfg.Domains.Client)
 	clientLocationSvc := service.NewClientLocationService(clientLocationRepo)
 	employeeSvc := service.NewEmployeeService(employeeRepo)
 	labSvc := service.NewLabService(labRepo, blobSvc)
@@ -98,15 +106,15 @@ func Run() error {
 	registerMiddleware(r, dbReady)
 
 	registerRoutes(r, cfg.JWT.Secret, routeDeps{
-		packageHandler: packageHandler,
-		loginHandler:   loginHandler,
+		packageHandler:        packageHandler,
+		loginHandler:          loginHandler,
 		clientHandler:         clientHandler,
 		clientLocationHandler: clientLocationHandler,
 		employeeHandler:       employeeHandler,
 		labHandler:            labHandler,
 		storeHandler:          storeHandler,
-		leadHandler:    leadHandler,
-		testHandler:   testHandler,
+		leadHandler:           leadHandler,
+		testHandler:           testHandler,
 	})
 
 	// Azure App Service and cloud platforms set PORT env; default 8080

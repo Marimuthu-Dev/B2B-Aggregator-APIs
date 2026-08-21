@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"b2b-diagnostic-aggregator/apis/internal/apperrors"
+	"b2b-diagnostic-aggregator/apis/internal/config"
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
@@ -37,10 +38,27 @@ type clientService struct {
 	repo      repository.ClientRepository
 	blobs     BlobService
 	storeRepo repository.StoreRepository
+	emails    *repository.EmailOutboxRepository
+	emailCfg  config.OutboundEmailConfig
+	portalURL string
 }
 
-func NewClientService(repo repository.ClientRepository, blobs BlobService, storeRepo repository.StoreRepository) ClientService {
-	return &clientService{repo: repo, blobs: blobs, storeRepo: storeRepo}
+func NewClientService(
+	repo repository.ClientRepository,
+	blobs BlobService,
+	storeRepo repository.StoreRepository,
+	emails *repository.EmailOutboxRepository,
+	emailCfg config.OutboundEmailConfig,
+	clientPortalURL string,
+) ClientService {
+	return &clientService{
+		repo:      repo,
+		blobs:     blobs,
+		storeRepo: storeRepo,
+		emails:    emails,
+		emailCfg:  emailCfg,
+		portalURL: clientPortalURL,
+	}
 }
 
 func (s *clientService) ListClients(filter repository.ClientListFilter) ([]domain.Client, int64, error) {
@@ -76,7 +94,11 @@ func (s *clientService) CreateClient(c *domain.Client, createdBy int64, brandNam
 	c.CreatedOn = timeutil.FromTime(now)
 	c.LastUpdatedBy = createdBy
 	c.LastUpdatedOn = timeutil.FromTime(now)
-	return s.repo.Create(c, brandNames)
+	if err := s.repo.Create(c, brandNames); err != nil {
+		return err
+	}
+	s.queueClientCreatedEmail(context.Background(), c)
+	return nil
 }
 
 func (s *clientService) CreateClientWithMoU(ctx context.Context, c *domain.Client, createdBy int64, mou *multipart.FileHeader, brandNames []string) error {
@@ -101,6 +123,7 @@ func (s *clientService) CreateClientWithMoU(ctx context.Context, c *domain.Clien
 		return err
 	}
 	if mou == nil {
+		s.queueClientCreatedEmail(ctx, c)
 		return nil
 	}
 
@@ -123,6 +146,7 @@ func (s *clientService) CreateClientWithMoU(ctx context.Context, c *domain.Clien
 		return apperrors.NewInternal("Failed to save MoU document URL", err)
 	}
 	c.MoUDocumentURL = &url
+	s.queueClientCreatedEmail(ctx, c)
 	return nil
 }
 

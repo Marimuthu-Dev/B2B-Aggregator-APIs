@@ -19,6 +19,17 @@ type Config struct {
 	Log         LogConfig
 	Domains     DomainURLs
 	AzureBlob   AzureBlobConfig
+	Email       OutboundEmailConfig
+}
+
+// OutboundEmailConfig is used when the API inserts rows into {DB_SCHEMA}.tbl_Emails.
+type OutboundEmailConfig struct {
+	FromAddress  string
+	CCAddress    string
+	BCCAddress   string
+	SupportPhone string
+	SupportEmail string
+	LogoURL      string
 }
 
 const defaultMoUMaxBytes = 5 * 1024 * 1024
@@ -132,6 +143,34 @@ func LoadConfig() *Config {
 			Lab:      getEnv("LAB_DOMAIN_URL", ""),
 		},
 		AzureBlob: loadAzureBlobConfig(),
+		Email:     loadOutboundEmailConfig(),
+	}
+}
+
+func loadOutboundEmailConfig() OutboundEmailConfig {
+	from := strings.TrimSpace(getEnv("EMAIL_FROM_ADDRESS", "support@urmediconnect.com"))
+	if from == "" {
+		from = "support@urmediconnect.com"
+	}
+	logo := strings.TrimSpace(getEnv("EMAIL_LOGO_URL", "https://urmediconnect.com/img/logo.jpeg"))
+	if logo == "" {
+		logo = "https://urmediconnect.com/img/logo.jpeg"
+	}
+	supportEmail := strings.TrimSpace(getEnv("EMAIL_SUPPORT_EMAIL", "support@urmediconnect.com"))
+	if supportEmail == "" {
+		supportEmail = "support@urmediconnect.com"
+	}
+	supportPhone := strings.TrimSpace(getEnv("EMAIL_SUPPORT_PHONE", "+91 9036302806"))
+	if supportPhone == "" {
+		supportPhone = "+91 9036302806"
+	}
+	return OutboundEmailConfig{
+		FromAddress:  from,
+		CCAddress:    strings.TrimSpace(getEnv("EMAIL_CC_ADDRESS", "")),
+		BCCAddress:   strings.TrimSpace(getEnv("EMAIL_BCC_ADDRESS", "")),
+		SupportPhone: supportPhone,
+		SupportEmail: supportEmail,
+		LogoURL:      logo,
 	}
 }
 

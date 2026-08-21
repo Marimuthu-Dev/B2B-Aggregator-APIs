@@ -34,6 +34,103 @@ func (r *EmailOutboxRepository) Close() error {
 	return nil
 }
 
+// NewEmailOutboxRepositoryFromSQL uses an existing pool (API process). Does not ping.
+func NewEmailOutboxRepositoryFromSQL(db *sql.DB) *EmailOutboxRepository {
+	if db == nil {
+		return nil
+	}
+	return &EmailOutboxRepository{db: db}
+}
+
+const (
+	emailSubjectMax = 150
+	emailFromMax    = 35
+	emailToMax      = 100
+	emailCCMax      = 100
+	emailBCCMax     = 100
+	emailTypeMax    = 20
+)
+
+// Enqueue inserts a pending row (IsSent = 0) into {DB_SCHEMA}.tbl_Emails for the email worker.
+func (r *EmailOutboxRepository) Enqueue(ctx context.Context, e domain.QueuedEmail) error {
+	if r == nil || r.db == nil {
+		return fmt.Errorf("email outbox repository is not configured")
+	}
+	from := clipRunes(strings.TrimSpace(e.FromAddress), emailFromMax)
+	to := clipRunes(strings.TrimSpace(e.ToAddress), emailToMax)
+	if from == "" {
+		return fmt.Errorf("FromAddress is required")
+	}
+	if to == "" {
+		return fmt.Errorf("ToAddress is required")
+	}
+
+	q := fmt.Sprintf(`
+INSERT INTO %s (
+  Subject,
+  FromAddress,
+  ToAddress,
+  CCAddress,
+  BCCAddress,
+  BodyContent,
+  EmailType,
+  IsSent,
+  SentOn,
+  CreatedBy,
+  CreatedOn,
+  LastUpdatedBy,
+  LastUpdatedOn
+) VALUES (
+  @subject,
+  @fromAddress,
+  @toAddress,
+  @ccAddress,
+  @bccAddress,
+  @bodyContent,
+  @emailType,
+  0,
+  NULL,
+  @createdBy,
+  GETDATE(),
+  @createdBy,
+  GETDATE()
+)`, emailsTable())
+
+	_, err := r.db.ExecContext(ctx, q,
+		sql.Named("subject", clipRunes(strings.TrimSpace(e.Subject), emailSubjectMax)),
+		sql.Named("fromAddress", from),
+		sql.Named("toAddress", to),
+		sql.Named("ccAddress", nullableClipped(e.CC, emailCCMax)),
+		sql.Named("bccAddress", nullableClipped(e.BCC, emailBCCMax)),
+		sql.Named("bodyContent", e.BodyContent),
+		sql.Named("emailType", clipRunes(strings.TrimSpace(e.EmailType), emailTypeMax)),
+		sql.Named("createdBy", e.CreatedBy),
+	)
+	if err != nil {
+		return fmt.Errorf("enqueue email: %w", err)
+	}
+	return nil
+}
+
+func nullableClipped(s string, max int) any {
+	s = clipRunes(strings.TrimSpace(s), max)
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
+func clipRunes(s string, max int) string {
+	if max <= 0 {
+		return ""
+	}
+	runes := []rune(s)
+	if len(runes) <= max {
+		return s
+	}
+	return string(runes[:max])
+}
+
 func emailsTable() string {
 	return persistencemodels.Table("tbl_Emails")
 }
