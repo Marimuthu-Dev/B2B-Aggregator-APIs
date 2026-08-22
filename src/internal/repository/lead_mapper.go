@@ -65,6 +65,10 @@ func mapLeadToDomain(p persistencemodels.Lead) domain.Lead {
 }
 
 func mapLeadToPersistence(d domain.Lead) persistencemodels.Lead {
+	storeMasterID := d.StoreMasterID
+	if !persistencemodels.HasLeadStoreMasterIDColumn() {
+		storeMasterID = nil
+	}
 	return persistencemodels.Lead{
 		LeadID:                        d.LeadID,
 		ClientID:                      d.ClientID,
@@ -81,7 +85,7 @@ func mapLeadToPersistence(d domain.Lead) persistencemodels.Lead {
 		Pincode:                       d.Pincode,
 		EmpID:                         stringPtrOrNil(d.EmpID),
 		StoreID:                       stringPtrOrNil(d.StoreID),
-		StoreMasterID:                 d.StoreMasterID,
+		StoreMasterID:                 storeMasterID,
 		CollectionType:                d.CollectionType,
 		LeadStatusID:                  d.LeadStatusID,
 		AppointmentAt:                 timeutil.StoredToTimePtr(d.AppointmentAt),

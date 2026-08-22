@@ -14,6 +14,7 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/apperrors"
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
+	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 	"b2b-diagnostic-aggregator/apis/pkg/utils"
@@ -112,7 +113,9 @@ func (s *leadService) CreateLead(l *domain.Lead, createdBy int64) error {
 	if err := domain.ValidateLeadStoreID(l.StoreID); err != nil {
 		return apperrors.NewBadRequest(err.Error(), err)
 	}
-	if err := s.validateLeadStoreMasterID(l.ClientID, l.StoreMasterID); err != nil {
+	if !persistencemodels.HasLeadStoreMasterIDColumn() {
+		l.StoreMasterID = nil
+	} else if err := s.validateLeadStoreMasterID(l.ClientID, l.StoreMasterID); err != nil {
 		return err
 	}
 
@@ -215,12 +218,19 @@ func (s *leadService) UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUp
 	if update.LabID != nil {
 		l.LabID = update.LabID
 	}
-	if update.StoreMasterID != nil {
-		if *update.StoreMasterID <= 0 {
-			l.StoreMasterID = nil
-		} else {
-			l.StoreMasterID = update.StoreMasterID
+	if persistencemodels.HasLeadStoreMasterIDColumn() {
+		if update.StoreMasterID != nil {
+			if *update.StoreMasterID <= 0 {
+				l.StoreMasterID = nil
+			} else {
+				l.StoreMasterID = update.StoreMasterID
+			}
 		}
+		if err := s.validateLeadStoreMasterID(l.ClientID, l.StoreMasterID); err != nil {
+			return nil, err
+		}
+	} else {
+		l.StoreMasterID = nil
 	}
 	if update.CollectionType != nil {
 		ct, err := domain.ParseLeadCollectionType(*update.CollectionType)
@@ -228,10 +238,6 @@ func (s *leadService) UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUp
 			return nil, apperrors.NewBadRequest(err.Error(), err)
 		}
 		l.CollectionType = ct
-	}
-
-	if err := s.validateLeadStoreMasterID(l.ClientID, l.StoreMasterID); err != nil {
-		return nil, err
 	}
 
 	l.LeadID = id
@@ -438,15 +444,17 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 		storeID = strings.TrimSpace(storeID)
 
 		var storeMasterID *int64
-		if raw := strings.TrimSpace(at(row, "StoreMasterID")); raw != "" {
-			id, parseErr := strconv.ParseInt(raw, 10, 64)
-			if parseErr != nil || id < 1 {
-				return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: StoreMasterID must be a positive integer", rowIdx+1), parseErr)
+		if persistencemodels.HasLeadStoreMasterIDColumn() {
+			if raw := strings.TrimSpace(at(row, "StoreMasterID")); raw != "" {
+				id, parseErr := strconv.ParseInt(raw, 10, 64)
+				if parseErr != nil || id < 1 {
+					return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: StoreMasterID must be a positive integer", rowIdx+1), parseErr)
+				}
+				if err := s.validateLeadStoreMasterID(clientID, &id); err != nil {
+					return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: %s", rowIdx+1, err.Error()), err)
+				}
+				storeMasterID = &id
 			}
-			if err := s.validateLeadStoreMasterID(clientID, &id); err != nil {
-				return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: %s", rowIdx+1, err.Error()), err)
-			}
-			storeMasterID = &id
 		}
 
 		now := time.Now()
@@ -706,6 +714,9 @@ func (s *leadService) ApproveLeadReport(leadID int64, req *dto.ApproveLeadReques
 }
 
 func (s *leadService) validateLeadStoreMasterID(clientID int64, storeMasterID *int64) error {
+	if !persistencemodels.HasLeadStoreMasterIDColumn() {
+		return nil
+	}
 	if storeMasterID == nil {
 		return nil
 	}

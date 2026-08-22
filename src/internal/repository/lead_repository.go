@@ -65,9 +65,17 @@ func NewLeadRepository(db *gorm.DB) LeadRepository {
 	return &leadRepository{db: db}
 }
 
+// gormLead omits StoreMasterID unless DB_SCHEMA is MedLyfe (column is absent on other schemas).
+func gormLead(db *gorm.DB) *gorm.DB {
+	if persistencemodels.HasLeadStoreMasterIDColumn() {
+		return db
+	}
+	return db.Omit("StoreMasterID")
+}
+
 func (r *leadRepository) FindAll() ([]domain.Lead, error) {
 	var leads []persistencemodels.Lead
-	err := r.db.Find(&leads).Error
+	err := gormLead(r.db).Find(&leads).Error
 	return mapLeadsToDomain(leads), err
 }
 
@@ -84,7 +92,7 @@ func (r *leadRepository) List(filter LeadListFilter) ([]domain.Lead, int64, erro
 	offset := (filter.Page - 1) * filter.PageSize
 
 	var rows []leadListScan
-	err := r.leadListJoinedQuery(filter).
+	err := gormLead(r.leadListJoinedQuery(filter)).
 		Select("l.*, lm.LabName AS joined_lab_name, cm.ClientName AS joined_client_name, ctm.CityName AS joined_city_name, stm.StateName AS joined_state_name").
 		Order(sortColumn + " " + order).
 		Limit(filter.PageSize).
@@ -132,14 +140,18 @@ func (r *leadRepository) leadListJoinedQuery(filter LeadListFilter) *gorm.DB {
 	}
 	if filter.RestrictToStoreID != nil {
 		sid := strconv.FormatInt(*filter.RestrictToStoreID, 10)
-		q = q.Where("(l.StoreMasterID = ? OR l.StoreID = ?)", *filter.RestrictToStoreID, sid)
+		if persistencemodels.HasLeadStoreMasterIDColumn() {
+			q = q.Where("(l.StoreMasterID = ? OR l.StoreID = ?)", *filter.RestrictToStoreID, sid)
+		} else {
+			q = q.Where("l.StoreID = ?", sid)
+		}
 	} else {
 		if filter.StoreID != nil {
 			if storeID := strings.TrimSpace(*filter.StoreID); storeID != "" {
 				q = q.Where("l.StoreID = ?", storeID)
 			}
 		}
-		if filter.StoreMasterID != nil {
+		if filter.StoreMasterID != nil && persistencemodels.HasLeadStoreMasterIDColumn() {
 			q = q.Where("l.StoreMasterID = ?", *filter.StoreMasterID)
 		}
 	}
@@ -192,7 +204,7 @@ func (r *leadRepository) FindByID(id int64) (*domain.Lead, error) {
 	cityTable := persistencemodels.CityMaster{}.TableName()
 	stateTable := persistencemodels.StateMaster{}.TableName()
 	var row leadByIDLocationScan
-	err := r.db.Table(leadTable+" AS l").
+	err := gormLead(r.db).Table(leadTable+" AS l").
 		Joins("LEFT JOIN "+cityTable+" AS ctm ON l.CityID = ctm.CityID").
 		Joins("LEFT JOIN "+stateTable+" AS stm ON l.StateID = stm.StateID").
 		Where("l.LeadID = ?", id).
@@ -207,7 +219,7 @@ func (r *leadRepository) FindByID(id int64) (*domain.Lead, error) {
 
 func (r *leadRepository) ExistsByID(id int64) (bool, error) {
 	var count int64
-	if err := r.db.Model(&persistencemodels.Lead{}).Where("LeadID = ?", id).Limit(1).Count(&count).Error; err != nil {
+	if err := gormLead(r.db).Model(&persistencemodels.Lead{}).Where("LeadID = ?", id).Limit(1).Count(&count).Error; err != nil {
 		return false, err
 	}
 	return count > 0, nil
@@ -215,7 +227,7 @@ func (r *leadRepository) ExistsByID(id int64) (bool, error) {
 
 func (r *leadRepository) Create(l *domain.Lead) error {
 	persist := mapLeadToPersistence(*l)
-	if err := r.db.Create(&persist).Error; err != nil {
+	if err := gormLead(r.db).Create(&persist).Error; err != nil {
 		return err
 	}
 	*l = mapLeadToDomain(persist)
@@ -224,7 +236,7 @@ func (r *leadRepository) Create(l *domain.Lead) error {
 
 func (r *leadRepository) Update(l *domain.Lead) error {
 	persist := mapLeadToPersistence(*l)
-	if err := r.db.Save(&persist).Error; err != nil {
+	if err := gormLead(r.db).Save(&persist).Error; err != nil {
 		return err
 	}
 	*l = mapLeadToDomain(persist)
@@ -232,7 +244,7 @@ func (r *leadRepository) Update(l *domain.Lead) error {
 }
 
 func (r *leadRepository) Delete(id int64) error {
-	return r.db.Delete(&persistencemodels.Lead{}, id).Error
+	return gormLead(r.db).Delete(&persistencemodels.Lead{}, id).Error
 }
 
 func (r *leadRepository) UpdateStatusForIDs(leadIDs []int64, statusID int8, lastUpdatedBy int64, labID *int64, appointmentAt *time.Time) (int64, error) {
@@ -247,31 +259,31 @@ func (r *leadRepository) UpdateStatusForIDs(leadIDs []int64, statusID int8, last
 	if appointmentAt != nil {
 		updates["AppointmentAt"] = *appointmentAt
 	}
-	result := r.db.Model(&persistencemodels.Lead{}).Where("LeadID IN ?", leadIDs).Updates(updates)
+	result := gormLead(r.db).Model(&persistencemodels.Lead{}).Where("LeadID IN ?", leadIDs).Updates(updates)
 	return result.RowsAffected, result.Error
 }
 
 func (r *leadRepository) FindByClientID(clientID int64) ([]domain.Lead, error) {
 	var leads []persistencemodels.Lead
-	err := r.db.Where("ClientID = ?", clientID).Find(&leads).Error
+	err := gormLead(r.db).Where("ClientID = ?", clientID).Find(&leads).Error
 	return mapLeadsToDomain(leads), err
 }
 
 func (r *leadRepository) FindByStatus(statusID int8) ([]domain.Lead, error) {
 	var leads []persistencemodels.Lead
-	err := r.db.Where("LeadStatusID = ?", statusID).Find(&leads).Error
+	err := gormLead(r.db).Where("LeadStatusID = ?", statusID).Find(&leads).Error
 	return mapLeadsToDomain(leads), err
 }
 
 func (r *leadRepository) FindByPackage(packageID int) ([]domain.Lead, error) {
 	var leads []persistencemodels.Lead
-	err := r.db.Where("PackageID = ?", packageID).Find(&leads).Error
+	err := gormLead(r.db).Where("PackageID = ?", packageID).Find(&leads).Error
 	return mapLeadsToDomain(leads), err
 }
 
 func (r *leadRepository) FindByPatientID(patientID string) (*domain.Lead, error) {
 	var l persistencemodels.Lead
-	err := r.db.Where("PatientID = ?", patientID).First(&l).Error
+	err := gormLead(r.db).Where("PatientID = ?", patientID).First(&l).Error
 	if err != nil {
 		return nil, err
 	}
@@ -281,13 +293,13 @@ func (r *leadRepository) FindByPatientID(patientID string) (*domain.Lead, error)
 
 func (r *leadRepository) FindByContactNumber(contactNumber string) ([]domain.Lead, error) {
 	var leads []persistencemodels.Lead
-	err := r.db.Where("ContactNumber = ?", contactNumber).Find(&leads).Error
+	err := gormLead(r.db).Where("ContactNumber = ?", contactNumber).Find(&leads).Error
 	return mapLeadsToDomain(leads), err
 }
 
 func (r *leadRepository) FindByEmail(email string) ([]domain.Lead, error) {
 	var leads []persistencemodels.Lead
-	err := r.db.Where("EmailID = ?", email).Find(&leads).Error
+	err := gormLead(r.db).Where("EmailID = ?", email).Find(&leads).Error
 	return mapLeadsToDomain(leads), err
 }
 
@@ -304,7 +316,7 @@ func (r *leadRepository) FindActiveLeadStatusIDByName(name string) (int8, error)
 }
 
 func (r *leadRepository) UpdateLeadReportURLAndStatus(leadID int64, reportURL string, statusID int8, userID int64) error {
-	result := r.db.Model(&persistencemodels.Lead{}).Where("LeadID = ?", leadID).Updates(map[string]interface{}{
+	result := gormLead(r.db).Model(&persistencemodels.Lead{}).Where("LeadID = ?", leadID).Updates(map[string]interface{}{
 		"ReportURL":     reportURL,
 		"LeadStatusID":  statusID,
 		"LastUpdatedBy": userID,
@@ -324,7 +336,7 @@ func (r *leadRepository) FindLeadsPendingFitCertification(limit int, pendingLead
 		limit = 10
 	}
 	var leads []persistencemodels.Lead
-	err := r.db.Where("LeadStatusID = ? AND IsFit = ? AND IsFitCertifiedGenerated = ?",
+	err := gormLead(r.db).Where("LeadStatusID = ? AND IsFit = ? AND IsFitCertifiedGenerated = ?",
 		pendingLeadStatusID, domain.LeadFitFit, false).
 		Where("ReportURL IS NOT NULL AND LTRIM(RTRIM(ReportURL)) <> ''").
 		Order("LeadID ASC").
@@ -337,7 +349,7 @@ func (r *leadRepository) MarkFitCertificationGenerated(leadID int64, userID int6
 	var updated bool
 	err := r.db.Transaction(func(tx *gorm.DB) error {
 		now := time.Now().UTC()
-		res := tx.Model(&persistencemodels.Lead{}).
+		res := gormLead(tx).Model(&persistencemodels.Lead{}).
 			Where("LeadID = ? AND LeadStatusID = ? AND IsFit = ? AND IsFitCertifiedGenerated = ?",
 				leadID, fromLeadStatusID, domain.LeadFitFit, false).
 			Updates(map[string]interface{}{
@@ -369,7 +381,7 @@ func (r *leadRepository) MarkReportReadyToDownload(leadID int64, userID int64, f
 	var updated bool
 	err := r.db.Transaction(func(tx *gorm.DB) error {
 		now := time.Now().UTC()
-		res := tx.Model(&persistencemodels.Lead{}).
+		res := gormLead(tx).Model(&persistencemodels.Lead{}).
 			Where("LeadID = ? AND LeadStatusID = ? AND IsFit = ? AND IsFitCertifiedGenerated = ?",
 				leadID, fromLeadStatusID, domain.LeadFitFit, false).
 			Updates(map[string]interface{}{
@@ -418,7 +430,7 @@ func (r *leadRepository) UpdateLeadReportApproval(leadID int64, lastUpdatedBy in
 	if brandID != nil {
 		updates["BrandID"] = *brandID
 	}
-	res := r.db.Model(&persistencemodels.Lead{}).Where("LeadID = ? AND LeadStatusID = ?", leadID, domain.LeadStatusIDReportApproval).Updates(updates)
+	res := gormLead(r.db).Model(&persistencemodels.Lead{}).Where("LeadID = ? AND LeadStatusID = ?", leadID, domain.LeadStatusIDReportApproval).Updates(updates)
 	if res.Error != nil {
 		return 0, res.Error
 	}

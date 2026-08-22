@@ -8,6 +8,9 @@ import (
 // DefaultSchema is used when DB_SCHEMA is unset (UrMediConnect / legacy).
 const DefaultSchema = "MediAdmin"
 
+// MedLyfeSchema is the SQL Server schema that includes tbl_Leads.StoreMasterID.
+const MedLyfeSchema = "MedLyfe"
+
 var (
 	schemaMu   sync.RWMutex
 	schemaName = DefaultSchema
@@ -36,4 +39,9 @@ func Schema() string {
 // Table returns a schema-qualified table name, e.g. "MediAdmin.tbl_Login".
 func Table(table string) string {
 	return Schema() + "." + table
+}
+
+// HasLeadStoreMasterIDColumn is true when tbl_Leads includes StoreMasterID (MedLyfe only).
+func HasLeadStoreMasterIDColumn() bool {
+	return strings.EqualFold(Schema(), MedLyfeSchema)
 }

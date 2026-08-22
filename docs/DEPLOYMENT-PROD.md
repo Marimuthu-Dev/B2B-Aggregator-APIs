@@ -232,7 +232,7 @@ Wait until the script finishes without errors.
 
 The script does the following in order:
 
-1. **Build** the Docker image from the project's `Dockerfile` (Go 1.25, Alpine).
+1. **Build** the Docker image from the project's `Dockerfile` (Go 1.27, Alpine).
 2. **Log in** to your Azure Container Registry (`az acr login`).
 3. **Tag** the image for ACR (e.g. `umproductionacr.azurecr.io/b2b-aggregator-api:latest`). If your ACR uses a different login server, the script uses that.
 4. **Push** the image to ACR.
