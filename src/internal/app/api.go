@@ -59,7 +59,6 @@ func Run() error {
 	// Initialize Services
 	packageSvc := service.NewPackageService(packageRepo, testRepo, packageClientMapRepo, packageLabMapRepo, clientRepo, labRepo)
 	storeRepo := repository.NewStoreRepository(db)
-	loginSvc := service.NewLoginService(loginRepo, forgotPasswordRepo, clientRepo, employeeRepo, labRepo, storeRepo, cfg.JWT)
 	var blobSvc service.BlobService
 	ab := cfg.AzureBlob
 	blobConfigured := strings.TrimSpace(ab.ConnectionString) != "" ||
@@ -80,6 +79,7 @@ func Run() error {
 			emailOutbox = repository.NewEmailOutboxRepositoryFromSQL(sqlDB)
 		}
 	}
+	loginSvc := service.NewLoginService(loginRepo, forgotPasswordRepo, clientRepo, employeeRepo, labRepo, storeRepo, cfg.JWT, emailOutbox, cfg.Email, cfg.Domains)
 	clientSvc := service.NewClientService(clientRepo, blobSvc, storeRepo, emailOutbox, forgotPasswordRepo, cfg.Email, cfg.Domains.Client)
 	clientLocationSvc := service.NewClientLocationService(clientLocationRepo)
 	employeeSvc := service.NewEmployeeService(employeeRepo, emailOutbox, forgotPasswordRepo, cfg.Email, cfg.Domains.Employee)

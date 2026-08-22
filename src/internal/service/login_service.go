@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -29,15 +30,20 @@ type LoginService interface {
 }
 
 type loginService struct {
-	repo         repository.LoginRepository
-	forgotRepo   repository.ForgotPasswordRepository
-	clientRepo   repository.ClientRepository
-	employeeRepo repository.EmployeeRepository
-	labRepo      repository.LabRepository
-	storeRepo    repository.StoreRepository
-	jwtSecret    string
-	accessTTL    time.Duration
-	refreshTTL   time.Duration
+	repo               repository.LoginRepository
+	forgotRepo         repository.ForgotPasswordRepository
+	clientRepo         repository.ClientRepository
+	employeeRepo       repository.EmployeeRepository
+	labRepo            repository.LabRepository
+	storeRepo          repository.StoreRepository
+	emails             *repository.EmailOutboxRepository
+	emailCfg           config.OutboundEmailConfig
+	clientPortalURL    string
+	employeePortalURL  string
+	labPortalURL       string
+	jwtSecret          string
+	accessTTL          time.Duration
+	refreshTTL         time.Duration
 }
 
 func NewLoginService(
@@ -48,6 +54,9 @@ func NewLoginService(
 	labRepo repository.LabRepository,
 	storeRepo repository.StoreRepository,
 	jwtCfg config.JWTConfig,
+	emails *repository.EmailOutboxRepository,
+	emailCfg config.OutboundEmailConfig,
+	domains config.DomainURLs,
 ) LoginService {
 	accessTTL, err := time.ParseDuration(jwtCfg.ExpiresIn)
 	if err != nil {
@@ -58,15 +67,20 @@ func NewLoginService(
 		refreshTTL = 7 * 24 * time.Hour
 	}
 	return &loginService{
-		repo:         repo,
-		forgotRepo:   forgotRepo,
-		clientRepo:   clientRepo,
-		employeeRepo: employeeRepo,
-		labRepo:      labRepo,
-		storeRepo:    storeRepo,
-		jwtSecret:    jwtCfg.Secret,
-		accessTTL:    accessTTL,
-		refreshTTL:   refreshTTL,
+		repo:              repo,
+		forgotRepo:        forgotRepo,
+		clientRepo:        clientRepo,
+		employeeRepo:      employeeRepo,
+		labRepo:           labRepo,
+		storeRepo:         storeRepo,
+		emails:            emails,
+		emailCfg:          emailCfg,
+		clientPortalURL:   domains.Client,
+		employeePortalURL: domains.Employee,
+		labPortalURL:      domains.Lab,
+		jwtSecret:         jwtCfg.Secret,
+		accessTTL:         accessTTL,
+		refreshTTL:        refreshTTL,
 	}
 }
 
@@ -221,13 +235,15 @@ func (s *loginService) Login(req dto.LoginRequest) (*dto.LoginResponse, error) {
 }
 
 func (s *loginService) CreateForgotPasswordRecord(domainName, mobileNumber string) (int, error) {
-	userID, userType, _, err := s.resolveUserByMobileNumber(domainName, mobileNumber)
+	userID, userType, userData, err := s.resolveUserByMobileNumber(domainName, mobileNumber)
 	if err != nil {
 		return 0, err
 	}
-	if _, err := insertForgotPasswordKey(s.forgotRepo, userID, userType, forgotPasswordKeyTTL); err != nil {
+	resetKey, err := insertForgotPasswordKey(s.forgotRepo, userID, userType, forgotPasswordKeyTTL)
+	if err != nil {
 		return 0, err
 	}
+	s.queueForgotPasswordEmail(context.Background(), userType, userData, resetKey)
 	return 1, nil
 }
 

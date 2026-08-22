@@ -109,6 +109,14 @@ func TestResolveTemplatePath_schemaFolderAndFallback(t *testing.T) {
 	if path != "templates/MediAdmin/employee_created.html" {
 		t.Errorf("employee path got %q", path)
 	}
+
+	path, err = ResolveTemplatePath("MediAdmin", EventForgotPassword)
+	if err != nil {
+		t.Fatalf("forgot password MediAdmin: %v", err)
+	}
+	if path != "templates/MediAdmin/forgot_password.html" {
+		t.Errorf("forgot password path got %q", path)
+	}
 }
 
 func TestRenderEmployeeCreated_MediAdmin(t *testing.T) {
@@ -159,6 +167,33 @@ func TestRenderLabCreated_MediAdmin(t *testing.T) {
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("MediAdmin lab HTML missing %q", want)
+		}
+	}
+}
+
+func TestRenderForgotPassword_MediAdmin(t *testing.T) {
+	html, err := RenderForgotPassword("MediAdmin", ForgotPasswordData{
+		DisplayName:         "Acme Industries",
+		Username:            "9490948334",
+		GeneratePasswordURL: "https://ops.urmediconnect.com/reset-password?token=abc%2B",
+		PortalURL:           "https://ops.urmediconnect.com/",
+		LogoURL:             "https://urmediconnect.com/img/logo.jpeg",
+		SupportPhone:        "+91 7411558079",
+		SupportEmail:        "support@urmediconnect.com",
+		Year:                2026,
+	})
+	if err != nil {
+		t.Fatalf("RenderForgotPassword MediAdmin: %v", err)
+	}
+	for _, want := range []string{
+		"Acme Industries",
+		"9490948334",
+		"Reset your password",
+		"reset-password?token=abc%2B",
+		"https://ops.urmediconnect.com/",
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("MediAdmin forgot password HTML missing %q", want)
 		}
 	}
 }

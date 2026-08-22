@@ -24,6 +24,7 @@ const (
 	EventClientCreated   = "client_created"
 	EventLabCreated      = "lab_created"
 	EventEmployeeCreated = "employee_created"
+	EventForgotPassword  = "forgot_password"
 	defaultTemplateDir = "default"
 	templatesRoot      = "templates"
 )
@@ -77,6 +78,23 @@ type EmployeeCreatedData struct {
 // RenderEmployeeCreated executes the employee-created template for the given SQL schema (DB_SCHEMA).
 func RenderEmployeeCreated(schema string, data EmployeeCreatedData) (string, error) {
 	return RenderEvent(schema, EventEmployeeCreated, data)
+}
+
+// ForgotPasswordData is passed to MediAdmin/forgot_password.html.
+type ForgotPasswordData struct {
+	DisplayName         string
+	Username            string
+	GeneratePasswordURL string
+	PortalURL           string
+	LogoURL             string
+	SupportPhone        string
+	SupportEmail        string
+	Year                int
+}
+
+// RenderForgotPassword executes the forgot-password template for the given SQL schema (DB_SCHEMA).
+func RenderForgotPassword(schema string, data ForgotPasswordData) (string, error) {
+	return RenderEvent(schema, EventForgotPassword, data)
 }
 
 // RenderEvent executes templates/{schema}/{event}.html, then templates/default/{event}.html.
