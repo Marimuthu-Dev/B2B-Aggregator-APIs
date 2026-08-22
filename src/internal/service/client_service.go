@@ -35,12 +35,13 @@ type ClientService interface {
 }
 
 type clientService struct {
-	repo      repository.ClientRepository
-	blobs     BlobService
-	storeRepo repository.StoreRepository
-	emails    *repository.EmailOutboxRepository
-	emailCfg  config.OutboundEmailConfig
-	portalURL string
+	repo       repository.ClientRepository
+	blobs      BlobService
+	storeRepo  repository.StoreRepository
+	emails     *repository.EmailOutboxRepository
+	forgotRepo repository.ForgotPasswordRepository
+	emailCfg   config.OutboundEmailConfig
+	portalURL  string
 }
 
 func NewClientService(
@@ -48,16 +49,18 @@ func NewClientService(
 	blobs BlobService,
 	storeRepo repository.StoreRepository,
 	emails *repository.EmailOutboxRepository,
+	forgotRepo repository.ForgotPasswordRepository,
 	emailCfg config.OutboundEmailConfig,
 	clientPortalURL string,
 ) ClientService {
 	return &clientService{
-		repo:      repo,
-		blobs:     blobs,
-		storeRepo: storeRepo,
-		emails:    emails,
-		emailCfg:  emailCfg,
-		portalURL: clientPortalURL,
+		repo:       repo,
+		blobs:      blobs,
+		storeRepo:  storeRepo,
+		emails:     emails,
+		forgotRepo: forgotRepo,
+		emailCfg:   emailCfg,
+		portalURL:  clientPortalURL,
 	}
 }
 

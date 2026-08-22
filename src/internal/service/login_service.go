@@ -10,7 +10,6 @@ import (
 
 	"b2b-diagnostic-aggregator/apis/internal/apperrors"
 	"b2b-diagnostic-aggregator/apis/internal/config"
-	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/timeutil"
@@ -226,28 +225,7 @@ func (s *loginService) CreateForgotPasswordRecord(domainName, mobileNumber strin
 	if err != nil {
 		return 0, err
 	}
-
-	now := time.Now().UTC()
-	expiry := now.Add(5 * time.Minute)
-
-	payload := map[string]interface{}{
-		"userId": userID, "userType": userType, "expiry": expiry.Format(time.RFC3339),
-	}
-	payloadBytes, _ := json.Marshal(payload)
-	resetKey, err := utils.Encrypt(string(payloadBytes))
-	if err != nil {
-		return 0, apperrors.NewInternal("Failed to generate reset key", err)
-	}
-
-	rec := &domain.ForgotPassword{
-		UserID:            userID,
-		UserType:          strconv.Itoa(userType),
-		ForgetPasswordKey: resetKey,
-		CreatedOn:         timeutil.FromTime(now),
-		ExpiryTimestamp:   timeutil.FromTime(expiry),
-		IsPasswordChanged: false,
-	}
-	if err := s.forgotRepo.Create(rec); err != nil {
+	if _, err := insertForgotPasswordKey(s.forgotRepo, userID, userType, forgotPasswordKeyTTL); err != nil {
 		return 0, err
 	}
 	return 1, nil

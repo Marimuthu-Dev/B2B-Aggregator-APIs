@@ -3,17 +3,19 @@ package service
 import (
 	"context"
 	"log/slog"
+	"net/url"
 	"strings"
 	"time"
 
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/emailtemplates"
 	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
+	"b2b-diagnostic-aggregator/apis/pkg/utils"
 )
 
 const (
-	emailTypeClientCreated = "ClientCreated"
-	defaultClientLoginPath = "login"
+	emailTypeClientCreated  = "ClientCreated"
+	clientResetPasswordPath = "reset-password"
 )
 
 func clientCreatedSubject(schema string) string {
@@ -43,7 +45,25 @@ func (s *clientService) queueClientCreatedEmail(ctx context.Context, c *domain.C
 			slog.Int64("clientID", c.ClientID))
 		return
 	}
-	generateURL := strings.TrimSuffix(portalURL, "/") + "/" + defaultClientLoginPath
+	if c.ClientID == 0 {
+		slog.Warn("client created email skipped: ClientID is missing after insert",
+			slog.String("clientName", strings.TrimSpace(c.ClientName)))
+		return
+	}
+
+	resetKey, err := insertForgotPasswordKey(s.forgotRepo, c.ClientID, utils.UserTypeClient, clientCreatedForgotPasswordTTL)
+	if err != nil {
+		slog.Error("client created email: tbl_ForgotPassword insert failed",
+			slog.Int64("clientID", c.ClientID),
+			slog.Any("err", err))
+		return
+	}
+	generateURL := buildClientResetPasswordURL(portalURL, resetKey)
+	if generateURL == "" {
+		slog.Error("client created email: reset password URL could not be built",
+			slog.Int64("clientID", c.ClientID))
+		return
+	}
 
 	schema := persistencemodels.Schema()
 	body, err := emailtemplates.RenderClientCreated(schema, emailtemplates.ClientCreatedData{
@@ -124,4 +144,20 @@ func normalizePortalHomeURL(raw string) string {
 		u += "/"
 	}
 	return u
+}
+
+func buildClientResetPasswordURL(portalHome, forgetPasswordKey string) string {
+	key := strings.TrimSpace(forgetPasswordKey)
+	base := strings.TrimSuffix(normalizePortalHomeURL(portalHome), "/")
+	if base == "" || key == "" {
+		return ""
+	}
+	u, err := url.Parse(base + "/" + clientResetPasswordPath)
+	if err != nil {
+		return ""
+	}
+	q := url.Values{}
+	q.Set("token", key)
+	u.RawQuery = q.Encode()
+	return u.String()
 }

@@ -29,7 +29,7 @@ func TestRenderClientCreated_MediAdmin(t *testing.T) {
 		"9036302806",
 		"https://client.urmediconnect.com/",
 		"https://urmediconnect.com/img/logo.jpeg",
-		"91 9036302806",
+		"7411558079",
 		"support@urmediconnect.com",
 		"&copy; 2026",
 	} {
@@ -39,6 +39,21 @@ func TestRenderClientCreated_MediAdmin(t *testing.T) {
 	}
 	if strings.Contains(html, "Team MedLyfe") {
 		t.Error("MediAdmin template should not use MedLyfe branding")
+	}
+}
+
+func TestRenderClientCreated_MediAdmin_resetPasswordHref(t *testing.T) {
+	data := sampleData()
+	data.GeneratePasswordURL = "https://client.urmediconnect.com/reset-password?token=abc%2Fdef%2Bghi%3D"
+	html, err := RenderClientCreated("MediAdmin", data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(html, "%252F") || strings.Contains(html, "%252B") {
+		t.Fatal("href double-encoded the reset token")
+	}
+	if !strings.Contains(html, "reset-password?token=abc%2Fdef%2Bghi%3D") {
+		t.Fatalf("href missing encoded token URL")
 	}
 }
 

@@ -80,7 +80,7 @@ func Run() error {
 			emailOutbox = repository.NewEmailOutboxRepositoryFromSQL(sqlDB)
 		}
 	}
-	clientSvc := service.NewClientService(clientRepo, blobSvc, storeRepo, emailOutbox, cfg.Email, cfg.Domains.Client)
+	clientSvc := service.NewClientService(clientRepo, blobSvc, storeRepo, emailOutbox, forgotPasswordRepo, cfg.Email, cfg.Domains.Client)
 	clientLocationSvc := service.NewClientLocationService(clientLocationRepo)
 	employeeSvc := service.NewEmployeeService(employeeRepo)
 	labSvc := service.NewLabService(labRepo, blobSvc)
