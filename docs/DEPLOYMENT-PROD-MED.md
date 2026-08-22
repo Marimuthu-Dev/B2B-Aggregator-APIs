@@ -333,7 +333,7 @@ chmod +x scripts/deploy-container.sh
 
 ### 6.4 What the deploy script does
 
-1. **Build** the Docker image from the project `Dockerfile` (Go 1.25 → Alpine; binary `./api`; `EXPOSE 8080`).
+1. **Build** the Docker image from the project `Dockerfile` (Go 1.27 → Alpine; binary `./api`; `EXPOSE 8080`).
 2. **Log in** to ACR (`az acr login`).
 3. **Tag** and **push** (e.g. `medproductionacr.azurecr.io/b2b-aggregator-api:latest`).
 4. **Enable** ACR admin when applicable; retrieve credentials.

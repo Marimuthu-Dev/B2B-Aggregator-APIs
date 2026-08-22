@@ -209,7 +209,7 @@ Wait until the script finishes without errors.
 
 The script does the following in order:
 
-1. **Build** the Docker image from the project's `Dockerfile` (Go 1.25, Alpine).
+1. **Build** the Docker image from the project's `Dockerfile` (Go 1.27, Alpine).
 2. **Log in** to your Azure Container Registry (`az acr login`).
 3. **Tag** the image for ACR (e.g. `umstagingacr.azurecr.io/b2b-aggregator-api:latest`). If your ACR uses a different login server (e.g. with a suffix like `umstagingacr-xxxxx.azurecr.io`), the script uses that.
 4. **Push** the image to ACR.
@@ -448,7 +448,7 @@ If the API returns **503** with `"message": "Database unavailable"` (e.g. on `PO
 | App keeps restarting | Check **Log stream**. Often missing `DB_PASSWORD` or wrong `DB_*` settings. Add or fix in **Configuration** → **Application settings**. |
 | 500 "Error validating credentials" | **1)** Add **LOGIN_ENC_KEY** and **LOGIN_ENC_SALT** in App Service → **Configuration** → **Application settings** (required for password encryption; if missing, login returns 500). **2)** Or check **Log stream** for the real error (e.g. DB error during Authenticate). |
 | 503 / "Database unavailable" | **1)** In App Service → **Configuration** → **Application settings**, ensure `DB_PASSWORD`, `DB_SERVER`, `DB_USER`, `DB_DATABASE_NAME` are set and correct (no typos). **2)** In **Azure SQL** → **Networking** (or **Firewalls and virtual networks**), allow Azure services and/or add the App Service outbound IPs. Then **restart** the App Service. |
-| Docker build fails (Go version) | Ensure `src/go.mod` has a Go version that matches the Dockerfile (e.g. Go 1.25 in both). Build from the folder that contains `Dockerfile` and `src/`. |
+| Docker build fails (Go version) | Ensure `src/go.mod` has a Go version that matches the Dockerfile (e.g. Go 1.27 in both). Build from the folder that contains `Dockerfile` and `src/`. |
 | Binary: "This app can't run on your PC" | Binary built for wrong architecture; rebuild with correct GOOS/GOARCH. |
 | Binary: Permission denied | Run `chmod +x b2b-aggregator`. |
 

@@ -201,15 +201,16 @@ Optional overrides:
 If the deploy script fails with a message like "Run 'az acr update -n umproductionacr --admin-enabled true'", run this once (replace names if needed):
 
 
+```bash
+
 az acr update \
   --name umproductionacr \
   --resource-group um-prod-rg-appservice \
   --admin-enabled true
+```
 
-
-  
 ```bash
-az acr update --name umproductionacr --resource-group rm-prod-rg-appservice --admin-enabled true
+az acr update --name umproductionacr --resource-group um-prod-rg-appservice --admin-enabled true
 ```
 
 ```bash
