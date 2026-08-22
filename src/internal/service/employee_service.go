@@ -1,10 +1,12 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"time"
 
 	"b2b-diagnostic-aggregator/apis/internal/apperrors"
+	"b2b-diagnostic-aggregator/apis/internal/config"
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
@@ -23,11 +25,27 @@ type EmployeeService interface {
 }
 
 type employeeService struct {
-	repo repository.EmployeeRepository
+	repo       repository.EmployeeRepository
+	emails     *repository.EmailOutboxRepository
+	forgotRepo repository.ForgotPasswordRepository
+	emailCfg   config.OutboundEmailConfig
+	portalURL  string
 }
 
-func NewEmployeeService(repo repository.EmployeeRepository) EmployeeService {
-	return &employeeService{repo: repo}
+func NewEmployeeService(
+	repo repository.EmployeeRepository,
+	emails *repository.EmailOutboxRepository,
+	forgotRepo repository.ForgotPasswordRepository,
+	emailCfg config.OutboundEmailConfig,
+	employeePortalURL string,
+) EmployeeService {
+	return &employeeService{
+		repo:       repo,
+		emails:     emails,
+		forgotRepo: forgotRepo,
+		emailCfg:   emailCfg,
+		portalURL:  employeePortalURL,
+	}
 }
 
 func (s *employeeService) GetAll() ([]domain.Employee, error) {
@@ -56,7 +74,11 @@ func (s *employeeService) Create(e *domain.Employee, createdBy int64) error {
 	e.CreatedOn = timeutil.FromTime(now)
 	e.LastUpdatedBy = createdBy
 	e.LastUpdatedOn = timeutil.FromTime(now)
-	return s.repo.Create(e)
+	if err := s.repo.Create(e); err != nil {
+		return err
+	}
+	s.queueEmployeeCreatedEmail(context.Background(), e)
+	return nil
 }
 
 func (s *employeeService) Update(id int64, update *dto.EmployeeUpdateRequest, lastUpdatedBy int64) (*domain.Employee, error) {

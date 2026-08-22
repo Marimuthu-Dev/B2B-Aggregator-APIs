@@ -21,8 +21,9 @@ import (
 var files embed.FS
 
 const (
-	EventClientCreated = "client_created"
-	EventLabCreated    = "lab_created"
+	EventClientCreated   = "client_created"
+	EventLabCreated      = "lab_created"
+	EventEmployeeCreated = "employee_created"
 	defaultTemplateDir = "default"
 	templatesRoot      = "templates"
 )
@@ -59,6 +60,23 @@ func RenderClientCreated(schema string, data ClientCreatedData) (string, error) 
 // RenderLabCreated executes the lab-created template for the given SQL schema (DB_SCHEMA).
 func RenderLabCreated(schema string, data LabCreatedData) (string, error) {
 	return RenderEvent(schema, EventLabCreated, data)
+}
+
+// EmployeeCreatedData is passed to {schema}/employee_created.html.
+type EmployeeCreatedData struct {
+	FullName            string
+	Username            string
+	GeneratePasswordURL string
+	PortalURL           string
+	LogoURL             string
+	SupportPhone        string
+	SupportEmail        string
+	Year                int
+}
+
+// RenderEmployeeCreated executes the employee-created template for the given SQL schema (DB_SCHEMA).
+func RenderEmployeeCreated(schema string, data EmployeeCreatedData) (string, error) {
+	return RenderEvent(schema, EventEmployeeCreated, data)
 }
 
 // RenderEvent executes templates/{schema}/{event}.html, then templates/default/{event}.html.

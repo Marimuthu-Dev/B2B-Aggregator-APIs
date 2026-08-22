@@ -101,6 +101,40 @@ func TestResolveTemplatePath_schemaFolderAndFallback(t *testing.T) {
 	if path != "templates/MediAdmin/lab_created.html" {
 		t.Errorf("lab path got %q", path)
 	}
+
+	path, err = ResolveTemplatePath("MediAdmin", EventEmployeeCreated)
+	if err != nil {
+		t.Fatalf("employee MediAdmin: %v", err)
+	}
+	if path != "templates/MediAdmin/employee_created.html" {
+		t.Errorf("employee path got %q", path)
+	}
+}
+
+func TestRenderEmployeeCreated_MediAdmin(t *testing.T) {
+	html, err := RenderEmployeeCreated("MediAdmin", EmployeeCreatedData{
+		FullName:            "Priya Sharma",
+		Username:            "9876543210",
+		GeneratePasswordURL: "https://ops.urmediconnect.com/reset-password?token=abc%2B",
+		PortalURL:           "https://ops.urmediconnect.com/",
+		LogoURL:             "https://urmediconnect.com/img/logo.jpeg",
+		SupportPhone:        "+91 7411558079",
+		SupportEmail:        "support@urmediconnect.com",
+		Year:                2026,
+	})
+	if err != nil {
+		t.Fatalf("RenderEmployeeCreated MediAdmin: %v", err)
+	}
+	for _, want := range []string{
+		"Priya Sharma",
+		"9876543210",
+		"reset-password?token=abc%2B",
+		"https://ops.urmediconnect.com/",
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("MediAdmin employee HTML missing %q", want)
+		}
+	}
 }
 
 func TestRenderLabCreated_MediAdmin(t *testing.T) {
