@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"b2b-diagnostic-aggregator/apis/internal/apperrors"
+	"b2b-diagnostic-aggregator/apis/internal/config"
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
@@ -33,12 +34,30 @@ type LabService interface {
 }
 
 type labService struct {
-	repo  repository.LabRepository
-	blobs BlobService
+	repo       repository.LabRepository
+	blobs      BlobService
+	emails     *repository.EmailOutboxRepository
+	forgotRepo repository.ForgotPasswordRepository
+	emailCfg   config.OutboundEmailConfig
+	portalURL  string
 }
 
-func NewLabService(repo repository.LabRepository, blobs BlobService) LabService {
-	return &labService{repo: repo, blobs: blobs}
+func NewLabService(
+	repo repository.LabRepository,
+	blobs BlobService,
+	emails *repository.EmailOutboxRepository,
+	forgotRepo repository.ForgotPasswordRepository,
+	emailCfg config.OutboundEmailConfig,
+	labPortalURL string,
+) LabService {
+	return &labService{
+		repo:       repo,
+		blobs:      blobs,
+		emails:     emails,
+		forgotRepo: forgotRepo,
+		emailCfg:   emailCfg,
+		portalURL:  labPortalURL,
+	}
 }
 
 func (s *labService) ListLabs(filter repository.LabListFilter) ([]domain.Lab, int64, error) {
@@ -67,7 +86,11 @@ func (s *labService) CreateLab(l *domain.Lab, createdBy int64) error {
 	l.CreatedOn = timeutil.FromTimePtr(&now)
 	l.LastUpdatedBy = &createdBy
 	l.LastUpdatedOn = timeutil.FromTimePtr(&now)
-	return s.repo.Create(l)
+	if err := s.repo.Create(l); err != nil {
+		return err
+	}
+	s.queueLabCreatedEmail(context.Background(), l)
+	return nil
 }
 
 func (s *labService) CreateLabWithMoU(ctx context.Context, l *domain.Lab, createdBy int64, mou *multipart.FileHeader) error {
@@ -88,6 +111,7 @@ func (s *labService) CreateLabWithMoU(ctx context.Context, l *domain.Lab, create
 		return err
 	}
 	if mou == nil {
+		s.queueLabCreatedEmail(ctx, l)
 		return nil
 	}
 	rc, err := mou.Open()
@@ -108,6 +132,7 @@ func (s *labService) CreateLabWithMoU(ctx context.Context, l *domain.Lab, create
 		return apperrors.NewInternal("Failed to save MoU document URL", err)
 	}
 	l.MoUDocumentURL = &url
+	s.queueLabCreatedEmail(ctx, l)
 	return nil
 }
 

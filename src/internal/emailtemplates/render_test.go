@@ -93,4 +93,38 @@ func TestResolveTemplatePath_schemaFolderAndFallback(t *testing.T) {
 	if path != "templates/default/client_created.html" {
 		t.Errorf("fallback got %q", path)
 	}
+
+	path, err = ResolveTemplatePath("MediAdmin", EventLabCreated)
+	if err != nil {
+		t.Fatalf("lab MediAdmin: %v", err)
+	}
+	if path != "templates/MediAdmin/lab_created.html" {
+		t.Errorf("lab path got %q", path)
+	}
+}
+
+func TestRenderLabCreated_MediAdmin(t *testing.T) {
+	html, err := RenderLabCreated("MediAdmin", LabCreatedData{
+		LabName:             "City Diagnostics",
+		Username:            "9876543210",
+		GeneratePasswordURL: "https://lab.urmediconnect.com/reset-password?token=abc%2B",
+		PortalURL:           "https://lab.urmediconnect.com/",
+		LogoURL:             "https://urmediconnect.com/img/logo.jpeg",
+		SupportPhone:        "+91 7411558079",
+		SupportEmail:        "support@urmediconnect.com",
+		Year:                2026,
+	})
+	if err != nil {
+		t.Fatalf("RenderLabCreated MediAdmin: %v", err)
+	}
+	for _, want := range []string{
+		"City Diagnostics",
+		"9876543210",
+		"reset-password?token=abc%2B",
+		"https://lab.urmediconnect.com/",
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("MediAdmin lab HTML missing %q", want)
+		}
+	}
 }

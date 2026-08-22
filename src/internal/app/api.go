@@ -83,7 +83,7 @@ func Run() error {
 	clientSvc := service.NewClientService(clientRepo, blobSvc, storeRepo, emailOutbox, forgotPasswordRepo, cfg.Email, cfg.Domains.Client)
 	clientLocationSvc := service.NewClientLocationService(clientLocationRepo)
 	employeeSvc := service.NewEmployeeService(employeeRepo)
-	labSvc := service.NewLabService(labRepo, blobSvc)
+	labSvc := service.NewLabService(labRepo, blobSvc, emailOutbox, forgotPasswordRepo, cfg.Email, cfg.Domains.Lab)
 	storeSvc := service.NewStoreService(storeRepo, clientRepo)
 	leadSvc := service.NewLeadService(leadRepo, leadUow, clientRepo, packageRepo, labRepo, storeRepo, blobSvc)
 	testSvc := service.NewTestService(testRepo)
