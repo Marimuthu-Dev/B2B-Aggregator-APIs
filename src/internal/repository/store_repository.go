@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"strings"
 
 	"b2b-diagnostic-aggregator/apis/internal/domain"
@@ -8,6 +9,9 @@ import (
 
 	"gorm.io/gorm"
 )
+
+// errStoreMasterUnavailable is returned when DB_SCHEMA is not MedLyfe (no tbl_StoreMaster).
+var errStoreMasterUnavailable = errors.New("tbl_StoreMaster is not available for this DB_SCHEMA")
 
 type StoreListFilter struct {
 	Page      int
@@ -40,6 +44,9 @@ func NewStoreRepository(db *gorm.DB) StoreRepository {
 }
 
 func (r *storeRepository) Create(s *domain.Store) error {
+	if !persistencemodels.HasStoreMasterTable() {
+		return errStoreMasterUnavailable
+	}
 	persist := mapStoreToPersistence(*s)
 	if err := r.db.Create(&persist).Error; err != nil {
 		return err
@@ -49,6 +56,9 @@ func (r *storeRepository) Create(s *domain.Store) error {
 }
 
 func (r *storeRepository) CreateWithLogin(s *domain.Store, login *domain.Login) error {
+	if !persistencemodels.HasStoreMasterTable() {
+		return errStoreMasterUnavailable
+	}
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		persist := mapStoreToPersistence(*s)
 		if err := tx.Create(&persist).Error; err != nil {
@@ -72,6 +82,9 @@ func (r *storeRepository) CreateWithLogin(s *domain.Store, login *domain.Login) 
 }
 
 func (r *storeRepository) Update(s *domain.Store) error {
+	if !persistencemodels.HasStoreMasterTable() {
+		return errStoreMasterUnavailable
+	}
 	persist := mapStoreToPersistence(*s)
 	if err := r.db.Save(&persist).Error; err != nil {
 		return err
@@ -81,6 +94,9 @@ func (r *storeRepository) Update(s *domain.Store) error {
 }
 
 func (r *storeRepository) FindByID(id int64) (*domain.Store, error) {
+	if !persistencemodels.HasStoreMasterTable() {
+		return nil, gorm.ErrRecordNotFound
+	}
 	var row persistencemodels.Store
 	if err := r.db.First(&row, id).Error; err != nil {
 		return nil, err
@@ -90,6 +106,9 @@ func (r *storeRepository) FindByID(id int64) (*domain.Store, error) {
 }
 
 func (r *storeRepository) FindByContactNumber(contactNumber string) (*domain.Store, error) {
+	if !persistencemodels.HasStoreMasterTable() {
+		return nil, gorm.ErrRecordNotFound
+	}
 	var row persistencemodels.Store
 	err := r.db.Where("ContactNumber = ?", contactNumber).First(&row).Error
 	if err != nil {
@@ -100,6 +119,9 @@ func (r *storeRepository) FindByContactNumber(contactNumber string) (*domain.Sto
 }
 
 func (r *storeRepository) ExistsByContactNumber(contactNumber string, excludeStoreID int64) (bool, error) {
+	if !persistencemodels.HasStoreMasterTable() {
+		return false, nil
+	}
 	q := r.db.Model(&persistencemodels.Store{}).Where("ContactNumber = ?", contactNumber)
 	if excludeStoreID > 0 {
 		q = q.Where("StoreID <> ?", excludeStoreID)
@@ -113,6 +135,9 @@ func (r *storeRepository) ExistsByContactNumber(contactNumber string, excludeSto
 }
 
 func (r *storeRepository) ExistsByEmailID(emailID string, excludeStoreID int64) (bool, error) {
+	if !persistencemodels.HasStoreMasterTable() {
+		return false, nil
+	}
 	q := r.db.Model(&persistencemodels.Store{}).Where("EmailID = ?", emailID)
 	if excludeStoreID > 0 {
 		q = q.Where("StoreID <> ?", excludeStoreID)
@@ -125,6 +150,9 @@ func (r *storeRepository) ExistsByEmailID(emailID string, excludeStoreID int64) 
 }
 
 func (r *storeRepository) List(filter StoreListFilter) ([]domain.Store, int64, error) {
+	if !persistencemodels.HasStoreMasterTable() {
+		return nil, 0, nil
+	}
 	query := r.db.Model(&persistencemodels.Store{})
 	if filter.StoreID != nil {
 		query = query.Where("StoreID = ?", *filter.StoreID)

@@ -10,6 +10,7 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
 	"b2b-diagnostic-aggregator/apis/internal/middleware"
+	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/service"
 	"b2b-diagnostic-aggregator/apis/internal/timeutil"
@@ -585,6 +586,9 @@ func (h *LeadHandler) applyLeadCreateScopeFromJWT(c *gin.Context, lead *domain.L
 		}
 		return nil
 	case utils.UserTypeStore:
+		if !persistencemodels.HasStoreMasterTable() {
+			return apperrors.NewForbidden("You are not authorized for this activity.", nil)
+		}
 		store, err := h.storeSvc.GetStoreByID(userID)
 		if err != nil {
 			return err

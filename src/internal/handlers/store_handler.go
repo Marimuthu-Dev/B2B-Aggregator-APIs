@@ -7,6 +7,7 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
 	"b2b-diagnostic-aggregator/apis/internal/middleware"
+	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/service"
 	"b2b-diagnostic-aggregator/apis/pkg/utils"
@@ -22,7 +23,18 @@ func NewStoreHandler(svc service.StoreService) *StoreHandler {
 	return &StoreHandler{svc: svc}
 }
 
+func requireStoreMaster(c *gin.Context) bool {
+	if persistencemodels.HasStoreMasterTable() {
+		return true
+	}
+	respondError(c, apperrors.NewNotFound("Store master is not available for this environment", nil))
+	return false
+}
+
 func (h *StoreHandler) GetAll(c *gin.Context) {
+	if !requireStoreMaster(c) {
+		return
+	}
 	var query dto.StoreListQuery
 	if !middleware.BindQuery(c, &query) {
 		return
@@ -71,6 +83,9 @@ func (h *StoreHandler) GetAll(c *gin.Context) {
 }
 
 func (h *StoreHandler) GetByID(c *gin.Context) {
+	if !requireStoreMaster(c) {
+		return
+	}
 	var params dto.IDParam
 	if !middleware.BindUri(c, &params) {
 		return
@@ -100,6 +115,9 @@ func (h *StoreHandler) GetByID(c *gin.Context) {
 }
 
 func (h *StoreHandler) Create(c *gin.Context) {
+	if !requireStoreMaster(c) {
+		return
+	}
 	userType, userID, ok := storeCaller(c)
 	if !ok {
 		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
@@ -122,6 +140,9 @@ func (h *StoreHandler) Create(c *gin.Context) {
 }
 
 func (h *StoreHandler) Update(c *gin.Context) {
+	if !requireStoreMaster(c) {
+		return
+	}
 	userType, userID, ok := storeCaller(c)
 	if !ok {
 		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))

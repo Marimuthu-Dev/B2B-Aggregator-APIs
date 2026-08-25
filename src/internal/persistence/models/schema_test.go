@@ -21,5 +21,8 @@ func TestHasLeadStoreMasterIDColumn(t *testing.T) {
 		if got := HasLeadStoreMasterIDColumn(); got != tc.want {
 			t.Errorf("schema %q: HasLeadStoreMasterIDColumn() = %v, want %v", tc.schema, got, tc.want)
 		}
+		if got := HasStoreMasterTable(); got != tc.want {
+			t.Errorf("schema %q: HasStoreMasterTable() = %v, want %v", tc.schema, got, tc.want)
+		}
 	}
 }

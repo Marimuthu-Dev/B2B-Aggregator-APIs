@@ -8,6 +8,7 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/apperrors"
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
+	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 	"b2b-diagnostic-aggregator/apis/pkg/utils"
@@ -31,7 +32,14 @@ func NewStoreService(repo repository.StoreRepository, clientRepo repository.Clie
 	return &storeService{repo: repo, clientRepo: clientRepo}
 }
 
+func storeMasterUnavailable() error {
+	return apperrors.NewNotFound("Store master is not available for this environment", nil)
+}
+
 func (s *storeService) ListStores(filter repository.StoreListFilter) ([]domain.Store, int64, error) {
+	if !persistencemodels.HasStoreMasterTable() {
+		return nil, 0, nil
+	}
 	stores, total, err := s.repo.List(filter)
 	if err != nil {
 		return nil, 0, err
@@ -41,6 +49,9 @@ func (s *storeService) ListStores(filter repository.StoreListFilter) ([]domain.S
 }
 
 func (s *storeService) GetStoreByID(id int64) (*domain.Store, error) {
+	if !persistencemodels.HasStoreMasterTable() {
+		return nil, storeMasterUnavailable()
+	}
 	store, err := s.repo.FindByID(id)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, apperrors.NewNotFound("Store not found", err)
@@ -53,6 +64,9 @@ func (s *storeService) GetStoreByID(id int64) (*domain.Store, error) {
 }
 
 func (s *storeService) CreateStore(st *domain.Store, createdBy int64, password string) error {
+	if !persistencemodels.HasStoreMasterTable() {
+		return storeMasterUnavailable()
+	}
 	st.StoreName = strings.TrimSpace(st.StoreName)
 	st.Address = strings.TrimSpace(st.Address)
 	st.Pincode = strings.TrimSpace(st.Pincode)
@@ -108,6 +122,9 @@ func (s *storeService) CreateStore(st *domain.Store, createdBy int64, password s
 }
 
 func (s *storeService) UpdateStore(id int64, update *dto.StoreUpdateRequest, lastUpdatedBy int64) (*domain.Store, error) {
+	if !persistencemodels.HasStoreMasterTable() {
+		return nil, storeMasterUnavailable()
+	}
 	existing, err := s.repo.FindByID(id)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, apperrors.NewNotFound("Store not found", err)

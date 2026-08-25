@@ -12,6 +12,7 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/apperrors"
 	"b2b-diagnostic-aggregator/apis/internal/config"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
+	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 	"b2b-diagnostic-aggregator/apis/pkg/utils"
@@ -106,9 +107,15 @@ func (s *loginService) resolveUserByMobileNumber(domainName, mobileNumber string
 			return 0, 0, nil, apperrors.NewNotFound("User not found", err)
 		}
 		fmt.Println("[LOGIN] Service.resolveUserByMobileNumber: client not found, trying store")
+		if !persistencemodels.HasStoreMasterTable() {
+			return 0, 0, nil, apperrors.NewNotFound("User not found", err)
+		}
 		return s.resolveStoreByMobileNumber(mobileNumber)
 	case utils.UserTypeStore:
 		fmt.Println("[LOGIN] Service.resolveUserByMobileNumber: resolving store by contact number")
+		if !persistencemodels.HasStoreMasterTable() {
+			return 0, 0, nil, apperrors.NewNotFound("User not found", nil)
+		}
 		return s.resolveStoreByMobileNumber(mobileNumber)
 	case utils.UserTypeEmployee:
 		fmt.Println("[LOGIN] Service.resolveUserByMobileNumber: resolving employee by mobile number")
@@ -135,6 +142,9 @@ func (s *loginService) resolveUserByMobileNumber(domainName, mobileNumber string
 }
 
 func (s *loginService) resolveStoreByMobileNumber(mobileNumber string) (int64, int, interface{}, error) {
+	if !persistencemodels.HasStoreMasterTable() {
+		return 0, 0, nil, apperrors.NewNotFound("User not found", nil)
+	}
 	store, err := s.storeRepo.FindByContactNumber(mobileNumber)
 	if err != nil {
 		fmt.Printf("[LOGIN] Service.resolveStoreByMobileNumber: store not found: %v\n", err)
@@ -350,6 +360,9 @@ func (s *loginService) GetProfile(domainName string, userIDStr, mobileNumber *st
 			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 				return nil, apperrors.NewNotFound("Profile not found", err)
 			}
+			if !persistencemodels.HasStoreMasterTable() {
+				return nil, apperrors.NewNotFound("Profile not found", err)
+			}
 			store, storeErr := s.storeRepo.FindByID(id)
 			if storeErr != nil {
 				return nil, apperrors.NewNotFound("Profile not found", storeErr)
@@ -368,6 +381,9 @@ func (s *loginService) GetProfile(domainName string, userIDStr, mobileNumber *st
 			return lab, nil
 		}
 		if userType == utils.UserTypeStore {
+			if !persistencemodels.HasStoreMasterTable() {
+				return nil, apperrors.NewNotFound("Profile not found", nil)
+			}
 			id, _ := strconv.ParseInt(*userIDStr, 10, 64)
 			store, err := s.storeRepo.FindByID(id)
 			if err != nil {

@@ -12,6 +12,7 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/config"
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
+	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 
@@ -443,6 +444,9 @@ func (s *clientService) GetClientMoUDownloadURL(ctx context.Context, clientID in
 }
 
 func (s *clientService) ensureClientMobileNotUsedByStore(mobile string) error {
+	if !persistencemodels.HasStoreMasterTable() {
+		return nil
+	}
 	mobile = strings.TrimSpace(mobile)
 	if mobile == "" || s.storeRepo == nil {
 		return nil

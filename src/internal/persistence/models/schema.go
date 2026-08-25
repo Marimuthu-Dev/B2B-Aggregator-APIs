@@ -8,7 +8,7 @@ import (
 // DefaultSchema is used when DB_SCHEMA is unset (UrMediConnect / legacy).
 const DefaultSchema = "MediAdmin"
 
-// MedLyfeSchema is the SQL Server schema that includes tbl_Leads.StoreMasterID.
+// MedLyfeSchema is the SQL Server schema that includes tbl_StoreMaster and tbl_Leads.StoreMasterID.
 const MedLyfeSchema = "MedLyfe"
 
 var (
@@ -41,7 +41,17 @@ func Table(table string) string {
 	return Schema() + "." + table
 }
 
+// IsMedLyfeSchema is true when DB_SCHEMA is MedLyfe (store login and StoreMasterID).
+func IsMedLyfeSchema() bool {
+	return strings.EqualFold(Schema(), MedLyfeSchema)
+}
+
+// HasStoreMasterTable is true when tbl_StoreMaster exists (MedLyfe only).
+func HasStoreMasterTable() bool {
+	return IsMedLyfeSchema()
+}
+
 // HasLeadStoreMasterIDColumn is true when tbl_Leads includes StoreMasterID (MedLyfe only).
 func HasLeadStoreMasterIDColumn() bool {
-	return strings.EqualFold(Schema(), MedLyfeSchema)
+	return IsMedLyfeSchema()
 }
