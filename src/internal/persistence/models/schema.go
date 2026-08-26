@@ -55,3 +55,8 @@ func HasStoreMasterTable() bool {
 func HasLeadStoreMasterIDColumn() bool {
 	return IsMedLyfeSchema()
 }
+
+// HasLabMapLocationURLColumn is true when tbl_LabMaster includes MapLocationURL (MedLyfe only).
+func HasLabMapLocationURLColumn() bool {
+	return IsMedLyfeSchema()
+}

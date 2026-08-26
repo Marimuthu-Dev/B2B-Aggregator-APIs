@@ -32,6 +32,7 @@ type Lab struct {
 	ServicesID                 *string
 	CollectionPincodes         *string
 	LabGrade                   *string
+	MapLocationURL             *string `json:"MapLocationURL,omitempty"`
 	IsActive                   *bool
 	CreatedBy                  *int64
 	CreatedOn                  *timeutil.ISTTime

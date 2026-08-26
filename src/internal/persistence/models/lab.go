@@ -29,6 +29,8 @@ type Lab struct {
 	ServicesID                 *string    `gorm:"column:ServicesID;type:varchar(10)"`      // JSON string
 	CollectionPincodes         *string    `gorm:"column:CollectionPincodes;type:varchar(max)"`
 	LabGrade                   *string    `gorm:"column:LabGrade;type:varchar(20)"`
+	// MapLocationURL exists only on MedLyfe.tbl_LabMaster. GORM omits it when DB_SCHEMA is not MedLyfe.
+	MapLocationURL             *string    `gorm:"column:MapLocationURL;type:varchar(1000)"`
 	IsActive                   *bool      `gorm:"column:IsActive"`
 	CreatedBy                  *int64     `gorm:"column:CreatedBy"`
 	CreatedOn                  *time.Time `gorm:"column:CreatedOn;default:GETDATE()"`

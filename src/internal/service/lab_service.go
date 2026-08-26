@@ -12,6 +12,7 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/config"
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
+	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 
@@ -80,7 +81,43 @@ func (s *labService) GetLabByContactNumber(contactNumber string) (*domain.Lab, e
 	return lab, err
 }
 
+const labMapLocationURLMaxLen = 1000
+
+func normalizeOptionalMapLocationURL(src *string) (*string, error) {
+	if src == nil {
+		return nil, nil
+	}
+	trimmed := strings.TrimSpace(*src)
+	if trimmed == "" {
+		return nil, nil
+	}
+	if len(trimmed) > labMapLocationURLMaxLen {
+		return nil, apperrors.NewBadRequest("MapLocationURL must be at most 1000 characters", nil)
+	}
+	lower := strings.ToLower(trimmed)
+	if !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") {
+		return nil, apperrors.NewBadRequest("MapLocationURL must be an http or https URL", nil)
+	}
+	return &trimmed, nil
+}
+
+func applyLabMapLocationURLOnCreate(l *domain.Lab) error {
+	if !persistencemodels.HasLabMapLocationURLColumn() {
+		l.MapLocationURL = nil
+		return nil
+	}
+	normalized, err := normalizeOptionalMapLocationURL(l.MapLocationURL)
+	if err != nil {
+		return err
+	}
+	l.MapLocationURL = normalized
+	return nil
+}
+
 func (s *labService) CreateLab(l *domain.Lab, createdBy int64) error {
+	if err := applyLabMapLocationURLOnCreate(l); err != nil {
+		return err
+	}
 	now := time.Now()
 	l.CreatedBy = &createdBy
 	l.CreatedOn = timeutil.FromTimePtr(&now)
@@ -94,6 +131,9 @@ func (s *labService) CreateLab(l *domain.Lab, createdBy int64) error {
 }
 
 func (s *labService) CreateLabWithMoU(ctx context.Context, l *domain.Lab, createdBy int64, mou *multipart.FileHeader) error {
+	if err := applyLabMapLocationURLOnCreate(l); err != nil {
+		return err
+	}
 	if mou != nil {
 		if s.blobs == nil {
 			return apperrors.NewInternal("MoU storage is not configured", nil)
@@ -145,7 +185,7 @@ func (s *labService) rollbackLabAfterFailedMoU(labID int64, phase string) {
 	slog.Info("CreateLabWithMoU: rolled back lab row after MoU failure", slog.Int64("labID", labID), slog.String("phase", phase))
 }
 
-func applyLabUpdatePatch(l *domain.Lab, update *dto.LabUpdateRequest) {
+func applyLabUpdatePatch(l *domain.Lab, update *dto.LabUpdateRequest) error {
 	if update.LabName != nil {
 		l.LabName = *update.LabName
 	}
@@ -218,9 +258,21 @@ func applyLabUpdatePatch(l *domain.Lab, update *dto.LabUpdateRequest) {
 	if update.LabGrade != nil {
 		l.LabGrade = update.LabGrade
 	}
+	if persistencemodels.HasLabMapLocationURLColumn() {
+		if update.MapLocationURL != nil {
+			normalized, err := normalizeOptionalMapLocationURL(update.MapLocationURL)
+			if err != nil {
+				return err
+			}
+			l.MapLocationURL = normalized
+		}
+	} else {
+		l.MapLocationURL = nil
+	}
 	if update.IsActive != nil {
 		l.IsActive = update.IsActive
 	}
+	return nil
 }
 
 func (s *labService) UpdateLab(id int64, update *dto.LabUpdateRequest, lastUpdatedBy int64) (*domain.Lab, error) {
@@ -232,7 +284,9 @@ func (s *labService) UpdateLab(id int64, update *dto.LabUpdateRequest, lastUpdat
 		return nil, err
 	}
 	l := *existing
-	applyLabUpdatePatch(&l, update)
+	if err := applyLabUpdatePatch(&l, update); err != nil {
+		return nil, err
+	}
 	l.LabID = id
 	l.LastUpdatedBy = &lastUpdatedBy
 	now := time.Now()
@@ -269,7 +323,9 @@ func (s *labService) UpdateLabWithMoU(ctx context.Context, id int64, update *dto
 
 	if hasFields && !hasFile {
 		l := *existing
-		applyLabUpdatePatch(&l, update)
+		if err := applyLabUpdatePatch(&l, update); err != nil {
+			return nil, err
+		}
 		l.LabID = id
 		l.LastUpdatedBy = &lastUpdatedBy
 		now := time.Now()
@@ -282,7 +338,9 @@ func (s *labService) UpdateLabWithMoU(ctx context.Context, id int64, update *dto
 
 	if hasFields {
 		l := *existing
-		applyLabUpdatePatch(&l, update)
+		if err := applyLabUpdatePatch(&l, update); err != nil {
+			return nil, err
+		}
 		l.LabID = id
 		l.LastUpdatedBy = &lastUpdatedBy
 		now := time.Now()
