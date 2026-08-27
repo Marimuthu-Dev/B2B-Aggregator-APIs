@@ -9,19 +9,36 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 )
 
-func mapLeadToDomainWithOptionalJoinedNames(p persistencemodels.Lead, labName, clientName, cityName, stateName sql.NullString) domain.Lead {
+type leadJoinedNames struct {
+	LabName    sql.NullString
+	ClientName sql.NullString
+	CityName   sql.NullString
+	StateName  sql.NullString
+	StoreName  sql.NullString
+	StoreCity  sql.NullString
+}
+
+func mapLeadToDomainWithOptionalJoinedNames(p persistencemodels.Lead, names leadJoinedNames) domain.Lead {
 	d := mapLeadToDomain(p)
-	if labName.Valid {
-		d.LabName = strings.TrimSpace(labName.String)
+	if names.LabName.Valid {
+		d.LabName = strings.TrimSpace(names.LabName.String)
 	}
-	if clientName.Valid {
-		d.ClientName = strings.TrimSpace(clientName.String)
+	if names.ClientName.Valid {
+		d.ClientName = strings.TrimSpace(names.ClientName.String)
 	}
-	if cityName.Valid {
-		d.CityName = strings.TrimSpace(cityName.String)
+	if names.CityName.Valid {
+		d.CityName = strings.TrimSpace(names.CityName.String)
 	}
-	if stateName.Valid {
-		d.StateName = strings.TrimSpace(stateName.String)
+	if names.StateName.Valid {
+		d.StateName = strings.TrimSpace(names.StateName.String)
+	}
+	if persistencemodels.HasStoreMasterTable() {
+		if names.StoreName.Valid {
+			d.StoreName = strings.TrimSpace(names.StoreName.String)
+		}
+		if names.StoreCity.Valid {
+			d.StoreCity = strings.TrimSpace(names.StoreCity.String)
+		}
 	}
 	return d
 }

@@ -174,6 +174,9 @@ type Lead struct {
 	EmpID                         string `json:"EmpID"`
 	StoreID                       string `json:"StoreID"`
 	StoreMasterID                 *int64 `json:"StoreMasterID,omitempty"`
+	// StoreName and StoreCity come from tbl_StoreMaster (MedLyfe only). Omitted on other schemas.
+	StoreName                     string `json:"StoreName,omitempty"`
+	StoreCity                     string `json:"StoreCity,omitempty"`
 	CollectionType                string `json:"CollectionType"`
 	LeadStatusID                  int8
 	AppointmentAt                 *timeutil.StoredTime `json:"AppointmentAt"`
