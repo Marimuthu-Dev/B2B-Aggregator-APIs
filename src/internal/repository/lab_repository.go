@@ -15,6 +15,7 @@ type LabRepository interface {
 	List(filter LabListFilter) ([]domain.Lab, int64, error)
 	FindByID(id int64) (*domain.Lab, error)
 	ExistsByID(id int64) (bool, error)
+	ExistsByContactPerson1Number(contactNumber string, excludeLabID int64) (bool, error)
 	Create(l *domain.Lab) error
 	Update(l *domain.Lab) error
 	UpdateLabMoUURL(labID int64, url string) error
@@ -114,6 +115,23 @@ func (r *labRepository) FindByID(id int64) (*domain.Lab, error) {
 func (r *labRepository) ExistsByID(id int64) (bool, error) {
 	var count int64
 	if err := gormLab(r.db.Model(&persistencemodels.Lab{})).Where("LabID = ?", id).Limit(1).Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (r *labRepository) ExistsByContactPerson1Number(contactNumber string, excludeLabID int64) (bool, error) {
+	contactNumber = strings.TrimSpace(contactNumber)
+	if contactNumber == "" {
+		return false, nil
+	}
+	q := gormLab(r.db.Model(&persistencemodels.Lab{})).Where("ContactPerson1Number = ?", contactNumber)
+	if excludeLabID > 0 {
+		q = q.Where("LabID <> ?", excludeLabID)
+	}
+	var count int64
+	// Do not use Limit() with Count(): SQL Server rejects ORDER BY on an aggregate.
+	if err := q.Count(&count).Error; err != nil {
 		return false, err
 	}
 	return count > 0, nil

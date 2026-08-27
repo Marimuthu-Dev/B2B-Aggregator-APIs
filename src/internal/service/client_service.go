@@ -90,7 +90,7 @@ func (s *clientService) GetClientBrandMappingsByClientID(clientID int64) ([]doma
 }
 
 func (s *clientService) CreateClient(c *domain.Client, createdBy int64, brandNames []string) error {
-	if err := s.ensureClientMobileNotUsedByStore(c.ContactPerson1Number); err != nil {
+	if err := s.ensureClientMobileUnique(c.ContactPerson1Number, 0); err != nil {
 		return err
 	}
 	now := time.Now()
@@ -114,7 +114,7 @@ func (s *clientService) CreateClientWithMoU(ctx context.Context, c *domain.Clien
 			return apperrors.NewBadRequest(err.Error(), err)
 		}
 	}
-	if err := s.ensureClientMobileNotUsedByStore(c.ContactPerson1Number); err != nil {
+	if err := s.ensureClientMobileUnique(c.ContactPerson1Number, 0); err != nil {
 		return err
 	}
 
@@ -275,7 +275,7 @@ func (s *clientService) UpdateClient(id int64, update *dto.ClientUpdateRequest, 
 
 	c := *existing
 	applyClientUpdatePatch(&c, update)
-	if err := s.ensureClientMobileNotUsedByStore(c.ContactPerson1Number); err != nil {
+	if err := s.ensureClientMobileUnique(c.ContactPerson1Number, id); err != nil {
 		return nil, err
 	}
 	c.ClientID = id
@@ -319,7 +319,7 @@ func (s *clientService) UpdateClientWithMoU(ctx context.Context, id int64, updat
 	if hasFields && !hasFile {
 		c := *existing
 		applyClientUpdatePatch(&c, update)
-		if err := s.ensureClientMobileNotUsedByStore(c.ContactPerson1Number); err != nil {
+		if err := s.ensureClientMobileUnique(c.ContactPerson1Number, id); err != nil {
 			return nil, err
 		}
 		c.ClientID = id
@@ -338,7 +338,7 @@ func (s *clientService) UpdateClientWithMoU(ctx context.Context, id int64, updat
 	if hasFields {
 		c := *existing
 		applyClientUpdatePatch(&c, update)
-		if err := s.ensureClientMobileNotUsedByStore(c.ContactPerson1Number); err != nil {
+		if err := s.ensureClientMobileUnique(c.ContactPerson1Number, id); err != nil {
 			return nil, err
 		}
 		c.ClientID = id
@@ -441,6 +441,21 @@ func (s *clientService) GetClientMoUDownloadURL(ctx context.Context, clientID in
 		return nil, apperrors.NewInternal("Failed to generate download link", err)
 	}
 	return &dto.ClientMoUDownloadURLResponse{URL: urlStr, ExpiresAt: exp}, nil
+}
+
+func (s *clientService) ensureClientMobileUnique(mobile string, excludeClientID int64) error {
+	mobile = strings.TrimSpace(mobile)
+	if mobile == "" {
+		return nil
+	}
+	taken, err := s.repo.ExistsByContactPerson1Number(mobile, excludeClientID)
+	if err != nil {
+		return err
+	}
+	if taken {
+		return apperrors.NewBadRequest("ContactPerson1Number mobile already exists with system", nil)
+	}
+	return s.ensureClientMobileNotUsedByStore(mobile)
 }
 
 func (s *clientService) ensureClientMobileNotUsedByStore(mobile string) error {

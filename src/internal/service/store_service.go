@@ -159,10 +159,8 @@ func (s *storeService) UpdateStore(id int64, update *dto.StoreUpdateRequest, las
 		st.IsActive = *update.IsActive
 	}
 
-	if update.ContactNumber != nil && st.ContactNumber != existing.ContactNumber {
-		if err := s.ensureMobileUnique(st.ContactNumber, st.StoreID); err != nil {
-			return nil, err
-		}
+	if err := s.ensureMobileUnique(st.ContactNumber, id); err != nil {
+		return nil, err
 	}
 	if update.EmailID != nil && !strings.EqualFold(st.EmailID, existing.EmailID) {
 		if err := s.ensureEmailUnique(st.EmailID, st.StoreID); err != nil {
@@ -191,7 +189,7 @@ func (s *storeService) ensureMobileUnique(mobile string, excludeStoreID int64) e
 		return err
 	}
 	if taken {
-		return apperrors.NewBadRequest("ContactNumber is already used by another store", nil)
+		return apperrors.NewBadRequest("ContactNumber mobile already exists with system", nil)
 	}
 	client, err := s.clientRepo.FindByContactNumber(mobile)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {

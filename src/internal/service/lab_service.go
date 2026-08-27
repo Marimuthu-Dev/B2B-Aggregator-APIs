@@ -118,6 +118,9 @@ func (s *labService) CreateLab(l *domain.Lab, createdBy int64) error {
 	if err := applyLabMapLocationURLOnCreate(l); err != nil {
 		return err
 	}
+	if err := s.ensureLabMobileUnique(derefString(l.ContactPerson1Number), 0); err != nil {
+		return err
+	}
 	now := time.Now()
 	l.CreatedBy = &createdBy
 	l.CreatedOn = timeutil.FromTimePtr(&now)
@@ -141,6 +144,9 @@ func (s *labService) CreateLabWithMoU(ctx context.Context, l *domain.Lab, create
 		if err := s.blobs.ValidatePDF(mou); err != nil {
 			return apperrors.NewBadRequest(err.Error(), err)
 		}
+	}
+	if err := s.ensureLabMobileUnique(derefString(l.ContactPerson1Number), 0); err != nil {
+		return err
 	}
 	now := time.Now()
 	l.CreatedBy = &createdBy
@@ -287,6 +293,9 @@ func (s *labService) UpdateLab(id int64, update *dto.LabUpdateRequest, lastUpdat
 	if err := applyLabUpdatePatch(&l, update); err != nil {
 		return nil, err
 	}
+	if err := s.ensureLabMobileUnique(derefString(l.ContactPerson1Number), id); err != nil {
+		return nil, err
+	}
 	l.LabID = id
 	l.LastUpdatedBy = &lastUpdatedBy
 	now := time.Now()
@@ -326,6 +335,9 @@ func (s *labService) UpdateLabWithMoU(ctx context.Context, id int64, update *dto
 		if err := applyLabUpdatePatch(&l, update); err != nil {
 			return nil, err
 		}
+		if err := s.ensureLabMobileUnique(derefString(l.ContactPerson1Number), id); err != nil {
+			return nil, err
+		}
 		l.LabID = id
 		l.LastUpdatedBy = &lastUpdatedBy
 		now := time.Now()
@@ -339,6 +351,9 @@ func (s *labService) UpdateLabWithMoU(ctx context.Context, id int64, update *dto
 	if hasFields {
 		l := *existing
 		if err := applyLabUpdatePatch(&l, update); err != nil {
+			return nil, err
+		}
+		if err := s.ensureLabMobileUnique(derefString(l.ContactPerson1Number), id); err != nil {
 			return nil, err
 		}
 		l.LabID = id
@@ -440,4 +455,19 @@ func (s *labService) GetLabsByCity(cityID uint8) ([]domain.Lab, error) {
 
 func (s *labService) GetLabsByState(stateID uint8) ([]domain.Lab, error) {
 	return s.repo.FindByState(stateID)
+}
+
+func (s *labService) ensureLabMobileUnique(mobile string, excludeLabID int64) error {
+	mobile = strings.TrimSpace(mobile)
+	if mobile == "" {
+		return nil
+	}
+	taken, err := s.repo.ExistsByContactPerson1Number(mobile, excludeLabID)
+	if err != nil {
+		return err
+	}
+	if taken {
+		return apperrors.NewBadRequest("ContactPerson1Number mobile already exists with system", nil)
+	}
+	return nil
 }

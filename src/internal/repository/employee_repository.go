@@ -2,10 +2,11 @@ package repository
 
 import (
 	"fmt"
+	"strings"
 
 	"b2b-diagnostic-aggregator/apis/internal/domain"
-	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
+	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 
 	"gorm.io/gorm"
 )
@@ -15,6 +16,7 @@ type EmployeeRepository interface {
 	FindByID(id int64) (*domain.Employee, error)
 	FindByMobileNumber(mobileNumber string) (*domain.Employee, error)
 	ExistsByID(id int64) (bool, error)
+	ExistsByMobileNumber(mobileNumber string, excludeUID int64) (bool, error)
 	Create(e *domain.Employee) error
 	Update(e *domain.Employee) error
 	Delete(id int64) error
@@ -62,6 +64,23 @@ func (r *employeeRepository) FindByMobileNumber(mobileNumber string) (*domain.Em
 func (r *employeeRepository) ExistsByID(id int64) (bool, error) {
 	var count int64
 	if err := r.db.Model(&persistencemodels.Employee{}).Where("UID = ?", id).Limit(1).Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (r *employeeRepository) ExistsByMobileNumber(mobileNumber string, excludeUID int64) (bool, error) {
+	mobileNumber = strings.TrimSpace(mobileNumber)
+	if mobileNumber == "" {
+		return false, nil
+	}
+	q := r.db.Model(&persistencemodels.Employee{}).Where("MobileNumber = ?", mobileNumber)
+	if excludeUID > 0 {
+		q = q.Where("UID <> ?", excludeUID)
+	}
+	var count int64
+	// Do not use Limit() with Count(): SQL Server rejects ORDER BY on an aggregate.
+	if err := q.Count(&count).Error; err != nil {
 		return false, err
 	}
 	return count > 0, nil

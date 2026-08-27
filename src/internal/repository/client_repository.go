@@ -15,6 +15,7 @@ type ClientRepository interface {
 	List(filter ClientListFilter) ([]domain.Client, int64, error)
 	FindByID(id int64) (*domain.Client, error)
 	ExistsByID(id int64) (bool, error)
+	ExistsByContactPerson1Number(contactNumber string, excludeClientID int64) (bool, error)
 	Create(c *domain.Client, brandNames []string) error
 	DeleteBrandMappingsByClientID(clientID int64) error
 	Update(c *domain.Client, syncBrands bool, brandNames []string) error
@@ -108,6 +109,23 @@ func (r *clientRepository) FindByID(id int64) (*domain.Client, error) {
 func (r *clientRepository) ExistsByID(id int64) (bool, error) {
 	var count int64
 	if err := r.db.Model(&persistencemodels.Client{}).Where("ClientID = ?", id).Limit(1).Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (r *clientRepository) ExistsByContactPerson1Number(contactNumber string, excludeClientID int64) (bool, error) {
+	contactNumber = strings.TrimSpace(contactNumber)
+	if contactNumber == "" {
+		return false, nil
+	}
+	q := r.db.Model(&persistencemodels.Client{}).Where("ContactPerson1Number = ?", contactNumber)
+	if excludeClientID > 0 {
+		q = q.Where("ClientID <> ?", excludeClientID)
+	}
+	var count int64
+	// Do not use Limit() with Count(): SQL Server rejects ORDER BY on an aggregate.
+	if err := q.Count(&count).Error; err != nil {
 		return false, err
 	}
 	return count > 0, nil
