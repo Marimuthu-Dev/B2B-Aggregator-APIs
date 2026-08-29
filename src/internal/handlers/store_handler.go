@@ -44,17 +44,9 @@ func (h *StoreHandler) GetAll(c *gin.Context) {
 		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
 		return
 	}
-	var storeID *int64
-	switch userType {
-	case utils.UserTypeEmployee:
-		// unscoped; optional clientId from query
-	case utils.UserTypeClient:
-		query.ClientID = &userID
-	case utils.UserTypeStore:
-		query.ClientID = nil
-		storeID = &userID
-	default:
-		respondError(c, apperrors.NewForbidden("You are not authorized for this activity.", nil))
+	scope, err := resolveStoreListScope(userType, userID, query.ClientID)
+	if err != nil {
+		respondError(c, err)
 		return
 	}
 
@@ -64,8 +56,8 @@ func (h *StoreHandler) GetAll(c *gin.Context) {
 		PageSize:  page.PageSize,
 		SortBy:    page.SortBy,
 		SortOrder: page.SortOrder,
-		ClientID:  query.ClientID,
-		StoreID:   storeID,
+		ClientID:  scope.ClientID,
+		StoreID:   scope.StoreID,
 		IsActive:  query.IsActive,
 		Search:    query.Search,
 	}
@@ -98,7 +90,9 @@ func (h *StoreHandler) GetByID(c *gin.Context) {
 		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
 		return
 	}
-	if userType != utils.UserTypeEmployee && userType != utils.UserTypeClient && userType != utils.UserTypeStore {
+	switch userType {
+	case utils.UserTypeEmployee, utils.UserTypeClient, utils.UserTypeStore:
+	default:
 		respondError(c, apperrors.NewForbidden("You are not authorized for this activity.", nil))
 		return
 	}
@@ -179,6 +173,33 @@ func storeCaller(c *gin.Context) (userType int, userID int64, ok bool) {
 	userID, idOK := middleware.GetUserID(c)
 	userType, typeOK := middleware.GetUserType(c)
 	return userType, userID, idOK && typeOK && userID > 0
+}
+
+type storeListScope struct {
+	ClientID *int64
+	StoreID  *int64
+}
+
+// resolveStoreListScope applies GET /stores visibility:
+// userType 1 (employee): optional clientId; omitted means all stores
+// userType 2 (client): JWT userId is always ClientID (query clientId cannot widen or switch tenants)
+// userType 3 (lab): forbidden
+// userType 4 (store): JWT userId is always StoreID
+func resolveStoreListScope(userType int, userID int64, queryClientID *int64) (storeListScope, error) {
+	switch userType {
+	case utils.UserTypeEmployee:
+		return storeListScope{ClientID: queryClientID}, nil
+	case utils.UserTypeClient:
+		id := userID
+		return storeListScope{ClientID: &id}, nil
+	case utils.UserTypeLab:
+		return storeListScope{}, apperrors.NewForbidden("You are not authorized for this activity.", nil)
+	case utils.UserTypeStore:
+		id := userID
+		return storeListScope{StoreID: &id}, nil
+	default:
+		return storeListScope{}, apperrors.NewForbidden("You are not authorized for this activity.", nil)
+	}
 }
 
 func storeReadableByCaller(userType int, userID int64, store *domain.Store) bool {
