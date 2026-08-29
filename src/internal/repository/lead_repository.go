@@ -179,6 +179,14 @@ func (r *leadRepository) leadListJoinedQuery(filter LeadListFilter) *gorm.DB {
 			q = q.Where("l.StoreMasterID = ?", *filter.StoreMasterID)
 		}
 	}
+	if persistencemodels.HasStoreMasterTable() {
+		if filter.StoreCityID != nil {
+			q = q.Where("sm.CityID = ?", *filter.StoreCityID)
+		}
+		if filter.StoreStateID != nil {
+			q = q.Where("sm.StateID = ?", *filter.StoreStateID)
+		}
+	}
 	if trimmed := strings.TrimSpace(filter.Search); trimmed != "" {
 		term := "%" + trimmed + "%"
 		q = q.Where("(l.PatientName LIKE ? OR l.ContactNumber LIKE ? OR l.EmailID LIKE ? OR l.StoreID LIKE ?)", term, term, term, term)

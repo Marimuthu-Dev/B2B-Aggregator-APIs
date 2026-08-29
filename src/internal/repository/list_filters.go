@@ -51,6 +51,10 @@ type LeadListFilter struct {
 	CollectionType   *string
 	StoreID          *string
 	StoreMasterID    *int64
+	// StoreCityID filters joined tbl_StoreMaster.CityID.
+	StoreCityID *int8
+	// StoreStateID filters joined tbl_StoreMaster.StateID.
+	StoreStateID *int8
 	// RestrictToStoreID is set from a store JWT (userType 4). Matches StoreMasterID or StoreID varchar.
 	RestrictToStoreID *int64
 	Search           string

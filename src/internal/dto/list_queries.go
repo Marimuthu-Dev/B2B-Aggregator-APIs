@@ -119,6 +119,10 @@ type LeadListQuery struct {
 	StoreID *string `form:"storeId" binding:"omitempty"`
 	// StoreMasterID filters by tbl_Leads.StoreMasterID (FK to tbl_StoreMaster.StoreID).
 	StoreMasterID *int64 `form:"storeMasterId" binding:"omitempty,min=1"`
+	// StoreCityID filters by tbl_StoreMaster.CityID (joined on l.StoreMasterID = sm.StoreID).
+	StoreCityID *int8 `form:"storeCityId" binding:"omitempty,min=1"`
+	// StoreStateID filters by tbl_StoreMaster.StateID (joined on l.StoreMasterID = sm.StoreID).
+	StoreStateID *int8 `form:"storeStateId" binding:"omitempty,min=1"`
 	// Search matches PatientName, ContactNumber, EmailID, or StoreID (substring, LIKE).
 	Search string `form:"search" binding:"omitempty"`
 	// FitnessStatus filters by tbl_Leads.IsFit (Empty | Not Assessed | On Hold | Fit | UnFit); see domain.ParseLeadListFitnessFilter.
