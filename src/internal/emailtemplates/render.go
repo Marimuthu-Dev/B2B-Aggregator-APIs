@@ -24,9 +24,10 @@ const (
 	EventClientCreated   = "client_created"
 	EventLabCreated      = "lab_created"
 	EventEmployeeCreated = "employee_created"
+	EventStoreCreated    = "store_created"
 	EventForgotPassword  = "forgot_password"
-	defaultTemplateDir = "default"
-	templatesRoot      = "templates"
+	defaultTemplateDir   = "default"
+	templatesRoot        = "templates"
 )
 
 // ClientCreatedData is passed to {schema}/client_created.html.
@@ -80,7 +81,24 @@ func RenderEmployeeCreated(schema string, data EmployeeCreatedData) (string, err
 	return RenderEvent(schema, EventEmployeeCreated, data)
 }
 
-// ForgotPasswordData is passed to MediAdmin/forgot_password.html.
+// StoreCreatedData is passed to {schema}/store_created.html (MedLyfe tbl_StoreMaster).
+type StoreCreatedData struct {
+	StoreName           string
+	Username            string
+	GeneratePasswordURL string
+	PortalURL           string
+	LogoURL             string
+	SupportPhone        string
+	SupportEmail        string
+	Year                int
+}
+
+// RenderStoreCreated executes the store-created template for the given SQL schema (DB_SCHEMA).
+func RenderStoreCreated(schema string, data StoreCreatedData) (string, error) {
+	return RenderEvent(schema, EventStoreCreated, data)
+}
+
+// ForgotPasswordData is passed to {schema}/forgot_password.html.
 type ForgotPasswordData struct {
 	DisplayName         string
 	Username            string
@@ -90,6 +108,7 @@ type ForgotPasswordData struct {
 	SupportPhone        string
 	SupportEmail        string
 	Year                int
+	LinkExpiry          string
 }
 
 // RenderForgotPassword executes the forgot-password template for the given SQL schema (DB_SCHEMA).

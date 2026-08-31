@@ -1,11 +1,13 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"time"
 
 	"b2b-diagnostic-aggregator/apis/internal/apperrors"
+	"b2b-diagnostic-aggregator/apis/internal/config"
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
 	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
@@ -26,10 +28,28 @@ type StoreService interface {
 type storeService struct {
 	repo       repository.StoreRepository
 	clientRepo repository.ClientRepository
+	emails     *repository.EmailOutboxRepository
+	forgotRepo repository.ForgotPasswordRepository
+	emailCfg   config.OutboundEmailConfig
+	portalURL  string
 }
 
-func NewStoreService(repo repository.StoreRepository, clientRepo repository.ClientRepository) StoreService {
-	return &storeService{repo: repo, clientRepo: clientRepo}
+func NewStoreService(
+	repo repository.StoreRepository,
+	clientRepo repository.ClientRepository,
+	emails *repository.EmailOutboxRepository,
+	forgotRepo repository.ForgotPasswordRepository,
+	emailCfg config.OutboundEmailConfig,
+	storePortalURL string,
+) StoreService {
+	return &storeService{
+		repo:       repo,
+		clientRepo: clientRepo,
+		emails:     emails,
+		forgotRepo: forgotRepo,
+		emailCfg:   emailCfg,
+		portalURL:  storePortalURL,
+	}
 }
 
 func storeMasterUnavailable() error {
@@ -118,6 +138,7 @@ func (s *storeService) CreateStore(st *domain.Store, createdBy int64, password s
 		return err
 	}
 	st.ClientName = client.ClientName
+	s.queueStoreCreatedEmail(context.Background(), st)
 	return nil
 }
 

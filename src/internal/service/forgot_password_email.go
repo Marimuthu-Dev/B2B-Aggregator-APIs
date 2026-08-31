@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -18,11 +19,47 @@ func isMediAdminSchema() bool {
 	return strings.EqualFold(strings.TrimSpace(persistencemodels.Schema()), "MediAdmin")
 }
 
+func shouldQueueForgotPasswordEmail() bool {
+	return isMediAdminSchema() || persistencemodels.IsMedLyfeSchema()
+}
+
+func forgotPasswordSubject(schema string) string {
+	if strings.EqualFold(strings.TrimSpace(schema), persistencemodels.MedLyfeSchema) {
+		return "Reset Your MedLyfe Health Password"
+	}
+	return "Reset your UrMediconnect password"
+}
+
+func formatLinkExpiry(d time.Duration) string {
+	if d <= 0 {
+		d = forgotPasswordKeyTTL
+	}
+	mins := int(d.Minutes())
+	if mins < 1 {
+		secs := int(d.Seconds())
+		if secs == 1 {
+			return "1 second"
+		}
+		return fmt.Sprintf("%d seconds", secs)
+	}
+	hours := int(d.Hours())
+	if mins%60 == 0 && hours >= 1 {
+		if hours == 1 {
+			return "1 hour"
+		}
+		return fmt.Sprintf("%d hours", hours)
+	}
+	if mins == 1 {
+		return "1 minute"
+	}
+	return fmt.Sprintf("%d minutes", mins)
+}
+
 func (s *loginService) queueForgotPasswordEmail(ctx context.Context, userType int, userData interface{}, resetKey string) {
 	if s == nil || s.emails == nil || userData == nil {
 		return
 	}
-	if !isMediAdminSchema() {
+	if !shouldQueueForgotPasswordEmail() {
 		return
 	}
 	if ctx == nil {
@@ -59,6 +96,7 @@ func (s *loginService) queueForgotPasswordEmail(ctx context.Context, userType in
 		SupportPhone:        s.emailCfg.SupportPhone,
 		SupportEmail:        s.emailCfg.SupportEmail,
 		Year:                time.Now().Year(),
+		LinkExpiry:          formatLinkExpiry(forgotPasswordKeyTTL),
 	})
 	if err != nil {
 		slog.Error("forgot password email: render failed", slog.Any("err", err))
@@ -66,7 +104,7 @@ func (s *loginService) queueForgotPasswordEmail(ctx context.Context, userType in
 	}
 
 	err = s.emails.Enqueue(ctx, domain.QueuedEmail{
-		Subject:     "Reset your UrMediconnect password",
+		Subject:     forgotPasswordSubject(schema),
 		FromAddress: s.emailCfg.FromAddress,
 		ToAddress:   to,
 		CC:          joinEmailAddresses(s.emailCfg.CCAddress),
@@ -95,7 +133,7 @@ func (s *loginService) portalURLForUserType(userType int) string {
 		return s.employeePortalURL
 	case utils.UserTypeLab:
 		return s.labPortalURL
-	case utils.UserTypeClient:
+	case utils.UserTypeClient, utils.UserTypeStore:
 		return s.clientPortalURL
 	default:
 		return ""
@@ -115,6 +153,10 @@ func forgotPasswordRecipient(userType int, userData interface{}) (to, displayNam
 	case utils.UserTypeClient:
 		if c, ok := userData.(*domain.Client); ok && c != nil {
 			return strings.TrimSpace(c.ContactPerson1EmailID), strings.TrimSpace(c.ClientName), strings.TrimSpace(c.ContactPerson1Number)
+		}
+	case utils.UserTypeStore:
+		if st, ok := userData.(*domain.Store); ok && st != nil {
+			return strings.TrimSpace(st.EmailID), strings.TrimSpace(st.StoreName), strings.TrimSpace(st.ContactNumber)
 		}
 	}
 	return "", "", ""

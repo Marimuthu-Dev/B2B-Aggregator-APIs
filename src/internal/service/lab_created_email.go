@@ -16,7 +16,7 @@ const emailTypeLabCreated = "LabCreated"
 
 func labCreatedSubject(schema string) string {
 	if strings.EqualFold(strings.TrimSpace(schema), "MedLyfe") {
-		return "Welcome to MedLyfe Portal"
+		return "Welcome to MedLyfe Health"
 	}
 	return "Welcome to the UrMediconnect Portal – Booking & Reports"
 }
