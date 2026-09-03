@@ -117,12 +117,16 @@ func (h *StoreHandler) Create(c *gin.Context) {
 		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
 		return
 	}
-	if userType != utils.UserTypeEmployee {
+	if userType != utils.UserTypeEmployee && userType != utils.UserTypeClient {
 		respondError(c, apperrors.NewForbidden("You are not authorized for this activity.", nil))
 		return
 	}
 	var req dto.StoreRequest
 	if !middleware.BindJSON(c, &req) {
+		return
+	}
+	if userType == utils.UserTypeClient && req.ClientID != userID {
+		respondError(c, apperrors.NewForbidden("You can only add stores for your own client ID.", nil))
 		return
 	}
 	store := req.ToDomain()
@@ -142,7 +146,7 @@ func (h *StoreHandler) Update(c *gin.Context) {
 		respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
 		return
 	}
-	if userType != utils.UserTypeEmployee {
+	if userType != utils.UserTypeEmployee && userType != utils.UserTypeClient {
 		respondError(c, apperrors.NewForbidden("You are not authorized for this activity.", nil))
 		return
 	}
@@ -152,6 +156,17 @@ func (h *StoreHandler) Update(c *gin.Context) {
 	}
 	if !middleware.RequirePositiveID(c, params.ID) {
 		return
+	}
+	if userType == utils.UserTypeClient {
+		store, err := h.svc.GetStoreByID(params.ID)
+		if err != nil {
+			respondError(c, err)
+			return
+		}
+		if !storeReadableByCaller(userType, userID, store) {
+			respondError(c, apperrors.NewForbidden("You are not authorized to update this store.", nil))
+			return
+		}
 	}
 	var req dto.StoreUpdateRequest
 	if !middleware.BindJSON(c, &req) {
