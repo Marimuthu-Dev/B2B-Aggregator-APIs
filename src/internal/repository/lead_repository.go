@@ -30,6 +30,8 @@ type LeadRepository interface {
 	FindByEmail(email string) ([]domain.Lead, error)
 	// FindActiveLeadStatusIDByName resolves LeadStatusID from MediAdmin.tbl_LeadStatusMaster (IsActive = 1).
 	FindActiveLeadStatusIDByName(name string) (int8, error)
+	// FindLeadStatusNameByID resolves LeadStatusName from MediAdmin.tbl_LeadStatusMaster.
+	FindLeadStatusNameByID(id int8) (string, error)
 	UpdateLeadReportURLAndStatus(leadID int64, reportURL string, statusID int8, userID int64) error
 	// FindLeadsPendingFitCertification returns FIT leads pending worker processing. Does not filter on IsFitCertificateTobeGenerated (all values eligible by query).
 	FindLeadsPendingFitCertification(limit int, pendingLeadStatusID int8) ([]domain.Lead, error)
@@ -355,6 +357,18 @@ func (r *leadRepository) FindActiveLeadStatusIDByName(name string) (int8, error)
 		return 0, err
 	}
 	return statusID, nil
+}
+
+func (r *leadRepository) FindLeadStatusNameByID(id int8) (string, error) {
+	var statusName string
+	err := r.db.Table(persistencemodels.Table("tbl_LeadStatusMaster")).
+		Select("LeadStatusName").
+		Where("LeadStatusID = ?", id).
+		Take(&statusName).Error
+	if err != nil {
+		return "", err
+	}
+	return statusName, nil
 }
 
 func (r *leadRepository) UpdateLeadReportURLAndStatus(leadID int64, reportURL string, statusID int8, userID int64) error {

@@ -124,9 +124,14 @@ func (s *leadService) CreateLead(l *domain.Lead, createdBy int64) error {
 			return err
 		}
 
+		statusName, err := leadRepo.FindLeadStatusNameByID(l.LeadStatusID)
+		if err != nil {
+			return err
+		}
+
 		history := &domain.LeadHistory{
 			LeadID:    l.LeadID,
-			Action:    domain.LeadActionCreate,
+			Action:    statusName,
 			CreatedBy: createdBy,
 		}
 
@@ -250,9 +255,14 @@ func (s *leadService) UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUp
 			return err
 		}
 
+		statusName, err := leadRepo.FindLeadStatusNameByID(l.LeadStatusID)
+		if err != nil {
+			return err
+		}
+
 		history := &domain.LeadHistory{
 			LeadID:    l.LeadID,
-			Action:    domain.LeadActionUpdate,
+			Action:    statusName,
 			CreatedBy: lastUpdatedBy,
 		}
 
