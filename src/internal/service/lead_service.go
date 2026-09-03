@@ -119,6 +119,10 @@ func (s *leadService) CreateLead(l *domain.Lead, createdBy int64) error {
 		return err
 	}
 
+	if l.LeadStatusID > 5 && l.LabID == nil {
+		return apperrors.NewBadRequest("Lab is not assigned, so it may not be able to update..!", nil)
+	}
+
 	return s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
 		if err := leadRepo.Create(l); err != nil {
 			return err
@@ -249,6 +253,10 @@ func (s *leadService) UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUp
 	l.LastUpdatedBy = lastUpdatedBy
 	l.LastUpdatedOn = timeutil.FromTime(time.Now())
 	l.PatientID = s.GeneratePatientID(l.PatientName, l.ContactNumber)
+
+	if l.LeadStatusID > 5 && l.LabID == nil {
+		return nil, apperrors.NewBadRequest("Lab is not assigned, so it may not be able to update..!", nil)
+	}
 
 	err = s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
 		if err := leadRepo.Update(&l); err != nil {
