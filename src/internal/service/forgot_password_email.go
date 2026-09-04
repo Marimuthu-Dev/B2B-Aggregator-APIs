@@ -133,8 +133,10 @@ func (s *loginService) portalURLForUserType(userType int) string {
 		return s.employeePortalURL
 	case utils.UserTypeLab:
 		return s.labPortalURL
-	case utils.UserTypeClient, utils.UserTypeStore:
+	case utils.UserTypeClient:
 		return s.clientPortalURL
+	case utils.UserTypeStore:
+		return s.storePortalURL
 	default:
 		return ""
 	}

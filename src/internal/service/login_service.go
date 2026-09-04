@@ -42,6 +42,7 @@ type loginService struct {
 	clientPortalURL    string
 	employeePortalURL  string
 	labPortalURL       string
+	storePortalURL     string
 	jwtSecret          string
 	accessTTL          time.Duration
 	refreshTTL         time.Duration
@@ -79,6 +80,7 @@ func NewLoginService(
 		clientPortalURL:   domains.Client,
 		employeePortalURL: domains.Employee,
 		labPortalURL:      domains.Lab,
+		storePortalURL:    domains.Store,
 		jwtSecret:         jwtCfg.Secret,
 		accessTTL:         accessTTL,
 		refreshTTL:        refreshTTL,

@@ -33,7 +33,7 @@ func (s *storeService) queueStoreCreatedEmail(ctx context.Context, st *domain.St
 
 	portalURL := normalizePortalHomeURL(s.portalURL)
 	if portalURL == "" {
-		slog.Warn("store created email skipped: CLIENT_DOMAIN_URL is empty",
+		slog.Warn("store created email skipped: STORE_DOMAIN_URL is empty",
 			slog.Int64("storeID", st.StoreID))
 		return
 	}

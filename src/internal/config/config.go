@@ -96,6 +96,7 @@ type DomainURLs struct {
 	Client   string
 	Employee string
 	Lab      string
+	Store    string
 }
 
 func LoadConfig() *Config {
@@ -141,6 +142,7 @@ func LoadConfig() *Config {
 			Client:   getEnv("CLIENT_DOMAIN_URL", ""),
 			Employee: getEnv("EMPLOYEE_DOMAIN_URL", ""),
 			Lab:      getEnv("LAB_DOMAIN_URL", ""),
+			Store:    getEnv("STORE_DOMAIN_URL", ""),
 		},
 		AzureBlob: loadAzureBlobConfig(),
 		Email:     loadOutboundEmailConfig(),
