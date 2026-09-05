@@ -13,6 +13,7 @@ type Employee struct {
 	CompanyEmailID string
 	Designation    string
 	Department        string
+	IsActive         bool
 	IsPriceViewAccess bool
 	CreatedBy         int64
 	CreatedOn      timeutil.ISTTime

@@ -13,6 +13,7 @@ type Employee struct {
 	CompanyEmailID string    `gorm:"column:CompanyEmailID;type:varchar(75);not null"`
 	Designation    string    `gorm:"column:Designation;type:varchar(20);not null"`
 	Department         string `gorm:"column:Department;type:varchar(15);not null"`
+	IsActive          bool   `gorm:"column:IsActive;not null;default:1"`
 	IsPriceViewAccess  bool   `gorm:"column:IsPriceViewAccess;not null;default:0"`
 	CreatedBy          int64  `gorm:"column:CreatedBy;not null"`
 	CreatedOn      time.Time `gorm:"column:CreatedOn;not null;default:GETDATE()"`

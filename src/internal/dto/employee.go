@@ -14,6 +14,7 @@ type EmployeeRequest struct {
 	CompanyEmailID string `json:"CompanyEmailID" binding:"required"`
 	Designation  string `json:"Designation" binding:"required"`
 	Department   string `json:"Department" binding:"required"`
+	IsActive     bool   `json:"IsActive"`
 }
 
 // EmployeeUpdateRequest is for PUT; all fields optional. At least one must be set.
@@ -27,11 +28,12 @@ type EmployeeUpdateRequest struct {
 	CompanyEmailID *string `json:"CompanyEmailID"`
 	Designation    *string `json:"Designation"`
 	Department     *string `json:"Department"`
+	IsActive       *bool   `json:"IsActive"`
 }
 
 func (r EmployeeUpdateRequest) HasAtLeastOneField() bool {
 	return r.FullName != nil || r.Address != nil || r.CityID != nil || r.StateID != nil || r.Pincode != nil ||
-		r.MobileNumber != nil || r.CompanyEmailID != nil || r.Designation != nil || r.Department != nil
+		r.MobileNumber != nil || r.CompanyEmailID != nil || r.Designation != nil || r.Department != nil || r.IsActive != nil
 }
 
 func (r EmployeeRequest) ToDomain() domain.Employee {
@@ -45,5 +47,6 @@ func (r EmployeeRequest) ToDomain() domain.Employee {
 		CompanyEmailID: r.CompanyEmailID,
 		Designation:    r.Designation,
 		Department:     r.Department,
+		IsActive:       r.IsActive,
 	}
 }

@@ -78,6 +78,8 @@ func (s *employeeService) Create(e *domain.Employee, createdBy int64) error {
 	e.CreatedOn = timeutil.FromTime(now)
 	e.LastUpdatedBy = createdBy
 	e.LastUpdatedOn = timeutil.FromTime(now)
+	// Set default IsActive to true if not provided
+	e.IsActive = true
 	if err := s.repo.Create(e); err != nil {
 		return err
 	}
@@ -120,6 +122,9 @@ func (s *employeeService) Update(id int64, update *dto.EmployeeUpdateRequest, la
 	}
 	if update.Department != nil {
 		e.Department = *update.Department
+	}
+	if update.IsActive != nil {
+		e.IsActive = *update.IsActive
 	}
 	if err := s.ensureEmployeeMobileUnique(e.MobileNumber, id); err != nil {
 		return nil, err

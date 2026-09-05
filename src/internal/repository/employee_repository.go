@@ -32,7 +32,7 @@ func NewEmployeeRepository(db *gorm.DB) EmployeeRepository {
 
 func (r *employeeRepository) FindAll() ([]domain.Employee, error) {
 	var list []persistencemodels.Employee
-	if err := r.db.Find(&list).Error; err != nil {
+	if err := r.db.Where("IsActive = ?", true).Find(&list).Error; err != nil {
 		return nil, err
 	}
 	return mapEmployeesToDomain(list), nil
@@ -40,7 +40,7 @@ func (r *employeeRepository) FindAll() ([]domain.Employee, error) {
 
 func (r *employeeRepository) FindByID(id int64) (*domain.Employee, error) {
 	var m persistencemodels.Employee
-	if err := r.db.First(&m, id).Error; err != nil {
+	if err := r.db.Where("UID = ? AND IsActive = ?", id, true).First(&m).Error; err != nil {
 		return nil, err
 	}
 	d := mapEmployeeToDomain(m)
@@ -49,14 +49,14 @@ func (r *employeeRepository) FindByID(id int64) (*domain.Employee, error) {
 
 func (r *employeeRepository) FindByMobileNumber(mobileNumber string) (*domain.Employee, error) {
 	var m persistencemodels.Employee
-	if err := r.db.Where("MobileNumber = ?", mobileNumber).First(&m).Error; err != nil {
+	if err := r.db.Where("MobileNumber = ? AND IsActive = ?", mobileNumber, true).First(&m).Error; err != nil {
 		return nil, err
 	}
 	d := mapEmployeeToDomain(m)
 
 	// Console log: print DB record details (excluding mobile number)
-	fmt.Printf("Employee DB record: UID=%d FullName=%s Address=%s CityID=%d StateID=%d Pincode=%s CompanyEmailID=%s Designation=%s Department=%s IsPriceViewAccess=%v CreatedBy=%d CreatedOn=%v LastUpdatedBy=%d LastUpdatedOn=%v\n",
-		d.UID, d.FullName, d.Address, d.CityID, d.StateID, d.Pincode, d.CompanyEmailID, d.Designation, d.Department, d.IsPriceViewAccess, d.CreatedBy, d.CreatedOn.ToTime(), d.LastUpdatedBy, d.LastUpdatedOn.ToTime())
+	fmt.Printf("Employee DB record: UID=%d FullName=%s Address=%s CityID=%d StateID=%d Pincode=%s CompanyEmailID=%s Designation=%s Department=%s IsActive=%v IsPriceViewAccess=%v CreatedBy=%d CreatedOn=%v LastUpdatedBy=%d LastUpdatedOn=%v\n",
+		d.UID, d.FullName, d.Address, d.CityID, d.StateID, d.Pincode, d.CompanyEmailID, d.Designation, d.Department, d.IsActive, d.IsPriceViewAccess, d.CreatedBy, d.CreatedOn.ToTime(), d.LastUpdatedBy, d.LastUpdatedOn.ToTime())
 
 	return &d, nil
 }
@@ -120,6 +120,7 @@ func mapEmployeeToDomain(p persistencemodels.Employee) domain.Employee {
 		CompanyEmailID: p.CompanyEmailID,
 		Designation:    p.Designation,
 		Department:        p.Department,
+		IsActive:         p.IsActive,
 		IsPriceViewAccess: p.IsPriceViewAccess,
 		CreatedBy:         p.CreatedBy,
 		CreatedOn:      timeutil.FromTime(p.CreatedOn),
@@ -140,6 +141,7 @@ func mapEmployeeToPersistence(d domain.Employee) persistencemodels.Employee {
 		CompanyEmailID: d.CompanyEmailID,
 		Designation:    d.Designation,
 		Department:        d.Department,
+		IsActive:         d.IsActive,
 		IsPriceViewAccess: d.IsPriceViewAccess,
 		CreatedBy:         d.CreatedBy,
 		CreatedOn:      d.CreatedOn.ToTime(),

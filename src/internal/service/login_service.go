@@ -126,6 +126,9 @@ func (s *loginService) resolveUserByMobileNumber(domainName, mobileNumber string
 			fmt.Printf("[LOGIN] Service.resolveUserByMobileNumber: employee not found: %v\n", err)
 			return 0, 0, nil, apperrors.NewNotFound("User not found", err)
 		}
+		if !employee.IsActive {
+			return 0, 0, nil, apperrors.NewUnauthorized("Invalid credentials", errors.New("employee inactive"))
+		}
 		fmt.Printf("[LOGIN] Service.resolveUserByMobileNumber: employee found UID=%d\n", employee.UID)
 		return employee.UID, utils.UserTypeEmployee, employee, nil
 	case utils.UserTypeLab:
