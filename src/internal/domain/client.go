@@ -6,8 +6,8 @@ type Client struct {
 	ClientID                  int64
 	ClientName                string
 	Address                   string
-	CityID                    int8
-	StateID                   int8
+	CityID                    int16
+	StateID                   int16
 	Pincode                   string
 	ContactPerson1Name        string
 	ContactPerson1Number      string
@@ -40,8 +40,8 @@ type ClientLocation struct {
 	ClientID         int64
 	Address          string
 	Pincode          string
-	CityID           int8
-	StateID          int8
+	CityID           int16
+	StateID          int16
 	IsActive         bool
 	CreatedBy        int64
 	CreatedOn        timeutil.ISTTime

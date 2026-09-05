@@ -19,8 +19,8 @@ const MultipartFormMaxMemory int64 = 6 << 20 // 6 MiB
 type ClientCreateForm struct {
 	ClientName                string  `form:"ClientName" binding:"required"`
 	Address                   string  `form:"Address" binding:"required"`
-	CityID                    int8    `form:"CityID" binding:"required"`
-	StateID                   int8    `form:"StateID" binding:"required"`
+	CityID                    int16   `form:"CityID" binding:"required"`
+	StateID                   int16   `form:"StateID" binding:"required"`
 	Pincode                   string  `form:"Pincode" binding:"required"`
 	ContactPerson1Name        string  `form:"ContactPerson1Name" binding:"required"`
 	ContactPerson1Number      string  `form:"ContactPerson1Number" binding:"required"`
@@ -153,14 +153,14 @@ func buildClientUpdateRequestFromForm(c *gin.Context) (*ClientUpdateRequest, err
 		req.Address = stringPtr(v)
 	}
 	if v, ok := firstFormValue(vals, "CityID"); ok {
-		if n, err := strconv.ParseInt(v, 10, 8); err == nil {
-			x := int8(n)
+		if n, err := strconv.ParseInt(v, 10, 16); err == nil {
+			x := int16(n)
 			req.CityID = &x
 		}
 	}
 	if v, ok := firstFormValue(vals, "StateID"); ok {
-		if n, err := strconv.ParseInt(v, 10, 8); err == nil {
-			x := int8(n)
+		if n, err := strconv.ParseInt(v, 10, 16); err == nil {
+			x := int16(n)
 			req.StateID = &x
 		}
 	}

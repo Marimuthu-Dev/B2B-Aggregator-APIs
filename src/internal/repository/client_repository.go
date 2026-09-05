@@ -23,8 +23,8 @@ type ClientRepository interface {
 	Delete(id int64) error
 	FindAllActive() ([]domain.Client, error)
 	FindByContactNumber(contactNumber string) (*domain.Client, error)
-	FindByCity(cityID int8) ([]domain.Client, error)
-	FindByState(stateID int8) ([]domain.Client, error)
+	FindByCity(cityID int16) ([]domain.Client, error)
+	FindByState(stateID int16) ([]domain.Client, error)
 	FindActiveBrandMappingsByClientID(clientID int64) ([]domain.ClientBrandMappingItem, error)
 }
 
@@ -213,7 +213,7 @@ func (r *clientRepository) FindByContactNumber(contactNumber string) (*domain.Cl
 	return &domainClient, nil
 }
 
-func (r *clientRepository) FindByCity(cityID int8) ([]domain.Client, error) {
+func (r *clientRepository) FindByCity(cityID int16) ([]domain.Client, error) {
 	var clients []persistencemodels.Client
 	err := r.db.Where("CityID = ?", cityID).Find(&clients).Error
 	return mapClientsToDomain(clients), err
@@ -239,7 +239,7 @@ func (r *clientRepository) FindActiveBrandMappingsByClientID(clientID int64) ([]
 	return out, nil
 }
 
-func (r *clientRepository) FindByState(stateID int8) ([]domain.Client, error) {
+func (r *clientRepository) FindByState(stateID int16) ([]domain.Client, error) {
 	var clients []persistencemodels.Client
 	err := r.db.Where("StateID = ?", stateID).Find(&clients).Error
 	return mapClientsToDomain(clients), err

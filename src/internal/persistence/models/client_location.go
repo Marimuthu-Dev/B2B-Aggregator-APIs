@@ -7,8 +7,8 @@ type ClientLocation struct {
 	ClientID         int64     `gorm:"column:ClientID;not null"`
 	Address          *string   `gorm:"column:Address;type:varchar(150)"`
 	Pincode          *string   `gorm:"column:Pincode;type:varchar(6)"`
-	CityID           int8      `gorm:"column:CityID;not null"`
-	StateID          int8      `gorm:"column:StateID;not null"`
+	CityID           int16     `gorm:"column:CityID;not null"`
+	StateID          int16     `gorm:"column:StateID;not null"`
 	IsActive         *bool     `gorm:"column:IsActive"`
 	CreatedBy        *int64    `gorm:"column:CreatedBy"`
 	CreatedOn        time.Time `gorm:"column:CreatedOn;default:GETDATE()"`

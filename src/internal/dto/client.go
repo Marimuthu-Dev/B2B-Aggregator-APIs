@@ -13,8 +13,8 @@ type ClientRequest struct {
 	ClientID                  int64      `binding:"omitempty"`
 	ClientName                string     `binding:"required"`
 	Address                   string     `binding:"required"`
-	CityID                    int8       `binding:"required"`
-	StateID                   int8       `binding:"required"`
+	CityID                    int16      `binding:"required"`
+	StateID                   int16      `binding:"required"`
 	Pincode                   string     `binding:"required"`
 	ContactPerson1Name        string     `binding:"required"`
 	ContactPerson1Number      string     `binding:"required"`
@@ -65,8 +65,8 @@ func ValidateClientBrandNames(names []string) error {
 type ClientUpdateRequest struct {
 	ClientName                *string    `json:"ClientName"`
 	Address                   *string    `json:"Address"`
-	CityID                    *int8      `json:"CityID"`
-	StateID                   *int8      `json:"StateID"`
+	CityID                    *int16     `json:"CityID"`
+	StateID                   *int16     `json:"StateID"`
 	Pincode                   *string    `json:"Pincode"`
 	ContactPerson1Name        *string    `json:"ContactPerson1Name"`
 	ContactPerson1Number      *string    `json:"ContactPerson1Number"`
@@ -106,8 +106,8 @@ func (r ClientUpdateRequest) HasAtLeastOneField() bool {
 type ClientLocationRequest struct {
 	Address  string `json:"Address" binding:"omitempty"`
 	Pincode  string `json:"Pincode" binding:"omitempty"`
-	CityID   int8   `json:"CityID" binding:"required"`
-	StateID  int8   `json:"StateID" binding:"required"`
+	CityID   int16  `json:"CityID" binding:"required"`
+	StateID  int16  `json:"StateID" binding:"required"`
 	IsActive *bool  `json:"IsActive" binding:"omitempty"`
 }
 
@@ -115,8 +115,8 @@ type ClientLocationRequest struct {
 type ClientLocationUpdateRequest struct {
 	Address  *string `json:"Address"`
 	Pincode  *string `json:"Pincode"`
-	CityID   *int8   `json:"CityID"`
-	StateID  *int8   `json:"StateID"`
+	CityID   *int16  `json:"CityID"`
+	StateID  *int16  `json:"StateID"`
 	IsActive *bool   `json:"IsActive"`
 }
 

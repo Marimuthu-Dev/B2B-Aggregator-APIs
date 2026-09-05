@@ -8,8 +8,8 @@ type Store struct {
 	ClientName    string `json:"ClientName,omitempty"`
 	StoreName     string
 	Address       string
-	CityID        int8
-	StateID       int8
+	CityID        int16
+	StateID       int16
 	Pincode       string
 	ContactNumber string
 	EmailID       string

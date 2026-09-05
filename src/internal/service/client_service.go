@@ -29,8 +29,8 @@ type ClientService interface {
 	UpdateClientWithMoU(ctx context.Context, id int64, update *dto.ClientUpdateRequest, lastUpdatedBy int64, mou *multipart.FileHeader) (*domain.Client, error)
 	DeleteClient(id int64) error
 	GetActiveClients() ([]domain.Client, error)
-	GetClientsByCity(cityID int8) ([]domain.Client, error)
-	GetClientsByState(stateID int8) ([]domain.Client, error)
+	GetClientsByCity(cityID int16) ([]domain.Client, error)
+	GetClientsByState(stateID int16) ([]domain.Client, error)
 	GetClientMoUDownloadURL(ctx context.Context, clientID int64) (*dto.ClientMoUDownloadURLResponse, error)
 	GetClientBrandMappingsByClientID(clientID int64) ([]domain.ClientBrandMappingItem, error)
 }
@@ -413,11 +413,11 @@ func (s *clientService) GetActiveClients() ([]domain.Client, error) {
 	return s.repo.FindAllActive()
 }
 
-func (s *clientService) GetClientsByCity(cityID int8) ([]domain.Client, error) {
+func (s *clientService) GetClientsByCity(cityID int16) ([]domain.Client, error) {
 	return s.repo.FindByCity(cityID)
 }
 
-func (s *clientService) GetClientsByState(stateID int8) ([]domain.Client, error) {
+func (s *clientService) GetClientsByState(stateID int16) ([]domain.Client, error) {
 	return s.repo.FindByState(stateID)
 }
 

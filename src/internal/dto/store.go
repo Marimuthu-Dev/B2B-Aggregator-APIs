@@ -6,8 +6,8 @@ type StoreRequest struct {
 	ClientID      int64  `json:"ClientID" binding:"required"`
 	StoreName     string `json:"StoreName" binding:"required"`
 	Address       string `json:"Address" binding:"required"`
-	CityID        int8   `json:"CityID" binding:"required"`
-	StateID       int8   `json:"StateID" binding:"required"`
+	CityID        int16  `json:"CityID" binding:"required"`
+	StateID       int16  `json:"StateID" binding:"required"`
 	Pincode       string `json:"Pincode" binding:"required"`
 	ContactNumber string `json:"ContactNumber" binding:"required"`
 	EmailID       string `json:"EmailID" binding:"required"`
@@ -18,8 +18,8 @@ type StoreRequest struct {
 type StoreUpdateRequest struct {
 	StoreName     *string `json:"StoreName"`
 	Address       *string `json:"Address"`
-	CityID        *int8   `json:"CityID"`
-	StateID       *int8   `json:"StateID"`
+	CityID        *int16  `json:"CityID"`
+	StateID       *int16  `json:"StateID"`
 	Pincode       *string `json:"Pincode"`
 	ContactNumber *string `json:"ContactNumber"`
 	EmailID       *string `json:"EmailID"`

@@ -531,10 +531,10 @@ func enrichLeadListQueryFromPascalCaseKeys(c *gin.Context, q *dto.LeadListQuery)
 	if err := mergePositiveInt64QueryMulti(c, &q.StoreMasterID, "StoreMasterID", "storeMasterID", "storemasterid"); err != nil {
 		return err
 	}
-	if err := mergePositiveInt8QueryMulti(c, &q.StoreCityID, "StoreCityID", "storeCityID", "storecityid"); err != nil {
+	if err := mergePositiveInt16QueryMulti(c, &q.StoreCityID, "StoreCityID", "storeCityID", "storecityid"); err != nil {
 		return err
 	}
-	if err := mergePositiveInt8QueryMulti(c, &q.StoreStateID, "StoreStateID", "storeStateID", "storestateid"); err != nil {
+	if err := mergePositiveInt16QueryMulti(c, &q.StoreStateID, "StoreStateID", "storeStateID", "storestateid"); err != nil {
 		return err
 	}
 	if strings.TrimSpace(q.FitnessStatus) == "" {
@@ -673,7 +673,7 @@ func mergePositiveIntQueryMulti(c *gin.Context, dest **int, keys ...string) erro
 	return nil
 }
 
-func mergePositiveInt8QueryMulti(c *gin.Context, dest **int8, keys ...string) error {
+func mergePositiveInt16QueryMulti(c *gin.Context, dest **int16, keys ...string) error {
 	if *dest != nil {
 		return nil
 	}
@@ -682,11 +682,11 @@ func mergePositiveInt8QueryMulti(c *gin.Context, dest **int8, keys ...string) er
 		if raw == "" {
 			continue
 		}
-		n64, err := strconv.ParseInt(raw, 10, 8)
+		n64, err := strconv.ParseInt(raw, 10, 16)
 		if err != nil || n64 < 1 {
 			return apperrors.NewBadRequest("Invalid query parameter "+key+": must be a positive integer", err)
 		}
-		v := int8(n64)
+		v := int16(n64)
 		*dest = &v
 		return nil
 	}

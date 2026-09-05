@@ -6,8 +6,8 @@ type Employee struct {
 	UID            int64
 	FullName       string
 	Address        string
-	CityID         int8
-	StateID        int8
+	CityID         int16
+	StateID        int16
 	Pincode        string
 	MobileNumber   string
 	CompanyEmailID string

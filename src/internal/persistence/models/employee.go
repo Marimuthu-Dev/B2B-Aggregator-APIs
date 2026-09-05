@@ -6,8 +6,8 @@ type Employee struct {
 	UID            int64     `gorm:"primaryKey;column:UID;autoIncrement"`
 	FullName       string    `gorm:"column:FullName;type:varchar(100);not null"`
 	Address        string    `gorm:"column:Address;type:varchar(200);not null"`
-	CityID         int8      `gorm:"column:CityID;not null"`
-	StateID        int8      `gorm:"column:StateID;not null"`
+	CityID         int16     `gorm:"column:CityID;not null"`
+	StateID        int16     `gorm:"column:StateID;not null"`
 	Pincode        string    `gorm:"column:Pincode;type:varchar(6);not null"`
 	MobileNumber   string    `gorm:"column:MobileNumber;type:varchar(10);not null"`
 	CompanyEmailID string    `gorm:"column:CompanyEmailID;type:varchar(75);not null"`

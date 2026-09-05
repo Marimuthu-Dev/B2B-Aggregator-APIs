@@ -7,8 +7,8 @@ import (
 type EmployeeRequest struct {
 	FullName       string `json:"FullName" binding:"required"`
 	Address        string `json:"Address" binding:"required"`
-	CityID         int8   `json:"CityID" binding:"required"`
-	StateID        int8   `json:"StateID" binding:"required"`
+	CityID         int16  `json:"CityID" binding:"required"`
+	StateID        int16  `json:"StateID" binding:"required"`
 	Pincode        string `json:"Pincode" binding:"required"`
 	MobileNumber   string `json:"MobileNumber" binding:"required"`
 	CompanyEmailID string `json:"CompanyEmailID" binding:"required"`
@@ -20,8 +20,8 @@ type EmployeeRequest struct {
 type EmployeeUpdateRequest struct {
 	FullName       *string `json:"FullName"`
 	Address        *string `json:"Address"`
-	CityID         *int8   `json:"CityID"`
-	StateID        *int8   `json:"StateID"`
+	CityID         *int16  `json:"CityID"`
+	StateID        *int16  `json:"StateID"`
 	Pincode        *string `json:"Pincode"`
 	MobileNumber   *string `json:"MobileNumber"`
 	CompanyEmailID *string `json:"CompanyEmailID"`

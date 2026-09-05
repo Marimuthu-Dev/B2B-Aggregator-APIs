@@ -6,8 +6,8 @@ type Client struct {
 	ClientID                  int64     `gorm:"primaryKey;column:ClientID;autoIncrement"`
 	ClientName                string    `gorm:"column:ClientName;type:varchar(150);not null"`
 	Address                   string    `gorm:"column:Address;type:varchar(150);not null"`
-	CityID                    int8      `gorm:"column:CityID;not null"`
-	StateID                   int8      `gorm:"column:StateID;not null"`
+	CityID                    int16     `gorm:"column:CityID;not null"`
+	StateID                   int16     `gorm:"column:StateID;not null"`
 	Pincode                   string    `gorm:"column:Pincode;type:varchar(6);not null"`
 	ContactPerson1Name        string    `gorm:"column:ContactPerson1Name;type:varchar(75);not null"`
 	ContactPerson1Number      string    `gorm:"column:ContactPerson1Number;type:varchar(10);not null"`
