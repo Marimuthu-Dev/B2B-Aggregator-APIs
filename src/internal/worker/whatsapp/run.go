@@ -1,4 +1,4 @@
-package email
+package whatsapp
 
 import (
 	"context"
@@ -7,32 +7,32 @@ import (
 	"strings"
 	"time"
 
-	"b2b-diagnostic-aggregator/apis/internal/acsemail"
 	"b2b-diagnostic-aggregator/apis/internal/config"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
+	"b2b-diagnostic-aggregator/apis/internal/whatsapp"
 )
 
-// Deps bundles dependencies for the email outbox worker (mirrors fitness.Deps).
+// Deps bundles dependencies for the WhatsApp worker (mirrors email.Deps).
 type Deps struct {
-	Repo   *repository.EmailOutboxRepository
-	Sender *acsemail.Service
-	Config config.EmailWorkerConfig
+	Repo   *repository.WhatsAppRepository
+	Sender *whatsapp.Service
+	Config config.WhatsAppWorkerConfig
 	Log    *slog.Logger
 }
 
-// RunLoop loads pending batches, sends via ACS, and sleeps until ctx is cancelled.
+// RunLoop loads pending batches, sends via WhatsApp API, and sleeps until ctx is cancelled.
 func RunLoop(ctx context.Context, d Deps) error {
 	log := d.Log
 	if log == nil {
 		log = slog.Default()
 	}
 	if d.Repo == nil {
-		return errors.New("email worker: repository is nil")
+		return errors.New("whatsapp worker: repository is nil")
 	}
 	if d.Sender == nil {
-		return errors.New("email worker: ACS sender is nil")
+		return errors.New("whatsapp worker: WhatsApp sender is nil")
 	}
-	log.Info("email worker loop running",
+	log.Info("whatsapp worker loop running",
 		slog.Int("batchSize", d.Config.BatchSize),
 		slog.Duration("pollIntervalAfterWork", d.Config.PollInterval),
 		slog.Duration("idleWaitWhenEmpty", d.Config.IdleWait),
@@ -40,14 +40,14 @@ func RunLoop(ctx context.Context, d Deps) error {
 	)
 	for {
 		if err := ctx.Err(); err != nil {
-			log.Info("email worker stopping", slog.String("reason", err.Error()))
+			log.Info("whatsapp worker stopping", slog.String("reason", err.Error()))
 			return err
 		}
 		foundRows, err := RunOnce(ctx, d)
 		if err != nil {
-			log.Error("email worker batch failed", slog.String("error", err.Error()))
+			log.Error("whatsapp worker batch failed", slog.String("error", err.Error()))
 			// If rate limited, wait longer before retrying
-			if strings.Contains(err.Error(), "rate limit") {
+			if strings.Contains(err.Error(), "rate limit") || strings.Contains(err.Error(), "rate limited") {
 				log.Info("rate limit detected, waiting longer before retry")
 				wait := 10 * time.Minute // Wait 10 minutes for rate limit to reset
 				log.Info("next iteration scheduled",
@@ -61,7 +61,7 @@ func RunLoop(ctx context.Context, d Deps) error {
 					if !timer.Stop() {
 						<-timer.C
 					}
-					log.Info("email worker stopping", slog.String("reason", ctx.Err().Error()))
+					log.Info("whatsapp worker stopping", slog.String("reason", ctx.Err().Error()))
 					return ctx.Err()
 				case <-timer.C:
 				}
@@ -82,7 +82,7 @@ func RunLoop(ctx context.Context, d Deps) error {
 			if !timer.Stop() {
 				<-timer.C
 			}
-			log.Info("email worker stopping", slog.String("reason", ctx.Err().Error()))
+			log.Info("whatsapp worker stopping", slog.String("reason", ctx.Err().Error()))
 			return ctx.Err()
 		case <-timer.C:
 		}
@@ -95,36 +95,36 @@ func RunOnce(ctx context.Context, d Deps) (foundRows bool, err error) {
 	if log == nil {
 		log = slog.Default()
 	}
-	emails, err := d.Repo.SelectPendingBatch(ctx, d.Config.BatchSize)
+	whatsApps, err := d.Repo.SelectPendingBatch(ctx, d.Config.BatchSize)
 	if err != nil {
 		return false, err
 	}
-	if len(emails) == 0 {
+	if len(whatsApps) == 0 {
 		return false, nil
 	}
 	
 	rateLimited := false
-	for _, e := range emails {
-		log.Info("processing email", slog.Int64("emailID", e.EmailID))
+	for _, w := range whatsApps {
+		log.Info("processing whatsapp", slog.Int64("whatsappID", w.WhatsappID))
 		sendCtx, cancel := context.WithTimeout(ctx, d.Config.SendTimeout)
-		sendErr := d.Sender.SendHTML(sendCtx, e)
+		sendErr := d.Sender.SendMessage(sendCtx, w)
 		cancel()
 		if sendErr == nil {
-			if err := d.Repo.MarkSent(ctx, e.EmailID); err != nil {
+			if err := d.Repo.MarkSent(ctx, w.WhatsAppID); err != nil {
 				log.Error("mark sent failed",
-					slog.Int64("emailID", e.EmailID),
+					slog.Int64("whatsappID", w.WhatsAppID),
 					slog.String("error", err.Error()),
 				)
 				continue
 			}
-			log.Info("email sent", slog.Int64("emailID", e.EmailID))
+			log.Info("whatsapp sent", slog.Int64("whatsappID", w.WhatsappID))
 			continue
 		}
 		
 		// Check if this is a rate limit error
 		if strings.Contains(sendErr.Error(), "rate limited") || strings.Contains(sendErr.Error(), "TooManyRequests") {
-			log.Warn("email rate limited by ACS",
-				slog.Int64("emailID", e.EmailID),
+			log.Warn("whatsapp rate limited by API",
+				slog.Int64("whatsappID", w.WhatsappID),
 				slog.String("error", sendErr.Error()),
 			)
 			rateLimited = true
@@ -133,12 +133,12 @@ func RunOnce(ctx context.Context, d Deps) (foundRows bool, err error) {
 		}
 		
 		log.Error("send failed",
-			slog.Int64("emailID", e.EmailID),
+			slog.Int64("whatsappID", w.WhatsappID),
 			slog.String("error", sendErr.Error()),
 		)
-		if err := d.Repo.MarkAfterFailure(ctx, e.EmailID); err != nil {
+		if err := d.Repo.MarkAfterFailure(ctx, w.WhatsAppID); err != nil {
 			log.Error("mark after failure",
-				slog.Int64("emailID", e.EmailID),
+				slog.Int64("whatsappID", w.WhatsappID),
 				slog.String("error", err.Error()),
 			)
 		}
@@ -146,7 +146,7 @@ func RunOnce(ctx context.Context, d Deps) (foundRows bool, err error) {
 	
 	// If rate limited, return an error to trigger longer wait in the main loop
 	if rateLimited {
-		return true, errors.New("ACS rate limit exceeded")
+		return true, errors.New("WhatsApp API rate limit exceeded")
 	}
 	
 	return true, nil

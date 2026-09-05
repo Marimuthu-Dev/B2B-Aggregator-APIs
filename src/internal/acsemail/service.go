@@ -197,7 +197,14 @@ func (s *Service) postSend(ctx context.Context, payload sendEmailRequest) error 
 	if _, err := buf.ReadFrom(resp.Body); err != nil {
 		return fmt.Errorf("acs email failed: status=%d, read body: %w", resp.StatusCode, err)
 	}
-	return fmt.Errorf("acs email failed: status=%d body=%s", resp.StatusCode, strings.TrimSpace(buf.String()))
+	bodyStr := strings.TrimSpace(buf.String())
+	
+	// Special handling for rate limiting (429)
+	if resp.StatusCode == http.StatusTooManyRequests {
+		return fmt.Errorf("acs email rate limited: status=%d body=%s", resp.StatusCode, bodyStr)
+	}
+	
+	return fmt.Errorf("acs email failed: status=%d body=%s", resp.StatusCode, bodyStr)
 }
 
 func signACSRequest(req *http.Request, body []byte, accessKey []byte) error {
