@@ -53,7 +53,8 @@ func main() {
 		slog.Int("logRetentionHours", appCfg.Log.RetentionHours),
 		slog.Bool("singleBatch", wc.SingleBatch),
 		slog.String("apiEndpoint", wc.APIEndpoint),
-		slog.String("templateName", wc.TemplateName),
+		slog.Bool("useMMLite", wc.UseMMLite),
+		slog.String("defaultTemplateName", wc.DefaultTemplateName),
 		slog.String("campaignName", wc.CampaignName),
 		slog.Int("batchSize", wc.BatchSize),
 		slog.Duration("pollIntervalAfterWork", wc.PollInterval),
@@ -80,24 +81,35 @@ func main() {
 		log.Fatalf("whatsapp repository: %v", err)
 	}
 
+	templateRepo, err := repository.NewWhatsAppTemplateRepository(context.Background(), sqlDB)
+	if err != nil {
+		logger.Warn("whatsapp template repository unavailable, falling back to defaults",
+			slog.String("error", err.Error()),
+		)
+		templateRepo = nil
+	} else {
+		logger.Info("whatsapp template repository ready")
+	}
+
 	httpClient := &http.Client{Timeout: wc.SendTimeout + 5*time.Second}
 	sender, err := whatsapp.NewService(whatsapp.Config{
-		APIKey:       wc.APIKey,
-		APIEndpoint:  wc.APIEndpoint,
-		TemplateName: wc.TemplateName,
-		CampaignName: wc.CampaignName,
-		HTTPClient:   httpClient,
-		SendTimeout:  wc.SendTimeout,
+		APIKey:              wc.APIKey,
+		APIEndpoint:         wc.APIEndpoint,
+		DefaultTemplateName: wc.DefaultTemplateName,
+		CampaignName:        wc.CampaignName,
+		HTTPClient:          httpClient,
+		SendTimeout:         wc.SendTimeout,
 	})
 	if err != nil {
 		log.Fatalf("whatsapp service: %v", err)
 	}
 
 	deps := whatsappworker.Deps{
-		Repo:   repo,
-		Sender: sender,
-		Config: wc,
-		Log:    logger,
+		Repo:         repo,
+		TemplateRepo: templateRepo,
+		Sender:       sender,
+		Config:       wc,
+		Log:          logger,
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

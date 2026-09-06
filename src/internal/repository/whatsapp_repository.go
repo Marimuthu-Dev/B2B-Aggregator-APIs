@@ -43,20 +43,9 @@ func NewWhatsAppRepositoryFromSQL(db *sql.DB) *WhatsAppRepository {
 }
 
 const (
-	whatsappMobileMax   = 10
-	whatsappTextMax     = 350
+	whatsappMobileMax = 10
+	whatsappTextMax   = 350
 )
-
-func clipRunes(s string, max int) string {
-	if max <= 0 {
-		return ""
-	}
-	runes := []rune(s)
-	if len(runes) <= max {
-		return s
-	}
-	return string(runes[:max])
-}
 
 // Enqueue inserts a pending row (IsSent = 0) into {DB_SCHEMA}.tbl_WhatsApp for the WhatsApp worker.
 func (r *WhatsAppRepository) Enqueue(ctx context.Context, w domain.QueuedWhatsApp) error {
@@ -66,7 +55,8 @@ func (r *WhatsAppRepository) Enqueue(ctx context.Context, w domain.QueuedWhatsAp
 	fromMobile := clipRunes(strings.TrimSpace(w.FromMobile), whatsappMobileMax)
 	toMobile := clipRunes(strings.TrimSpace(w.ToMobile), whatsappMobileMax)
 	whatsappText := clipRunes(strings.TrimSpace(w.WhatsAppText), whatsappTextMax)
-	
+	templateName := clipRunes(strings.TrimSpace(w.TemplateName), templateNameMax)
+
 	if fromMobile == "" {
 		return fmt.Errorf("FromMobile is required")
 	}
@@ -83,6 +73,8 @@ INSERT INTO %s (
   FromMobile,
   ToMobile,
   WhatsAppText,
+  TemplateID,
+  TemplateName,
   CreatedBy,
   CreatedOn,
   IsSent,
@@ -94,6 +86,8 @@ INSERT INTO %s (
   @fromMobile,
   @toMobile,
   @whatsappText,
+  @templateID,
+  @templateName,
   @createdBy,
   GETDATE(),
   0,
@@ -107,12 +101,51 @@ INSERT INTO %s (
 		sql.Named("fromMobile", fromMobile),
 		sql.Named("toMobile", toMobile),
 		sql.Named("whatsappText", whatsappText),
+		sql.Named("templateID", nullableInt64(w.TemplateID)),
+		sql.Named("templateName", nullableString(templateName)),
 		sql.Named("createdBy", w.CreatedBy),
 	)
 	if err != nil {
 		return fmt.Errorf("enqueue whatsapp: %w", err)
 	}
 	return nil
+}
+
+// EnqueueWithTemplate resolves the given template name / id from {DB_SCHEMA}.tbl_WhatsAppTemplates,
+// then enqueues a pending WhatsApp message with both TemplateID and TemplateName populated.
+// If the template is not found or inactive, an error is returned.
+func (r *WhatsAppRepository) EnqueueWithTemplate(
+	ctx context.Context,
+	w domain.QueuedWhatsApp,
+	templateRepo *WhatsAppTemplateRepository,
+) error {
+	if templateRepo == nil {
+		return fmt.Errorf("whatsapp template repository is required for EnqueueWithTemplate")
+	}
+
+	templateName := strings.TrimSpace(w.TemplateName)
+	if w.TemplateID == 0 && templateName != "" {
+		tpl, err := templateRepo.FindByName(ctx, templateName)
+		if err != nil {
+			return fmt.Errorf("resolve template by name %q: %w", templateName, err)
+		}
+		if !tpl.IsActive {
+			return fmt.Errorf("template is inactive: %s", templateName)
+		}
+		w.TemplateID = tpl.TemplateID
+		w.TemplateName = tpl.TemplateName
+	} else if w.TemplateID != 0 && templateName == "" {
+		tpl, err := templateRepo.FindByID(ctx, w.TemplateID)
+		if err != nil {
+			return fmt.Errorf("resolve template by id %d: %w", w.TemplateID, err)
+		}
+		if !tpl.IsActive {
+			return fmt.Errorf("template is inactive: %s", tpl.TemplateName)
+		}
+		w.TemplateName = tpl.TemplateName
+	}
+
+	return r.Enqueue(ctx, w)
 }
 
 func nullableInt64(n int64) any {
@@ -134,17 +167,23 @@ func (r *WhatsAppRepository) SelectPendingBatch(ctx context.Context, batchSize i
 SELECT TOP (`)
 	b.WriteString(fmt.Sprintf("%d", batchSize))
 	b.WriteString(`)
-  WhatsAppID,
-  ClientID,
-  FromMobile,
-  ToMobile,
-  WhatsAppText,
-  CreatedBy
+  w.WhatsAppID,
+  w.ClientID,
+  w.FromMobile,
+  w.ToMobile,
+  w.WhatsAppText,
+  w.TemplateID,
+  COALESCE(NULLIF(t.TemplateName, ''), NULLIF(w.TemplateName, '')) AS TemplateName,
+  t.TemplateType,
+  w.CreatedBy
 FROM `)
 	b.WriteString(whatsappTable())
-	b.WriteString(` WITH (ROWLOCK, READPAST)
-WHERE IsSent = 0 OR IsSent IS NULL
-ORDER BY CreatedOn ASC, WhatsAppID ASC`)
+	b.WriteString(` w WITH (ROWLOCK, READPAST)
+LEFT JOIN `)
+	b.WriteString(whatsappTemplatesTable())
+	b.WriteString(` t ON w.TemplateID = t.TemplateID
+WHERE w.IsSent = 0 OR w.IsSent IS NULL
+ORDER BY w.CreatedOn ASC, w.WhatsAppID ASC`)
 
 	rows, err := r.db.QueryContext(ctx, b.String())
 	if err != nil {
@@ -155,6 +194,9 @@ ORDER BY CreatedOn ASC, WhatsAppID ASC`)
 	var out []domain.OutboxWhatsApp
 	for rows.Next() {
 		var clientID sql.NullInt64
+		var templateID sql.NullInt64
+		var templateName sql.NullString
+		var templateType sql.NullString
 		var w domain.OutboxWhatsApp
 		err := rows.Scan(
 			&w.WhatsAppID,
@@ -162,6 +204,9 @@ ORDER BY CreatedOn ASC, WhatsAppID ASC`)
 			&w.FromMobile,
 			&w.ToMobile,
 			&w.WhatsAppText,
+			&templateID,
+			&templateName,
+			&templateType,
 			&w.CreatedBy,
 		)
 		if err != nil {
@@ -169,6 +214,15 @@ ORDER BY CreatedOn ASC, WhatsAppID ASC`)
 		}
 		if clientID.Valid {
 			w.ClientID = clientID.Int64
+		}
+		if templateID.Valid {
+			w.TemplateID = templateID.Int64
+		}
+		if templateName.Valid {
+			w.TemplateName = templateName.String
+		}
+		if templateType.Valid {
+			w.TemplateType = templateType.String
 		}
 		out = append(out, w)
 	}
@@ -214,4 +268,8 @@ WHERE WhatsAppID = @id`, whatsappTable())
 
 func whatsappTable() string {
 	return persistencemodels.Table("tbl_WhatsApp")
+}
+
+func whatsappTemplatesTable() string {
+	return persistencemodels.Table("tbl_WhatsAppTemplates")
 }

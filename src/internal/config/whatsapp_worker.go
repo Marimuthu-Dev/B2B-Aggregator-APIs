@@ -18,8 +18,8 @@ type WhatsAppWorkerConfig struct {
 	APIEndpoint string
 	// UseMMLite determines whether to use the MM Lite endpoint instead of the regular endpoint.
 	UseMMLite bool
-	// TemplateName is the default WhatsApp template name to use for messages.
-	TemplateName string
+	// DefaultTemplateName is the fallback template name to use when message doesn't have a template.
+	DefaultTemplateName string
 	// CampaignName is the default campaign name for WhatsApp messages.
 	CampaignName string
 	BatchSize    int
@@ -32,16 +32,16 @@ type WhatsAppWorkerConfig struct {
 // Call after godotenv.Load (same pattern as LoadEmailWorkerConfig and LoadFitnessCertWorkerConfig).
 func LoadWhatsAppWorkerConfig() (WhatsAppWorkerConfig, error) {
 	c := WhatsAppWorkerConfig{
-		SingleBatch:   getEnvAsBool("WHATSAPP_WORKER_SINGLE_BATCH", false),
-		APIKey:        strings.TrimSpace(getEnv("WHATSAPP_API_KEY", "")),
-		APIEndpoint:   strings.TrimSpace(getEnv("WHATSAPP_API_ENDPOINT", "https://cpaaslink.com/api/whatsapp/public/apikey")),
-		UseMMLite:     getEnvAsBool("WHATSAPP_USE_MM_LITE", false),
-		TemplateName:  strings.TrimSpace(getEnv("WHATSAPP_TEMPLATE_NAME", "")),
-		CampaignName:  strings.TrimSpace(getEnv("WHATSAPP_CAMPAIGN_NAME", "default_campaign")),
-		BatchSize:     getEnvAsInt("WHATSAPP_BATCH_SIZE", 25),
-		PollInterval:  time.Duration(getEnvAsInt("WHATSAPP_POLL_INTERVAL_SECONDS", 120)) * time.Second,
-		IdleWait:      time.Duration(getEnvAsInt("WHATSAPP_IDLE_WAIT_SECONDS", 60)) * time.Second,
-		SendTimeout:   time.Duration(getEnvAsInt("WHATSAPP_SEND_TIMEOUT_SECONDS", 60)) * time.Second,
+		SingleBatch:        getEnvAsBool("WHATSAPP_WORKER_SINGLE_BATCH", false),
+		APIKey:             strings.TrimSpace(getEnv("WHATSAPP_API_KEY", "")),
+		APIEndpoint:        strings.TrimSpace(getEnv("WHATSAPP_API_ENDPOINT", "https://cpaaslink.com/api/whatsapp/public/apikey")),
+		UseMMLite:          getEnvAsBool("WHATSAPP_USE_MM_LITE", false),
+		DefaultTemplateName: strings.TrimSpace(getEnv("WHATSAPP_DEFAULT_TEMPLATE_NAME", "")),
+		CampaignName:       strings.TrimSpace(getEnv("WHATSAPP_CAMPAIGN_NAME", "default_campaign")),
+		BatchSize:          getEnvAsInt("WHATSAPP_BATCH_SIZE", 25),
+		PollInterval:       time.Duration(getEnvAsInt("WHATSAPP_POLL_INTERVAL_SECONDS", 120)) * time.Second,
+		IdleWait:           time.Duration(getEnvAsInt("WHATSAPP_IDLE_WAIT_SECONDS", 60)) * time.Second,
+		SendTimeout:        time.Duration(getEnvAsInt("WHATSAPP_SEND_TIMEOUT_SECONDS", 60)) * time.Second,
 	}
 	if c.APIKey == "" {
 		return c, errors.New("WHATSAPP_API_KEY is required")
@@ -49,9 +49,7 @@ func LoadWhatsAppWorkerConfig() (WhatsAppWorkerConfig, error) {
 	if c.APIEndpoint == "" {
 		return c, errors.New("WHATSAPP_API_ENDPOINT is required")
 	}
-	if c.TemplateName == "" {
-		return c, errors.New("WHATSAPP_TEMPLATE_NAME is required")
-	}
+	// Default template name is optional - messages can have their own templates from the database
 	if c.BatchSize < 1 {
 		c.BatchSize = 1
 	}

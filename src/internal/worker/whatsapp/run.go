@@ -8,19 +8,19 @@ import (
 	"time"
 
 	"b2b-diagnostic-aggregator/apis/internal/config"
+	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/whatsapp"
 )
 
-// Deps bundles dependencies for the WhatsApp worker (mirrors email.Deps).
 type Deps struct {
-	Repo   *repository.WhatsAppRepository
-	Sender *whatsapp.Service
-	Config config.WhatsAppWorkerConfig
-	Log    *slog.Logger
+	Repo         *repository.WhatsAppRepository
+	TemplateRepo *repository.WhatsAppTemplateRepository
+	Sender       *whatsapp.Service
+	Config       config.WhatsAppWorkerConfig
+	Log          *slog.Logger
 }
 
-// RunLoop loads pending batches, sends via WhatsApp API, and sleeps until ctx is cancelled.
 func RunLoop(ctx context.Context, d Deps) error {
 	log := d.Log
 	if log == nil {
@@ -37,6 +37,7 @@ func RunLoop(ctx context.Context, d Deps) error {
 		slog.Duration("pollIntervalAfterWork", d.Config.PollInterval),
 		slog.Duration("idleWaitWhenEmpty", d.Config.IdleWait),
 		slog.Duration("sendTimeout", d.Config.SendTimeout),
+		slog.Bool("templateRepoAvailable", d.TemplateRepo != nil),
 	)
 	for {
 		if err := ctx.Err(); err != nil {
@@ -46,10 +47,9 @@ func RunLoop(ctx context.Context, d Deps) error {
 		foundRows, err := RunOnce(ctx, d)
 		if err != nil {
 			log.Error("whatsapp worker batch failed", slog.String("error", err.Error()))
-			// If rate limited, wait longer before retrying
 			if strings.Contains(err.Error(), "rate limit") || strings.Contains(err.Error(), "rate limited") {
 				log.Info("rate limit detected, waiting longer before retry")
-				wait := 10 * time.Minute // Wait 10 minutes for rate limit to reset
+				wait := 10 * time.Minute
 				log.Info("next iteration scheduled",
 					slog.Duration("wait", wait),
 					slog.Bool("hadRowsInPreviousCycle", foundRows),
@@ -89,7 +89,9 @@ func RunLoop(ctx context.Context, d Deps) error {
 	}
 }
 
-// RunOnce reads up to BatchSize pending rows and processes each (returns foundRows true if any were returned).
+// RunOnce reads up to BatchSize pending rows and processes each.
+// When TemplateRepo is configured, missing TemplateName / TemplateType are looked up
+// from tbl_WhatsAppTemplates using the row's TemplateID before sending.
 func RunOnce(ctx context.Context, d Deps) (foundRows bool, err error) {
 	log := d.Log
 	if log == nil {
@@ -102,10 +104,20 @@ func RunOnce(ctx context.Context, d Deps) (foundRows bool, err error) {
 	if len(whatsApps) == 0 {
 		return false, nil
 	}
-	
+
 	rateLimited := false
 	for _, w := range whatsApps {
-		log.Info("processing whatsapp", slog.Int64("whatsappID", w.WhatsappID))
+		resolved := resolveMessageMetadata(ctx, d.TemplateRepo, &w, d.Config.DefaultTemplateName)
+
+		log.Info("processing whatsapp",
+			slog.Int64("whatsappID", w.WhatsAppID),
+			slog.Int64("templateID", w.TemplateID),
+			slog.String("templateName", w.TemplateName),
+			slog.String("templateType", w.TemplateType),
+			slog.String("toMobile", w.ToMobile),
+			slog.String("resolvedFrom", resolved),
+		)
+
 		sendCtx, cancel := context.WithTimeout(ctx, d.Config.SendTimeout)
 		sendErr := d.Sender.SendMessage(sendCtx, w)
 		cancel()
@@ -113,41 +125,87 @@ func RunOnce(ctx context.Context, d Deps) (foundRows bool, err error) {
 			if err := d.Repo.MarkSent(ctx, w.WhatsAppID); err != nil {
 				log.Error("mark sent failed",
 					slog.Int64("whatsappID", w.WhatsAppID),
+					slog.String("templateName", w.TemplateName),
 					slog.String("error", err.Error()),
 				)
 				continue
 			}
-			log.Info("whatsapp sent", slog.Int64("whatsappID", w.WhatsappID))
+			log.Info("whatsapp sent",
+				slog.Int64("whatsappID", w.WhatsAppID),
+				slog.String("templateName", w.TemplateName),
+				slog.String("templateType", w.TemplateType),
+			)
 			continue
 		}
-		
-		// Check if this is a rate limit error
+
 		if strings.Contains(sendErr.Error(), "rate limited") || strings.Contains(sendErr.Error(), "TooManyRequests") {
 			log.Warn("whatsapp rate limited by API",
-				slog.Int64("whatsappID", w.WhatsappID),
+				slog.Int64("whatsappID", w.WhatsAppID),
+				slog.String("templateName", w.TemplateName),
 				slog.String("error", sendErr.Error()),
 			)
 			rateLimited = true
-			// Don't mark as failure - keep it for retry after rate limit expires
 			continue
 		}
-		
+
 		log.Error("send failed",
-			slog.Int64("whatsappID", w.WhatsappID),
+			slog.Int64("whatsappID", w.WhatsAppID),
+			slog.Int64("templateID", w.TemplateID),
+			slog.String("templateName", w.TemplateName),
+			slog.String("templateType", w.TemplateType),
 			slog.String("error", sendErr.Error()),
 		)
 		if err := d.Repo.MarkAfterFailure(ctx, w.WhatsAppID); err != nil {
 			log.Error("mark after failure",
-				slog.Int64("whatsappID", w.WhatsappID),
+				slog.Int64("whatsappID", w.WhatsAppID),
 				slog.String("error", err.Error()),
 			)
 		}
 	}
-	
-	// If rate limited, return an error to trigger longer wait in the main loop
+
 	if rateLimited {
 		return true, errors.New("WhatsApp API rate limit exceeded")
 	}
-	
+
 	return true, nil
+}
+
+// resolveMessageMetadata ensures TemplateName and TemplateType are populated on *msg.
+// It returns a short human-readable source describing how the metadata was resolved.
+// Resolution order:
+//  1. Row already has both TemplateName + TemplateType -> "row"
+//  2. Row has TemplateID (but missing name/type) and TemplateRepo is available -> "tpl_by_id"
+//  3. Fallback to config.DefaultTemplateName with 'regular' type -> "config_default"
+func resolveMessageMetadata(
+	ctx context.Context,
+	tplRepo *repository.WhatsAppTemplateRepository,
+	msg *domain.OutboxWhatsApp,
+	defaultTemplateName string,
+) string {
+	hasName := strings.TrimSpace(msg.TemplateName) != ""
+	hasType := strings.TrimSpace(msg.TemplateType) != ""
+
+	if hasName && hasType {
+		return "row"
+	}
+
+	if msg.TemplateID != 0 && tplRepo != nil {
+		if tpl, err := tplRepo.FindByID(ctx, msg.TemplateID); err == nil && tpl != nil {
+			if !hasName {
+				msg.TemplateName = tpl.TemplateName
+			}
+			if !hasType {
+				msg.TemplateType = tpl.TemplateType
+			}
+			return "tpl_by_id"
+		}
+	}
+
+	if !hasName {
+		msg.TemplateName = strings.TrimSpace(defaultTemplateName)
+	}
+	if !hasType {
+		msg.TemplateType = domain.WhatsAppTemplateTypeRegular
+	}
+	return "config_default"
 }
