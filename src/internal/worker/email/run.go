@@ -55,15 +55,23 @@ func RunLoop(ctx context.Context, d Deps) error {
 					slog.Bool("hadRowsInPreviousCycle", foundRows),
 					slog.String("reason", "rate limit"),
 				)
+				// Use a ticker to print a heartbeat every minute to prevent Azure WebJob idle timeout (WEBJOBS_IDLE_TIMEOUT)
+				ticker := time.NewTicker(1 * time.Minute)
 				timer := time.NewTimer(wait)
-				select {
-				case <-ctx.Done():
-					if !timer.Stop() {
-						<-timer.C
+			WaitLoop:
+				for {
+					select {
+					case <-ctx.Done():
+						timer.Stop()
+						ticker.Stop()
+						log.Info("email worker stopping", slog.String("reason", ctx.Err().Error()))
+						return ctx.Err()
+					case <-ticker.C:
+						log.Info("heartbeat: waiting for rate limit to reset...")
+					case <-timer.C:
+						ticker.Stop()
+						break WaitLoop
 					}
-					log.Info("email worker stopping", slog.String("reason", ctx.Err().Error()))
-					return ctx.Err()
-				case <-timer.C:
 				}
 				continue
 			}
@@ -76,15 +84,23 @@ func RunLoop(ctx context.Context, d Deps) error {
 			slog.Duration("wait", wait),
 			slog.Bool("hadRowsInPreviousCycle", foundRows),
 		)
+		// Use a ticker to print a heartbeat every minute to prevent Azure WebJob idle timeout (WEBJOBS_IDLE_TIMEOUT)
+		ticker := time.NewTicker(1 * time.Minute)
 		timer := time.NewTimer(wait)
-		select {
-		case <-ctx.Done():
-			if !timer.Stop() {
-				<-timer.C
+	NormalWaitLoop:
+		for {
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				ticker.Stop()
+				log.Info("email worker stopping", slog.String("reason", ctx.Err().Error()))
+				return ctx.Err()
+			case <-ticker.C:
+				log.Info("heartbeat: waiting for next polling cycle...")
+			case <-timer.C:
+				ticker.Stop()
+				break NormalWaitLoop
 			}
-			log.Info("email worker stopping", slog.String("reason", ctx.Err().Error()))
-			return ctx.Err()
-		case <-timer.C:
 		}
 	}
 }

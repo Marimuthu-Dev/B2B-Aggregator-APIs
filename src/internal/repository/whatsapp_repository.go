@@ -55,7 +55,6 @@ func (r *WhatsAppRepository) Enqueue(ctx context.Context, w domain.QueuedWhatsAp
 	fromMobile := clipRunes(strings.TrimSpace(w.FromMobile), whatsappMobileMax)
 	toMobile := clipRunes(strings.TrimSpace(w.ToMobile), whatsappMobileMax)
 	whatsappText := clipRunes(strings.TrimSpace(w.WhatsAppText), whatsappTextMax)
-	templateName := clipRunes(strings.TrimSpace(w.TemplateName), templateNameMax)
 
 	if fromMobile == "" {
 		return fmt.Errorf("FromMobile is required")
@@ -74,7 +73,6 @@ INSERT INTO %s (
   ToMobile,
   WhatsAppText,
   TemplateID,
-  TemplateName,
   CreatedBy,
   CreatedOn,
   IsSent,
@@ -87,7 +85,6 @@ INSERT INTO %s (
   @toMobile,
   @whatsappText,
   @templateID,
-  @templateName,
   @createdBy,
   GETDATE(),
   0,
@@ -102,7 +99,6 @@ INSERT INTO %s (
 		sql.Named("toMobile", toMobile),
 		sql.Named("whatsappText", whatsappText),
 		sql.Named("templateID", nullableInt64(w.TemplateID)),
-		sql.Named("templateName", nullableString(templateName)),
 		sql.Named("createdBy", w.CreatedBy),
 	)
 	if err != nil {
@@ -173,7 +169,7 @@ SELECT TOP (`)
   w.ToMobile,
   w.WhatsAppText,
   w.TemplateID,
-  COALESCE(NULLIF(t.TemplateName, ''), NULLIF(w.TemplateName, '')) AS TemplateName,
+  t.TemplateName,
   t.TemplateType,
   w.CreatedBy
 FROM `)

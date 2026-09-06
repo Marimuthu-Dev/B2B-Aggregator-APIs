@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build fitness-worker + email-worker (Linux amd64), pack both WebJobs under
+# Build fitness-worker + email-worker + whatsapp-worker (Linux amd64), pack all three WebJobs under
 # App_Data/jobs/triggered/, and optionally deploy with Azure CLI.
 #
 # Usage (from repo root):
@@ -30,15 +30,17 @@ AZURE_WEBAPP_NAME="${AZURE_WEBAPP_NAME:-${AZURE_WEBAPP:-}}"
 
 echo "=== Building Linux amd64 binaries (module: $SRC) ==="
 cd "$SRC"
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o fitness-worker ./cmd/fitness-worker
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o email-worker ./cmd/email-worker
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o fitness-worker  ./cmd/fitness-worker
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o email-worker    ./cmd/email-worker
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o whatsapp-worker ./cmd/whatsapp-worker
 
 FITNESS_JOB="$BUILD/App_Data/jobs/triggered/fitness-worker-job"
 EMAIL_JOB="$BUILD/App_Data/jobs/triggered/email-worker-job"
+WHATSAPP_JOB="$BUILD/App_Data/jobs/triggered/whatsapp-worker-job"
 
-echo "=== Assembling WebJob folders ==="
+echo "=== Assembling WebJob folders (3 jobs: fitness, email, whatsapp) ==="
 rm -rf "$BUILD"
-mkdir -p "$FITNESS_JOB" "$EMAIL_JOB"
+mkdir -p "$FITNESS_JOB" "$EMAIL_JOB" "$WHATSAPP_JOB"
 
 cp "$SRC/fitness-worker" "$SRC/run-fitness-worker.sh" "$FITNESS_JOB/"
 mv "$FITNESS_JOB/run-fitness-worker.sh" "$FITNESS_JOB/run.sh"
@@ -80,7 +82,13 @@ fi
 cp "$SRC/email-worker" "$SRC/run-email-worker.sh" "$EMAIL_JOB/"
 mv "$EMAIL_JOB/run-email-worker.sh" "$EMAIL_JOB/run.sh"
 
-chmod +x "$FITNESS_JOB/run.sh" "$FITNESS_JOB/fitness-worker" "$EMAIL_JOB/run.sh" "$EMAIL_JOB/email-worker"
+cp "$SRC/whatsapp-worker" "$SRC/run-whatsapp-worker.sh" "$WHATSAPP_JOB/"
+mv "$WHATSAPP_JOB/run-whatsapp-worker.sh" "$WHATSAPP_JOB/run.sh"
+
+chmod +x \
+  "$FITNESS_JOB/run.sh"   "$FITNESS_JOB/fitness-worker" \
+  "$EMAIL_JOB/run.sh"     "$EMAIL_JOB/email-worker" \
+  "$WHATSAPP_JOB/run.sh"  "$WHATSAPP_JOB/whatsapp-worker"
 
 SETTINGS="$REPO_ROOT/deploy/linux-webjobs"
 if [ -f "$SETTINGS/fitness-worker-job/settings.job" ]; then
@@ -91,6 +99,10 @@ if [ -f "$SETTINGS/email-worker-job/settings.job" ]; then
   cp "$SETTINGS/email-worker-job/settings.job" "$EMAIL_JOB/settings.job"
   echo "Included $SETTINGS/email-worker-job/settings.job"
 fi
+if [ -f "$SETTINGS/whatsapp-worker-job/settings.job" ]; then
+  cp "$SETTINGS/whatsapp-worker-job/settings.job" "$WHATSAPP_JOB/settings.job"
+  echo "Included $SETTINGS/whatsapp-worker-job/settings.job"
+fi
 
 echo "=== Creating zip: $OUTPUT_ZIP ==="
 mkdir -p "$(dirname "$OUTPUT_ZIP")"
@@ -98,8 +110,8 @@ rm -f "$OUTPUT_ZIP"
 cd "$BUILD"
 zip -qr "$OUTPUT_ZIP" App_Data
 
-echo "Done. Zip layout:"
-unzip -l "$OUTPUT_ZIP" | head -n 40
+echo "Done. Zip layout (first 60 lines):"
+unzip -l "$OUTPUT_ZIP" | head -n 60
 
 if [ "$DO_DEPLOY" -eq 1 ]; then
   if [ -z "$AZURE_RESOURCE_GROUP" ] || [ -z "$AZURE_WEBAPP_NAME" ]; then
