@@ -18,3 +18,10 @@ docs/STORE_LOGIN_PLAN.md
 Database/med-prod-DB.sql
 /src/chrome-linux-deps
 /src/chrome-linux64
+/Whatsapp_docs
+*.example
+Database/whatsapp_schema.sql
+run-whatsapp-worker.bat
+run-whatsapp-worker.sh
+WHATSAPP_WORKER_README.md
+WHATSAPP_WORKER_VERIFICATION.md
