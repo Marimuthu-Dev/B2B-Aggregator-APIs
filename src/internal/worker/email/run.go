@@ -43,6 +43,7 @@ func RunLoop(ctx context.Context, d Deps) error {
 			log.Info("email worker stopping", slog.String("reason", err.Error()))
 			return err
 		}
+		log.Info("starting new run cycle, checking for pending emails")
 		foundRows, err := RunOnce(ctx, d)
 		if err != nil {
 			log.Error("email worker batch failed", slog.String("error", err.Error()))
@@ -111,29 +112,35 @@ func RunOnce(ctx context.Context, d Deps) (foundRows bool, err error) {
 	if log == nil {
 		log = slog.Default()
 	}
+	log.Info("querying database for pending emails", slog.Int("batchSize", d.Config.BatchSize))
 	emails, err := d.Repo.SelectPendingBatch(ctx, d.Config.BatchSize)
 	if err != nil {
 		return false, err
 	}
 	if len(emails) == 0 {
+		log.Info("no pending emails found in this cycle")
 		return false, nil
 	}
+	
+	log.Info("successfully fetched pending emails", slog.Int("count", len(emails)))
 	
 	rateLimited := false
 	for _, e := range emails {
 		log.Info("processing email", slog.Int64("emailID", e.EmailID))
+		log.Info("attempting to send email via ACS", slog.Int64("emailID", e.EmailID))
 		sendCtx, cancel := context.WithTimeout(ctx, d.Config.SendTimeout)
 		sendErr := d.Sender.SendHTML(sendCtx, e)
 		cancel()
 		if sendErr == nil {
+			log.Info("ACS successfully accepted email, marking as sent in database", slog.Int64("emailID", e.EmailID))
 			if err := d.Repo.MarkSent(ctx, e.EmailID); err != nil {
-				log.Error("mark sent failed",
+				log.Error("mark sent failed in database",
 					slog.Int64("emailID", e.EmailID),
 					slog.String("error", err.Error()),
 				)
 				continue
 			}
-			log.Info("email sent", slog.Int64("emailID", e.EmailID))
+			log.Info("email processing completed successfully", slog.Int64("emailID", e.EmailID))
 			continue
 		}
 		
