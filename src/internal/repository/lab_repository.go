@@ -196,3 +196,19 @@ func (r *labRepository) FindByState(stateID uint8) ([]domain.Lab, error) {
 	err := gormLab(r.db).Where("StateID = ?", stateID).Find(&labs).Error
 	return mapLabsToDomain(labs), err
 }
+
+func (r *labRepository) GetLabFullAddress(id int64) (string, error) {
+	var address string
+	query := fmt.Sprintf(`
+		SELECT COALESCE(l.Address, '') + ', ' + COALESCE(c.CityName, '') + ', ' + COALESCE(s.StateName, '')
+		FROM %s l
+		LEFT JOIN %s c ON l.CityID = c.CityID
+		LEFT JOIN %s s ON l.StateID = s.StateID
+		WHERE l.LabID = ?
+	`, persistencemodels.Table("tbl_LabMaster"), persistencemodels.Table("tbl_CityMaster"), persistencemodels.Table("tbl_StateMaster"))
+	err := r.db.Raw(query, id).Row().Scan(&address)
+	if err != nil {
+		return "", err
+	}
+	return strings.Trim(strings.TrimSpace(address), ","), nil
+}

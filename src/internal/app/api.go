@@ -1,6 +1,8 @@
 package app
 
 import (
+	"context"
+	"database/sql"
 	"log"
 	"log/slog"
 	"os"
@@ -67,7 +69,10 @@ func Run() error {
 	
 	// Initialize Services
 	whatsappRepo := repository.NewWhatsAppRepositoryFromSQL(sqlDB)
-	whatsappTemplateRepo := repository.NewWhatsAppTemplateRepository(db)
+	whatsappTemplateRepo, err := repository.NewWhatsAppTemplateRepository(context.Background(), sqlDB)
+	if err != nil {
+		log.Printf("Failed to initialize WhatsApp template repo: %v", err)
+	}
 	
 	packageSvc := service.NewPackageService(packageRepo, testRepo, packageClientMapRepo, packageLabMapRepo, clientRepo, labRepo)
 	storeRepo := repository.NewStoreRepository(db)

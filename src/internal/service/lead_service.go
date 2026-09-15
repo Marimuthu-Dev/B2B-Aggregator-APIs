@@ -292,7 +292,7 @@ func (s *leadService) UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUp
 		var eventType string
 		if existing.AppointmentAt == nil {
 			eventType = "lab_appointment_confirmation"
-		} else if existing.AppointmentAt.Time().Unix() != timeutil.StoredFromTime(*update.AppointmentAt).Time().Unix() {
+		} else if existing.AppointmentAt.Unix() != update.AppointmentAt.Unix() {
 			eventType = "appointment_rescheduled"
 		}
 
@@ -393,7 +393,7 @@ func (s *leadService) BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastU
 			var eventType string
 			if l.AppointmentAt == nil {
 				eventType = "lab_appointment_confirmation"
-			} else if l.AppointmentAt.Time().Unix() != appointmentPersist.Time().Unix() {
+			} else if l.AppointmentAt.Unix() != appointmentPersist.Unix() {
 				eventType = "appointment_rescheduled"
 			}
 			
@@ -401,7 +401,8 @@ func (s *leadService) BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastU
 				address, _ := s.labRepo.GetLabFullAddress(*currentLabID)
 				
 				updatedLead := l
-				updatedLead.AppointmentAt = appointmentPersist
+				ap := timeutil.StoredFromTime(*appointmentPersist)
+				updatedLead.AppointmentAt = &ap
 				updatedLead.LabID = currentLabID
 				
 				go s.queueWhatsAppMessage(ctx, &updatedLead, eventType, address)
