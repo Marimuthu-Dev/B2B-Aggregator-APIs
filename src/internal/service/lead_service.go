@@ -50,10 +50,12 @@ type leadService struct {
 	labRepo     repository.LabRepository
 	storeRepo   repository.StoreRepository
 	blobs       BlobService
+	whatsappRepo *repository.WhatsAppRepository
+	whatsappTemplateRepo *repository.WhatsAppTemplateRepository
 }
 
-func NewLeadService(repo repository.LeadRepository, uow repository.LeadUnitOfWork, clientRepo repository.ClientRepository, packageRepo repository.PackageRepository, labRepo repository.LabRepository, storeRepo repository.StoreRepository, blobs BlobService) LeadService {
-	return &leadService{repo: repo, uow: uow, clientRepo: clientRepo, packageRepo: packageRepo, labRepo: labRepo, storeRepo: storeRepo, blobs: blobs}
+func NewLeadService(repo repository.LeadRepository, uow repository.LeadUnitOfWork, clientRepo repository.ClientRepository, packageRepo repository.PackageRepository, labRepo repository.LabRepository, storeRepo repository.StoreRepository, blobs BlobService, whatsappRepo *repository.WhatsAppRepository, whatsappTemplateRepo *repository.WhatsAppTemplateRepository) LeadService {
+	return &leadService{repo: repo, uow: uow, clientRepo: clientRepo, packageRepo: packageRepo, labRepo: labRepo, storeRepo: storeRepo, blobs: blobs, whatsappRepo: whatsappRepo, whatsappTemplateRepo: whatsappTemplateRepo}
 }
 
 func (s *leadService) ListLeads(filter repository.LeadListFilter) ([]domain.Lead, int64, error) {
@@ -283,6 +285,23 @@ func (s *leadService) UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUp
 	if err != nil {
 		return nil, err
 	}
+	
+	// WhatsApp Notification Logic
+	if update.AppointmentAt != nil && l.LabID != nil {
+		ctx := context.Background()
+		var eventType string
+		if existing.AppointmentAt == nil {
+			eventType = "lab_appointment_confirmation"
+		} else if existing.AppointmentAt.Time().Unix() != timeutil.StoredFromTime(*update.AppointmentAt).Time().Unix() {
+			eventType = "appointment_rescheduled"
+		}
+
+		if eventType != "" {
+			address, _ := s.labRepo.GetLabFullAddress(*l.LabID)
+			go s.queueWhatsAppMessage(ctx, &l, eventType, address)
+		}
+	}
+	
 	return &l, nil
 }
 
@@ -326,6 +345,16 @@ func (s *leadService) BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastU
 		st := timeutil.StoredFromTime(appt)
 		appointmentPersist = timeutil.StoredToTimePtr(&st)
 	}
+
+	var existingLeads []domain.Lead
+	if appointmentAt != nil {
+		for _, id := range leadIDs {
+			if l, err := s.repo.FindByID(id); err == nil && l != nil {
+				existingLeads = append(existingLeads, *l)
+			}
+		}
+	}
+
 	var affected int64
 	err := s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
 		n, err := leadRepo.UpdateStatusForIDs(leadIDs, statusID, lastUpdatedBy, labID, appointmentPersist)
@@ -349,6 +378,37 @@ func (s *leadService) BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastU
 
 		return nil
 	})
+	
+	if err == nil && appointmentAt != nil {
+		ctx := context.Background()
+		for _, l := range existingLeads {
+			currentLabID := l.LabID
+			if labID != nil {
+				currentLabID = labID
+			}
+			if currentLabID == nil {
+				continue
+			}
+			
+			var eventType string
+			if l.AppointmentAt == nil {
+				eventType = "lab_appointment_confirmation"
+			} else if l.AppointmentAt.Time().Unix() != appointmentPersist.Time().Unix() {
+				eventType = "appointment_rescheduled"
+			}
+			
+			if eventType != "" {
+				address, _ := s.labRepo.GetLabFullAddress(*currentLabID)
+				
+				updatedLead := l
+				updatedLead.AppointmentAt = appointmentPersist
+				updatedLead.LabID = currentLabID
+				
+				go s.queueWhatsAppMessage(ctx, &updatedLead, eventType, address)
+			}
+		}
+	}
+	
 	return affected, err
 }
 
@@ -729,6 +789,12 @@ func (s *leadService) ApproveLeadReport(leadID int64, req *dto.ApproveLeadReques
 			CreatedBy: userID,
 		})
 	})
+	
+	if err == nil {
+		go s.queueWhatsAppMessage(context.Background(), lead, "lab_report_completed", "")
+	}
+	
+	return err
 }
 
 func (s *leadService) validateLeadStoreMasterID(clientID int64, storeMasterID *int64) error {
@@ -755,4 +821,53 @@ func (s *leadService) validateLeadStoreMasterID(clientID int64, storeMasterID *i
 		return apperrors.NewBadRequest("StoreMasterID does not belong to this client", nil)
 	}
 	return nil
+}
+
+func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lead, templateName string, labAddress string) {
+	if s.whatsappRepo == nil || s.whatsappTemplateRepo == nil {
+		slog.Warn("WhatsApp repos not configured, skipping notification", slog.Int64("leadID", lead.LeadID))
+		return
+	}
+	if lead.ContactNumber == "" {
+		slog.Warn("Lead has no contact number, skipping WhatsApp", slog.Int64("leadID", lead.LeadID))
+		return
+	}
+	
+	// Format text based on template
+	var text string
+	switch templateName {
+	case "lab_appointment_confirmation":
+		text = fmt.Sprintf("Dear %s, Your lab appointment has been confirmed. Date: %s Time: %s Location: %s",
+			lead.PatientName,
+			lead.AppointmentAt.Format("02-01-2006"),
+			lead.AppointmentAt.Format("03:04 PM"),
+			labAddress)
+	case "appointment_rescheduled":
+		text = fmt.Sprintf("Dear %s, Your lab appointment has been rescheduled. New Date: %s New Time: %s Location: %s",
+			lead.PatientName,
+			lead.AppointmentAt.Format("02-01-2006"),
+			lead.AppointmentAt.Format("03:04 PM"),
+			labAddress)
+	case "lab_report_completed":
+		text = fmt.Sprintf("Dear %s, Your lab report is now ready. Please click on below link to download your report. %s",
+			lead.PatientName,
+			lead.ReportURL)
+	default:
+		slog.Error("Unknown WhatsApp template", slog.String("templateName", templateName))
+		return
+	}
+
+	msg := domain.QueuedWhatsApp{
+		ClientID:     lead.ClientID,
+		FromMobile:   "System", // Default fallback if not available
+		ToMobile:     lead.ContactNumber,
+		WhatsAppText: text,
+		TemplateName: templateName,
+		CreatedBy:    lead.LastUpdatedBy,
+	}
+	
+	err := s.whatsappRepo.EnqueueWithTemplate(ctx, msg, s.whatsappTemplateRepo)
+	if err != nil {
+		slog.Error("Failed to queue WhatsApp message", slog.Any("err", err), slog.Int64("leadID", lead.LeadID))
+	}
 }

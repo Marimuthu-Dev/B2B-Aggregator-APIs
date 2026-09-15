@@ -56,7 +56,19 @@ func Run() error {
 	leadUow := repository.NewLeadUnitOfWork(db)
 	testRepo := repository.NewTestRepository(db)
 
+	var sqlDB *sql.DB
+	if db != nil {
+		var sqlErr error
+		sqlDB, sqlErr = db.DB()
+		if sqlErr != nil {
+			log.Printf("Failed to get sql.DB: %v", sqlErr)
+		}
+	}
+	
 	// Initialize Services
+	whatsappRepo := repository.NewWhatsAppRepositoryFromSQL(sqlDB)
+	whatsappTemplateRepo := repository.NewWhatsAppTemplateRepository(db)
+	
 	packageSvc := service.NewPackageService(packageRepo, testRepo, packageClientMapRepo, packageLabMapRepo, clientRepo, labRepo)
 	storeRepo := repository.NewStoreRepository(db)
 	var blobSvc service.BlobService
@@ -72,12 +84,8 @@ func Run() error {
 		}
 	}
 	var emailOutbox *repository.EmailOutboxRepository
-	if db != nil {
-		if sqlDB, sqlErr := db.DB(); sqlErr != nil {
-			log.Printf("Email outbox disabled (sql.DB): %v", sqlErr)
-		} else {
-			emailOutbox = repository.NewEmailOutboxRepositoryFromSQL(sqlDB)
-		}
+	if sqlDB != nil {
+		emailOutbox = repository.NewEmailOutboxRepositoryFromSQL(sqlDB)
 	}
 	loginSvc := service.NewLoginService(loginRepo, forgotPasswordRepo, clientRepo, employeeRepo, labRepo, storeRepo, cfg.JWT, emailOutbox, cfg.Email, cfg.Domains)
 	clientSvc := service.NewClientService(clientRepo, blobSvc, storeRepo, emailOutbox, forgotPasswordRepo, cfg.Email, cfg.Domains.Client)
@@ -85,7 +93,7 @@ func Run() error {
 	employeeSvc := service.NewEmployeeService(employeeRepo, emailOutbox, forgotPasswordRepo, cfg.Email, cfg.Domains.Employee)
 	labSvc := service.NewLabService(labRepo, blobSvc, emailOutbox, forgotPasswordRepo, cfg.Email, cfg.Domains.Lab)
 	storeSvc := service.NewStoreService(storeRepo, clientRepo, emailOutbox, forgotPasswordRepo, cfg.Email, cfg.Domains.Store)
-	leadSvc := service.NewLeadService(leadRepo, leadUow, clientRepo, packageRepo, labRepo, storeRepo, blobSvc)
+	leadSvc := service.NewLeadService(leadRepo, leadUow, clientRepo, packageRepo, labRepo, storeRepo, blobSvc, whatsappRepo, whatsappTemplateRepo)
 	testSvc := service.NewTestService(testRepo)
 
 	// Initialize Handlers

@@ -24,6 +24,7 @@ type LabRepository interface {
 	FindByContactNumber(contactNumber string) (*domain.Lab, error)
 	FindByCity(cityID uint8) ([]domain.Lab, error)
 	FindByState(stateID uint8) ([]domain.Lab, error)
+	GetLabFullAddress(id int64) (string, error)
 }
 
 type labRepository struct {
