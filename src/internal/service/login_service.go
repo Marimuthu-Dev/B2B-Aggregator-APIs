@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,8 +11,8 @@ import (
 
 	"b2b-diagnostic-aggregator/apis/internal/apperrors"
 	"b2b-diagnostic-aggregator/apis/internal/config"
-	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
+	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 	"b2b-diagnostic-aggregator/apis/pkg/utils"
@@ -30,14 +31,21 @@ type LoginService interface {
 }
 
 type loginService struct {
-	repo         repository.LoginRepository
-	forgotRepo   repository.ForgotPasswordRepository
-	clientRepo   repository.ClientRepository
-	employeeRepo repository.EmployeeRepository
-	labRepo      repository.LabRepository
-	jwtSecret    string
-	accessTTL    time.Duration
-	refreshTTL   time.Duration
+	repo               repository.LoginRepository
+	forgotRepo         repository.ForgotPasswordRepository
+	clientRepo         repository.ClientRepository
+	employeeRepo       repository.EmployeeRepository
+	labRepo            repository.LabRepository
+	storeRepo          repository.StoreRepository
+	emails             *repository.EmailOutboxRepository
+	emailCfg           config.OutboundEmailConfig
+	clientPortalURL    string
+	employeePortalURL  string
+	labPortalURL       string
+	storePortalURL     string
+	jwtSecret          string
+	accessTTL          time.Duration
+	refreshTTL         time.Duration
 }
 
 func NewLoginService(
@@ -46,7 +54,11 @@ func NewLoginService(
 	clientRepo repository.ClientRepository,
 	employeeRepo repository.EmployeeRepository,
 	labRepo repository.LabRepository,
+	storeRepo repository.StoreRepository,
 	jwtCfg config.JWTConfig,
+	emails *repository.EmailOutboxRepository,
+	emailCfg config.OutboundEmailConfig,
+	domains config.DomainURLs,
 ) LoginService {
 	accessTTL, err := time.ParseDuration(jwtCfg.ExpiresIn)
 	if err != nil {
@@ -57,14 +69,21 @@ func NewLoginService(
 		refreshTTL = 7 * 24 * time.Hour
 	}
 	return &loginService{
-		repo:         repo,
-		forgotRepo:   forgotRepo,
-		clientRepo:   clientRepo,
-		employeeRepo: employeeRepo,
-		labRepo:      labRepo,
-		jwtSecret:    jwtCfg.Secret,
-		accessTTL:    accessTTL,
-		refreshTTL:   refreshTTL,
+		repo:              repo,
+		forgotRepo:        forgotRepo,
+		clientRepo:        clientRepo,
+		employeeRepo:      employeeRepo,
+		labRepo:           labRepo,
+		storeRepo:         storeRepo,
+		emails:            emails,
+		emailCfg:          emailCfg,
+		clientPortalURL:   domains.Client,
+		employeePortalURL: domains.Employee,
+		labPortalURL:      domains.Lab,
+		storePortalURL:    domains.Store,
+		jwtSecret:         jwtCfg.Secret,
+		accessTTL:         accessTTL,
+		refreshTTL:        refreshTTL,
 	}
 }
 
@@ -81,18 +100,34 @@ func (s *loginService) resolveUserByMobileNumber(domainName, mobileNumber string
 	case utils.UserTypeClient:
 		fmt.Println("[LOGIN] Service.resolveUserByMobileNumber: resolving client by contact number")
 		client, err := s.clientRepo.FindByContactNumber(mobileNumber)
-		if err != nil {
-			fmt.Printf("[LOGIN] Service.resolveUserByMobileNumber: client not found: %v\n", err)
+		if err == nil && client != nil {
+			fmt.Printf("[LOGIN] Service.resolveUserByMobileNumber: client found ClientID=%d\n", client.ClientID)
+			return client.ClientID, utils.UserTypeClient, client, nil
+		}
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			fmt.Printf("[LOGIN] Service.resolveUserByMobileNumber: client lookup error: %v\n", err)
 			return 0, 0, nil, apperrors.NewNotFound("User not found", err)
 		}
-		fmt.Printf("[LOGIN] Service.resolveUserByMobileNumber: client found ClientID=%d\n", client.ClientID)
-		return client.ClientID, utils.UserTypeClient, client, nil
+		fmt.Println("[LOGIN] Service.resolveUserByMobileNumber: client not found, trying store")
+		if !persistencemodels.HasStoreMasterTable() {
+			return 0, 0, nil, apperrors.NewNotFound("User not found", err)
+		}
+		return s.resolveStoreByMobileNumber(mobileNumber)
+	case utils.UserTypeStore:
+		fmt.Println("[LOGIN] Service.resolveUserByMobileNumber: resolving store by contact number")
+		if !persistencemodels.HasStoreMasterTable() {
+			return 0, 0, nil, apperrors.NewNotFound("User not found", nil)
+		}
+		return s.resolveStoreByMobileNumber(mobileNumber)
 	case utils.UserTypeEmployee:
 		fmt.Println("[LOGIN] Service.resolveUserByMobileNumber: resolving employee by mobile number")
 		employee, err := s.employeeRepo.FindByMobileNumber(mobileNumber)
 		if err != nil {
 			fmt.Printf("[LOGIN] Service.resolveUserByMobileNumber: employee not found: %v\n", err)
 			return 0, 0, nil, apperrors.NewNotFound("User not found", err)
+		}
+		if !employee.IsActive {
+			return 0, 0, nil, apperrors.NewUnauthorized("Invalid credentials", errors.New("employee inactive"))
 		}
 		fmt.Printf("[LOGIN] Service.resolveUserByMobileNumber: employee found UID=%d\n", employee.UID)
 		return employee.UID, utils.UserTypeEmployee, employee, nil
@@ -109,6 +144,27 @@ func (s *loginService) resolveUserByMobileNumber(domainName, mobileNumber string
 		fmt.Printf("[LOGIN] Service.resolveUserByMobileNumber: unknown userType=%d, invalid domain\n", userType)
 		return 0, 0, nil, apperrors.NewBadRequest("Invalid domain", nil)
 	}
+}
+
+func (s *loginService) resolveStoreByMobileNumber(mobileNumber string) (int64, int, interface{}, error) {
+	if !persistencemodels.HasStoreMasterTable() {
+		return 0, 0, nil, apperrors.NewNotFound("User not found", nil)
+	}
+	store, err := s.storeRepo.FindByContactNumber(mobileNumber)
+	if err != nil {
+		fmt.Printf("[LOGIN] Service.resolveStoreByMobileNumber: store not found: %v\n", err)
+		return 0, 0, nil, apperrors.NewNotFound("User not found", err)
+	}
+	if !store.IsActive {
+		return 0, 0, nil, apperrors.NewUnauthorized("Invalid credentials", errors.New("store inactive"))
+	}
+	parent, parentErr := s.clientRepo.FindByID(store.ClientID)
+	if parentErr != nil || parent == nil || !parent.IsStoreLoginEnabled || !parent.IsAcitve {
+		return 0, 0, nil, apperrors.NewUnauthorized("Invalid credentials", errors.New("store login disabled"))
+	}
+	store.ClientName = parent.ClientName
+	fmt.Printf("[LOGIN] Service.resolveStoreByMobileNumber: store found StoreID=%d ClientID=%d\n", store.StoreID, store.ClientID)
+	return store.StoreID, utils.UserTypeStore, store, nil
 }
 
 func (s *loginService) Login(req dto.LoginRequest) (*dto.LoginResponse, error) {
@@ -145,6 +201,8 @@ func (s *loginService) Login(req dto.LoginRequest) (*dto.LoginResponse, error) {
 			userType = utils.UserTypeClient
 		case "3", "lab", "um-staging-lab-web.azurewebsites.net", "lab.urmediconnect.com":
 			userType = utils.UserTypeLab
+		case "4", "store":
+			userType = utils.UserTypeStore
 		}
 		userData = login
 		fmt.Printf("[LOGIN] Service.Login: found login userID=%d userTypeStr=%s\n", userID, userTypeStr)
@@ -185,40 +243,22 @@ func (s *loginService) Login(req dto.LoginRequest) (*dto.LoginResponse, error) {
 	fmt.Println("[LOGIN] Service.Login: success")
 	return &dto.LoginResponse{
 		User:         userData,
+		UserType:     userType,
 		Token:        accessToken,
 		RefreshToken: refreshToken,
 	}, nil
 }
 
 func (s *loginService) CreateForgotPasswordRecord(domainName, mobileNumber string) (int, error) {
-	userID, userType, _, err := s.resolveUserByMobileNumber(domainName, mobileNumber)
+	userID, userType, userData, err := s.resolveUserByMobileNumber(domainName, mobileNumber)
 	if err != nil {
 		return 0, err
 	}
-
-	now := time.Now().UTC()
-	expiry := now.Add(5 * time.Minute)
-
-	payload := map[string]interface{}{
-		"userId": userID, "userType": userType, "expiry": expiry.Format(time.RFC3339),
-	}
-	payloadBytes, _ := json.Marshal(payload)
-	resetKey, err := utils.Encrypt(string(payloadBytes))
+	resetKey, err := insertForgotPasswordKey(s.forgotRepo, userID, userType, forgotPasswordKeyTTL)
 	if err != nil {
-		return 0, apperrors.NewInternal("Failed to generate reset key", err)
-	}
-
-	rec := &domain.ForgotPassword{
-		UserID:            userID,
-		UserType:          strconv.Itoa(userType),
-		ForgetPasswordKey: resetKey,
-		CreatedOn:         timeutil.FromTime(now),
-		ExpiryTimestamp:   timeutil.FromTime(expiry),
-		IsPasswordChanged: false,
-	}
-	if err := s.forgotRepo.Create(rec); err != nil {
 		return 0, err
 	}
+	s.queueForgotPasswordEmail(context.Background(), userType, userData, resetKey)
 	return 1, nil
 }
 
@@ -319,10 +359,23 @@ func (s *loginService) GetProfile(domainName string, userIDStr, mobileNumber *st
 		if userType == utils.UserTypeClient {
 			id, _ := strconv.ParseInt(*userIDStr, 10, 64)
 			client, err := s.clientRepo.FindByID(id)
-			if err != nil {
+			if err == nil && client != nil {
+				return client, nil
+			}
+			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 				return nil, apperrors.NewNotFound("Profile not found", err)
 			}
-			return client, nil
+			if !persistencemodels.HasStoreMasterTable() {
+				return nil, apperrors.NewNotFound("Profile not found", err)
+			}
+			store, storeErr := s.storeRepo.FindByID(id)
+			if storeErr != nil {
+				return nil, apperrors.NewNotFound("Profile not found", storeErr)
+			}
+			if parent, pErr := s.clientRepo.FindByID(store.ClientID); pErr == nil && parent != nil {
+				store.ClientName = parent.ClientName
+			}
+			return store, nil
 		}
 		if userType == utils.UserTypeLab {
 			id, _ := strconv.ParseInt(*userIDStr, 10, 64)
@@ -331,6 +384,20 @@ func (s *loginService) GetProfile(domainName string, userIDStr, mobileNumber *st
 				return nil, apperrors.NewNotFound("Profile not found", err)
 			}
 			return lab, nil
+		}
+		if userType == utils.UserTypeStore {
+			if !persistencemodels.HasStoreMasterTable() {
+				return nil, apperrors.NewNotFound("Profile not found", nil)
+			}
+			id, _ := strconv.ParseInt(*userIDStr, 10, 64)
+			store, err := s.storeRepo.FindByID(id)
+			if err != nil {
+				return nil, apperrors.NewNotFound("Profile not found", err)
+			}
+			if parent, pErr := s.clientRepo.FindByID(store.ClientID); pErr == nil && parent != nil {
+				store.ClientName = parent.ClientName
+			}
+			return store, nil
 		}
 		return nil, apperrors.NewBadRequest("Employee profile not supported", nil)
 	}

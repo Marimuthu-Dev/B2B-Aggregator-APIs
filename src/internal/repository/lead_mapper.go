@@ -9,19 +9,36 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 )
 
-func mapLeadToDomainWithOptionalJoinedNames(p persistencemodels.Lead, labName, clientName, cityName, stateName sql.NullString) domain.Lead {
+type leadJoinedNames struct {
+	LabName    sql.NullString
+	ClientName sql.NullString
+	CityName   sql.NullString
+	StateName  sql.NullString
+	StoreName  sql.NullString
+	StoreCity  sql.NullString
+}
+
+func mapLeadToDomainWithOptionalJoinedNames(p persistencemodels.Lead, names leadJoinedNames) domain.Lead {
 	d := mapLeadToDomain(p)
-	if labName.Valid {
-		d.LabName = strings.TrimSpace(labName.String)
+	if names.LabName.Valid {
+		d.LabName = strings.TrimSpace(names.LabName.String)
 	}
-	if clientName.Valid {
-		d.ClientName = strings.TrimSpace(clientName.String)
+	if names.ClientName.Valid {
+		d.ClientName = strings.TrimSpace(names.ClientName.String)
 	}
-	if cityName.Valid {
-		d.CityName = strings.TrimSpace(cityName.String)
+	if names.CityName.Valid {
+		d.CityName = strings.TrimSpace(names.CityName.String)
 	}
-	if stateName.Valid {
-		d.StateName = strings.TrimSpace(stateName.String)
+	if names.StateName.Valid {
+		d.StateName = strings.TrimSpace(names.StateName.String)
+	}
+	if persistencemodels.HasStoreMasterTable() {
+		if names.StoreName.Valid {
+			d.StoreName = strings.TrimSpace(names.StoreName.String)
+		}
+		if names.StoreCity.Valid {
+			d.StoreCity = strings.TrimSpace(names.StoreCity.String)
+		}
 	}
 	return d
 }
@@ -42,6 +59,8 @@ func mapLeadToDomain(p persistencemodels.Lead) domain.Lead {
 		StateID:                       p.StateID,
 		Pincode:                       p.Pincode,
 		EmpID:                         derefString(p.EmpID),
+		StoreID:                       derefString(p.StoreID),
+		StoreMasterID:                 p.StoreMasterID,
 		CollectionType:                p.CollectionType,
 		LeadStatusID:                  p.LeadStatusID,
 		AppointmentAt:                 timeutil.StoredFromTimePtr(p.AppointmentAt),
@@ -63,6 +82,10 @@ func mapLeadToDomain(p persistencemodels.Lead) domain.Lead {
 }
 
 func mapLeadToPersistence(d domain.Lead) persistencemodels.Lead {
+	storeMasterID := d.StoreMasterID
+	if !persistencemodels.HasLeadStoreMasterIDColumn() {
+		storeMasterID = nil
+	}
 	return persistencemodels.Lead{
 		LeadID:                        d.LeadID,
 		ClientID:                      d.ClientID,
@@ -78,6 +101,8 @@ func mapLeadToPersistence(d domain.Lead) persistencemodels.Lead {
 		StateID:                       d.StateID,
 		Pincode:                       d.Pincode,
 		EmpID:                         stringPtrOrNil(d.EmpID),
+		StoreID:                       stringPtrOrNil(d.StoreID),
+		StoreMasterID:                 storeMasterID,
 		CollectionType:                d.CollectionType,
 		LeadStatusID:                  d.LeadStatusID,
 		AppointmentAt:                 timeutil.StoredToTimePtr(d.AppointmentAt),

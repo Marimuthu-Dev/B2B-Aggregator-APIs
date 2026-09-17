@@ -15,6 +15,7 @@ type LabRepository interface {
 	List(filter LabListFilter) ([]domain.Lab, int64, error)
 	FindByID(id int64) (*domain.Lab, error)
 	ExistsByID(id int64) (bool, error)
+	ExistsByContactPerson1Number(contactNumber string, excludeLabID int64) (bool, error)
 	Create(l *domain.Lab) error
 	Update(l *domain.Lab) error
 	UpdateLabMoUURL(labID int64, url string) error
@@ -23,6 +24,7 @@ type LabRepository interface {
 	FindByContactNumber(contactNumber string) (*domain.Lab, error)
 	FindByCity(cityID uint8) ([]domain.Lab, error)
 	FindByState(stateID uint8) ([]domain.Lab, error)
+	GetLabFullAddressAndMap(id int64) (string, string, error)
 }
 
 type labRepository struct {
@@ -33,14 +35,22 @@ func NewLabRepository(db *gorm.DB) LabRepository {
 	return &labRepository{db: db}
 }
 
+// gormLab omits MapLocationURL unless DB_SCHEMA is MedLyfe (column is absent on other schemas).
+func gormLab(db *gorm.DB) *gorm.DB {
+	if persistencemodels.HasLabMapLocationURLColumn() {
+		return db
+	}
+	return db.Omit("MapLocationURL")
+}
+
 func (r *labRepository) FindAll() ([]domain.Lab, error) {
 	var labs []persistencemodels.Lab
-	err := r.db.Find(&labs).Error
+	err := gormLab(r.db).Find(&labs).Error
 	return mapLabsToDomain(labs), err
 }
 
 func (r *labRepository) List(filter LabListFilter) ([]domain.Lab, int64, error) {
-	query := r.db.Model(&persistencemodels.Lab{})
+	query := gormLab(r.db.Model(&persistencemodels.Lab{}))
 	if filter.CityID != nil {
 		query = query.Where("CityID = ?", *filter.CityID)
 	}
@@ -95,7 +105,7 @@ func mapLabSortColumn(sortBy string) string {
 
 func (r *labRepository) FindByID(id int64) (*domain.Lab, error) {
 	var l persistencemodels.Lab
-	err := r.db.First(&l, id).Error
+	err := gormLab(r.db).First(&l, id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +115,24 @@ func (r *labRepository) FindByID(id int64) (*domain.Lab, error) {
 
 func (r *labRepository) ExistsByID(id int64) (bool, error) {
 	var count int64
-	if err := r.db.Model(&persistencemodels.Lab{}).Where("LabID = ?", id).Limit(1).Count(&count).Error; err != nil {
+	if err := gormLab(r.db.Model(&persistencemodels.Lab{})).Where("LabID = ?", id).Limit(1).Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (r *labRepository) ExistsByContactPerson1Number(contactNumber string, excludeLabID int64) (bool, error) {
+	contactNumber = strings.TrimSpace(contactNumber)
+	if contactNumber == "" {
+		return false, nil
+	}
+	q := gormLab(r.db.Model(&persistencemodels.Lab{})).Where("ContactPerson1Number = ?", contactNumber)
+	if excludeLabID > 0 {
+		q = q.Where("LabID <> ?", excludeLabID)
+	}
+	var count int64
+	// Do not use Limit() with Count(): SQL Server rejects ORDER BY on an aggregate.
+	if err := q.Count(&count).Error; err != nil {
 		return false, err
 	}
 	return count > 0, nil
@@ -113,7 +140,7 @@ func (r *labRepository) ExistsByID(id int64) (bool, error) {
 
 func (r *labRepository) Create(l *domain.Lab) error {
 	persist := mapLabToPersistence(*l)
-	if err := r.db.Create(&persist).Error; err != nil {
+	if err := gormLab(r.db).Create(&persist).Error; err != nil {
 		return err
 	}
 	*l = mapLabToDomain(persist)
@@ -122,7 +149,7 @@ func (r *labRepository) Create(l *domain.Lab) error {
 
 func (r *labRepository) Update(l *domain.Lab) error {
 	persist := mapLabToPersistence(*l)
-	if err := r.db.Save(&persist).Error; err != nil {
+	if err := gormLab(r.db).Save(&persist).Error; err != nil {
 		return err
 	}
 	*l = mapLabToDomain(persist)
@@ -130,25 +157,25 @@ func (r *labRepository) Update(l *domain.Lab) error {
 }
 
 func (r *labRepository) UpdateLabMoUURL(labID int64, url string) error {
-	return r.db.Model(&persistencemodels.Lab{}).
+	return gormLab(r.db.Model(&persistencemodels.Lab{})).
 		Where("LabID = ?", labID).
 		Update("MoUDocumentURL", url).Error
 }
 
 func (r *labRepository) Delete(id int64) error {
-	return r.db.Delete(&persistencemodels.Lab{}, id).Error
+	return gormLab(r.db).Delete(&persistencemodels.Lab{}, id).Error
 }
 
 func (r *labRepository) FindAllActive() ([]domain.Lab, error) {
 	var labs []persistencemodels.Lab
-	err := r.db.Where("IsActive = ?", true).Find(&labs).Error
+	err := gormLab(r.db).Where("IsActive = ?", true).Find(&labs).Error
 	return mapLabsToDomain(labs), err
 }
 
 func (r *labRepository) FindByContactNumber(contactNumber string) (*domain.Lab, error) {
 	fmt.Printf("[LOGIN] Repository.Lab.FindByContactNumber: entry contactNumber=%s\n", contactNumber)
 	var l persistencemodels.Lab
-	err := r.db.Where("ContactPerson1Number = ? OR ContactPerson1Number1 = ?", contactNumber, contactNumber).First(&l).Error
+	err := gormLab(r.db).Where("ContactPerson1Number = ? OR ContactPerson1Number1 = ?", contactNumber, contactNumber).First(&l).Error
 	if err != nil {
 		fmt.Printf("[LOGIN] Repository.Lab.FindByContactNumber: not found err=%v\n", err)
 		return nil, err
@@ -160,12 +187,32 @@ func (r *labRepository) FindByContactNumber(contactNumber string) (*domain.Lab, 
 
 func (r *labRepository) FindByCity(cityID uint8) ([]domain.Lab, error) {
 	var labs []persistencemodels.Lab
-	err := r.db.Where("CityID = ?", cityID).Find(&labs).Error
+	err := gormLab(r.db).Where("CityID = ?", cityID).Find(&labs).Error
 	return mapLabsToDomain(labs), err
 }
 
 func (r *labRepository) FindByState(stateID uint8) ([]domain.Lab, error) {
 	var labs []persistencemodels.Lab
-	err := r.db.Where("StateID = ?", stateID).Find(&labs).Error
+	err := gormLab(r.db).Where("StateID = ?", stateID).Find(&labs).Error
 	return mapLabsToDomain(labs), err
+}
+
+func (r *labRepository) GetLabFullAddressAndMap(id int64) (string, string, error) {
+	var result struct {
+		Address        string
+		MapLocationURL string
+	}
+	query := fmt.Sprintf(`
+		SELECT COALESCE(l.Address, '') + ', ' + COALESCE(c.CityName, '') + ', ' + COALESCE(s.StateName, '') as Address,
+		       COALESCE(l.MapLocationURL, '') as MapLocationURL
+		FROM %s l
+		LEFT JOIN %s c ON l.CityID = c.CityID
+		LEFT JOIN %s s ON l.StateID = s.StateID
+		WHERE l.LabID = ?
+	`, persistencemodels.Table("tbl_LabMaster"), persistencemodels.Table("tbl_CityMaster"), persistencemodels.Table("tbl_StateMaster"))
+	err := r.db.Raw(query, id).Scan(&result).Error
+	if err != nil {
+		return "", "", err
+	}
+	return strings.Trim(strings.TrimSpace(result.Address), ","), result.MapLocationURL, nil
 }

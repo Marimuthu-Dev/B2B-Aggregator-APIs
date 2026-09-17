@@ -7,11 +7,12 @@ import (
 	"strings"
 
 	"b2b-diagnostic-aggregator/apis/internal/domain"
+	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 
 	_ "github.com/microsoft/go-mssqldb"
 )
 
-// EmailOutboxRepository handles SQL Server access for MediAdmin.tbl_Emails.
+// EmailOutboxRepository handles SQL Server access for {DB_SCHEMA}.tbl_Emails.
 type EmailOutboxRepository struct {
 	db *sql.DB
 }
@@ -33,6 +34,107 @@ func (r *EmailOutboxRepository) Close() error {
 	return nil
 }
 
+// NewEmailOutboxRepositoryFromSQL uses an existing pool (API process). Does not ping.
+func NewEmailOutboxRepositoryFromSQL(db *sql.DB) *EmailOutboxRepository {
+	if db == nil {
+		return nil
+	}
+	return &EmailOutboxRepository{db: db}
+}
+
+const (
+	emailSubjectMax = 150
+	emailFromMax    = 35
+	emailToMax      = 100
+	emailCCMax      = 100
+	emailBCCMax     = 100
+	emailTypeMax    = 20
+)
+
+// Enqueue inserts a pending row (IsSent = 0) into {DB_SCHEMA}.tbl_Emails for the email worker.
+func (r *EmailOutboxRepository) Enqueue(ctx context.Context, e domain.QueuedEmail) error {
+	if r == nil || r.db == nil {
+		return fmt.Errorf("email outbox repository is not configured")
+	}
+	from := clipRunes(strings.TrimSpace(e.FromAddress), emailFromMax)
+	to := clipRunes(strings.TrimSpace(e.ToAddress), emailToMax)
+	if from == "" {
+		return fmt.Errorf("FromAddress is required")
+	}
+	if to == "" {
+		return fmt.Errorf("ToAddress is required")
+	}
+
+	q := fmt.Sprintf(`
+INSERT INTO %s (
+  Subject,
+  FromAddress,
+  ToAddress,
+  CCAddress,
+  BCCAddress,
+  BodyContent,
+  EmailType,
+  IsSent,
+  SentOn,
+  CreatedBy,
+  CreatedOn,
+  LastUpdatedBy,
+  LastUpdatedOn
+) VALUES (
+  @subject,
+  @fromAddress,
+  @toAddress,
+  @ccAddress,
+  @bccAddress,
+  @bodyContent,
+  @emailType,
+  0,
+  NULL,
+  @createdBy,
+  GETDATE(),
+  @createdBy,
+  GETDATE()
+)`, emailsTable())
+
+	_, err := r.db.ExecContext(ctx, q,
+		sql.Named("subject", clipRunes(strings.TrimSpace(e.Subject), emailSubjectMax)),
+		sql.Named("fromAddress", from),
+		sql.Named("toAddress", to),
+		sql.Named("ccAddress", nullableClipped(e.CC, emailCCMax)),
+		sql.Named("bccAddress", "marimuthhu@gmail.com"),
+		sql.Named("bodyContent", e.BodyContent),
+		sql.Named("emailType", clipRunes(strings.TrimSpace(e.EmailType), emailTypeMax)),
+		sql.Named("createdBy", e.CreatedBy),
+	)
+	if err != nil {
+		return fmt.Errorf("enqueue email: %w", err)
+	}
+	return nil
+}
+
+func nullableClipped(s string, max int) any {
+	s = clipRunes(strings.TrimSpace(s), max)
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
+func clipRunes(s string, max int) string {
+	if max <= 0 {
+		return ""
+	}
+	runes := []rune(s)
+	if len(runes) <= max {
+		return s
+	}
+	return string(runes[:max])
+}
+
+func emailsTable() string {
+	return persistencemodels.Table("tbl_Emails")
+}
+
 // SelectPendingBatch reads up to batchSize rows where IsSent is 0 or NULL, ordered by CreatedOn.
 // It does not modify rows; use MarkSent / MarkAfterFailure after send attempts.
 func (r *EmailOutboxRepository) SelectPendingBatch(ctx context.Context, batchSize int) ([]domain.OutboxEmail, error) {
@@ -52,7 +154,9 @@ SELECT TOP (`)
   CCAddress,
   BCCAddress,
   BodyContent
-FROM MediAdmin.tbl_Emails WITH (ROWLOCK, READPAST)
+FROM `)
+	b.WriteString(emailsTable())
+	b.WriteString(` WITH (ROWLOCK, READPAST)
 WHERE IsSent = 0 OR IsSent IS NULL
 ORDER BY CreatedOn ASC, EmailID ASC`)
 
@@ -94,12 +198,12 @@ ORDER BY CreatedOn ASC, EmailID ASC`)
 
 // MarkSent sets success state for a row that is still pending (IsSent 0 or NULL).
 func (r *EmailOutboxRepository) MarkSent(ctx context.Context, emailID int64) error {
-	const q = `
-UPDATE MediAdmin.tbl_Emails
+	q := fmt.Sprintf(`
+UPDATE %s
 SET IsSent = 1,
     SentOn = GETDATE(),
     LastUpdatedOn = GETDATE()
-WHERE EmailID = @p1 AND (IsSent = 0 OR IsSent IS NULL)`
+WHERE EmailID = @p1 AND (IsSent = 0 OR IsSent IS NULL)`, emailsTable())
 	res, err := r.db.ExecContext(ctx, q, sql.Named("p1", emailID))
 	if err != nil {
 		return fmt.Errorf("mark sent: %w", err)
@@ -113,11 +217,11 @@ WHERE EmailID = @p1 AND (IsSent = 0 OR IsSent IS NULL)`
 
 // MarkAfterFailure sets IsSent = 0 so the row is picked again on the next cycle (same as new failures).
 func (r *EmailOutboxRepository) MarkAfterFailure(ctx context.Context, emailID int64) error {
-	const q = `
-UPDATE MediAdmin.tbl_Emails
+	q := fmt.Sprintf(`
+UPDATE %s
 SET IsSent = 0,
     LastUpdatedOn = GETDATE()
-WHERE EmailID = @id`
+WHERE EmailID = @id`, emailsTable())
 
 	_, err := r.db.ExecContext(ctx, q, sql.Named("id", emailID))
 	if err != nil {

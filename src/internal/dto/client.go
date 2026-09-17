@@ -13,8 +13,8 @@ type ClientRequest struct {
 	ClientID                  int64      `binding:"omitempty"`
 	ClientName                string     `binding:"required"`
 	Address                   string     `binding:"required"`
-	CityID                    int8       `binding:"required"`
-	StateID                   int8       `binding:"required"`
+	CityID                    int16      `binding:"required"`
+	StateID                   int16      `binding:"required"`
 	Pincode                   string     `binding:"required"`
 	ContactPerson1Name        string     `binding:"required"`
 	ContactPerson1Number      string     `binding:"required"`
@@ -32,6 +32,8 @@ type ClientRequest struct {
 	BillingPincode            *string    `binding:"omitempty"`
 	ClientTypeID              *int8      `json:"ClientTypeID" binding:"omitempty"`
 	IsAcitve                  bool       `binding:"omitempty"`
+	// IsStoreLoginEnabled omitted or JSON null on POST → persisted as false.
+	IsStoreLoginEnabled       *bool      `json:"IsStoreLoginEnabled" binding:"omitempty"`
 	MOUStartDate              *time.Time `json:"MOUStartDate" binding:"omitempty"`
 	MOUEndDate                *time.Time `json:"MOUEndDate" binding:"omitempty"`
 	// Brands optional. JSON null, [], or omitted → no rows in tbl_ClientBrandMapping.
@@ -63,8 +65,8 @@ func ValidateClientBrandNames(names []string) error {
 type ClientUpdateRequest struct {
 	ClientName                *string    `json:"ClientName"`
 	Address                   *string    `json:"Address"`
-	CityID                    *int8      `json:"CityID"`
-	StateID                   *int8      `json:"StateID"`
+	CityID                    *int16     `json:"CityID"`
+	StateID                   *int16     `json:"StateID"`
 	Pincode                   *string    `json:"Pincode"`
 	ContactPerson1Name        *string    `json:"ContactPerson1Name"`
 	ContactPerson1Number      *string    `json:"ContactPerson1Number"`
@@ -82,6 +84,8 @@ type ClientUpdateRequest struct {
 	BillingPincode            *string    `json:"BillingPincode"`
 	ClientTypeID              *int8      `json:"ClientTypeID"`
 	IsAcitve                  *bool      `json:"IsAcitve"`
+	// IsStoreLoginEnabled omitted or JSON null on PUT → column is not updated.
+	IsStoreLoginEnabled       *bool      `json:"IsStoreLoginEnabled"`
 	MOUStartDate              *time.Time `json:"MOUStartDate"`
 	MOUEndDate                *time.Time `json:"MOUEndDate"`
 	// Brands: nil or JSON null (omitted) or [] or only whitespace → do not change tbl_ClientBrandMapping.
@@ -95,15 +99,15 @@ func (r ClientUpdateRequest) HasAtLeastOneField() bool {
 		r.ContactPerson2Name != nil || r.ContactPerson2Number != nil || r.ContactPerson2EmailID != nil || r.ContactPerson2Designation != nil ||
 		r.GSTIN_UIN != nil || r.PANNumber != nil || r.BusinessVertical != nil ||
 		r.BillingName != nil || r.BillingAdderss != nil || r.BillingPincode != nil || r.ClientTypeID != nil || r.IsAcitve != nil ||
-		r.MOUStartDate != nil || r.MOUEndDate != nil ||
+		r.MOUStartDate != nil || r.MOUEndDate != nil || r.IsStoreLoginEnabled != nil ||
 		(r.Brands != nil && len(*r.Brands) > 0)
 }
 
 type ClientLocationRequest struct {
 	Address  string `json:"Address" binding:"omitempty"`
 	Pincode  string `json:"Pincode" binding:"omitempty"`
-	CityID   int8   `json:"CityID" binding:"required"`
-	StateID  int8   `json:"StateID" binding:"required"`
+	CityID   int16  `json:"CityID" binding:"required"`
+	StateID  int16  `json:"StateID" binding:"required"`
 	IsActive *bool  `json:"IsActive" binding:"omitempty"`
 }
 
@@ -111,8 +115,8 @@ type ClientLocationRequest struct {
 type ClientLocationUpdateRequest struct {
 	Address  *string `json:"Address"`
 	Pincode  *string `json:"Pincode"`
-	CityID   *int8   `json:"CityID"`
-	StateID  *int8   `json:"StateID"`
+	CityID   *int16  `json:"CityID"`
+	StateID  *int16  `json:"StateID"`
 	IsActive *bool   `json:"IsActive"`
 }
 
@@ -159,9 +163,17 @@ func (r ClientRequest) ToDomain() domain.Client {
 		BillingPincode:            r.BillingPincode,
 		ClientTypeID:              r.ClientTypeID,
 		IsAcitve:                  r.IsAcitve,
+		IsStoreLoginEnabled:       boolFromOptional(r.IsStoreLoginEnabled, false),
 		MOUStartDate:              timeutil.FromTimePtr(r.MOUStartDate),
 		MOUEndDate:                timeutil.FromTimePtr(r.MOUEndDate),
 	}
+}
+
+func boolFromOptional(v *bool, defaultVal bool) bool {
+	if v == nil {
+		return defaultVal
+	}
+	return *v
 }
 
 // ClientMoUDownloadURLResponse is returned by GET /api/v1/clients/:id/mou/download-url (SAS link for viewing the PDF).

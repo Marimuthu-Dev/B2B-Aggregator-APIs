@@ -17,6 +17,9 @@ type Lead struct {
 	StateID                       int32      `gorm:"column:StateID;not null"`
 	Pincode                       string     `gorm:"column:Pincode;type:varchar(6);not null"`
 	EmpID                         *string    `gorm:"column:EmpID;type:varchar(10)"`
+	StoreID                       *string    `gorm:"column:StoreID;type:varchar(15)"`
+	// StoreMasterID exists only on MedLyfe.tbl_Leads. GORM omits it when DB_SCHEMA is not MedLyfe.
+	StoreMasterID                 *int64     `gorm:"column:StoreMasterID"`
 	CollectionType                string     `gorm:"column:CollectionType;type:varchar(10);not null;default:Center"`
 	LeadStatusID                  int8       `gorm:"column:LeadStatusID;not null"`
 	LabID                         *int64     `gorm:"column:LabID"`
@@ -37,7 +40,7 @@ type Lead struct {
 }
 
 func (Lead) TableName() string {
-	return "MediAdmin.tbl_Leads"
+	return Table("tbl_Leads")
 }
 
 type LeadHistory struct {
@@ -49,5 +52,5 @@ type LeadHistory struct {
 }
 
 func (LeadHistory) TableName() string {
-	return "MediAdmin.tbl_LeadsHistory"
+	return Table("tbl_LeadsHistory")
 }

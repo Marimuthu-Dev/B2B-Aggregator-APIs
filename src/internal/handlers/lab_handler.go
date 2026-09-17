@@ -12,6 +12,7 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/apperrors"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
 	"b2b-diagnostic-aggregator/apis/internal/middleware"
+	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/service"
 
@@ -62,6 +63,18 @@ func parsePincodesCSV(data []byte) (string, error) {
 		}
 	}
 	return strings.Join(pincodes, ","), nil
+}
+
+func ignoreLabMapLocationURLIfUnsupported(create *dto.LabRequest, update *dto.LabUpdateRequest) {
+	if persistencemodels.HasLabMapLocationURLColumn() {
+		return
+	}
+	if create != nil {
+		create.MapLocationURL = nil
+	}
+	if update != nil {
+		update.MapLocationURL = nil
+	}
 }
 
 type LabHandler struct {
@@ -174,6 +187,7 @@ func (h *LabHandler) Create(c *gin.Context) {
 			respondError(c, apperrors.NewBadRequest("Invalid JSON in data field: "+err.Error(), err))
 			return
 		}
+		ignoreLabMapLocationURLIfUnsupported(&req, nil)
 		file, err := c.FormFile(labCollectionPincodesFileField)
 		if err == nil && file != nil {
 			f, openErr := file.Open()
@@ -223,6 +237,7 @@ func (h *LabHandler) Create(c *gin.Context) {
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
+	ignoreLabMapLocationURLIfUnsupported(&req, nil)
 	lab := req.ToDomain()
 	if err := h.svc.CreateLab(&lab, userID); err != nil {
 		respondError(c, err)
@@ -264,6 +279,7 @@ func (h *LabHandler) Update(c *gin.Context) {
 				return
 			}
 		}
+		ignoreLabMapLocationURLIfUnsupported(nil, &req)
 		file, err := c.FormFile(labCollectionPincodesFileField)
 		if err == nil && file != nil {
 			f, openErr := file.Open()
@@ -309,6 +325,7 @@ func (h *LabHandler) Update(c *gin.Context) {
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
+	ignoreLabMapLocationURLIfUnsupported(nil, &req)
 	if !req.HasAtLeastOneField() {
 		respondError(c, apperrors.NewBadRequest("At least one field is required in the payload to update", nil))
 		return

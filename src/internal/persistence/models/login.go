@@ -12,5 +12,5 @@ type Login struct {
 }
 
 func (Login) TableName() string {
-	return "MediAdmin.tbl_Login"
+	return Table("tbl_Login")
 }

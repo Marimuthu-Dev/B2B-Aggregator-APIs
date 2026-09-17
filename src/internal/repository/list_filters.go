@@ -17,8 +17,8 @@ type ClientListFilter struct {
 	PageSize       int
 	SortBy         string
 	SortOrder      string
-	CityID         *int8
-	StateID        *int8
+	CityID         *int16
+	StateID        *int16
 	IsActive       *bool
 	MouStatuses    []string // active, expired, expiringSoon — OR semantics
 	MouExpiryRange *MouExpiryDateRange
@@ -49,6 +49,14 @@ type LeadListFilter struct {
 	StatusID         *int8
 	PackageID        *int
 	CollectionType   *string
+	StoreID          *string
+	StoreMasterID    *int64
+	// StoreCityID filters joined tbl_StoreMaster.CityID.
+	StoreCityID *int16
+	// StoreStateID filters joined tbl_StoreMaster.StateID.
+	StoreStateID *int16
+	// RestrictToStoreID is set from a store JWT (userType 4). Matches StoreMasterID or StoreID varchar.
+	RestrictToStoreID *int64
 	Search           string
 	FitnessStatus    domain.LeadListFitnessFilter
 	// AppointmentAtMin is inclusive lower bound (appointmentAtFrom at 00:00:00 IST); nil = no lower filter.

@@ -1,5 +1,5 @@
-# Build stage (Go 1.25 to match go.mod)
-FROM golang:1.25-alpine AS builder
+# Build stage (Go 1.27 to match go.mod)
+FROM golang:1.27-alpine AS builder
 
 WORKDIR /app
 

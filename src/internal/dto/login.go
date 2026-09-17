@@ -11,6 +11,7 @@ type LoginRequest struct {
 // LoginResponse returns user data and tokens
 type LoginResponse struct {
 	User         interface{} `json:"User"`
+	UserType     int         `json:"UserType"`
 	Token        string      `json:"Token"`
 	RefreshToken string      `json:"RefreshToken"`
 }

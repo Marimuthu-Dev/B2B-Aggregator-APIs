@@ -1,6 +1,8 @@
 package app
 
 import (
+	"context"
+	"database/sql"
 	"log"
 	"log/slog"
 	"os"
@@ -56,9 +58,24 @@ func Run() error {
 	leadUow := repository.NewLeadUnitOfWork(db)
 	testRepo := repository.NewTestRepository(db)
 
+	var sqlDB *sql.DB
+	if db != nil {
+		var sqlErr error
+		sqlDB, sqlErr = db.DB()
+		if sqlErr != nil {
+			log.Printf("Failed to get sql.DB: %v", sqlErr)
+		}
+	}
+	
 	// Initialize Services
+	whatsappRepo := repository.NewWhatsAppRepositoryFromSQL(sqlDB)
+	whatsappTemplateRepo, err := repository.NewWhatsAppTemplateRepository(context.Background(), sqlDB)
+	if err != nil {
+		log.Printf("Failed to initialize WhatsApp template repo: %v", err)
+	}
+	
 	packageSvc := service.NewPackageService(packageRepo, testRepo, packageClientMapRepo, packageLabMapRepo, clientRepo, labRepo)
-	loginSvc := service.NewLoginService(loginRepo, forgotPasswordRepo, clientRepo, employeeRepo, labRepo, cfg.JWT)
+	storeRepo := repository.NewStoreRepository(db)
 	var blobSvc service.BlobService
 	ab := cfg.AzureBlob
 	blobConfigured := strings.TrimSpace(ab.ConnectionString) != "" ||
@@ -71,21 +88,28 @@ func Run() error {
 			blobSvc = bs
 		}
 	}
-	clientSvc := service.NewClientService(clientRepo, blobSvc)
+	var emailOutbox *repository.EmailOutboxRepository
+	if sqlDB != nil {
+		emailOutbox = repository.NewEmailOutboxRepositoryFromSQL(sqlDB)
+	}
+	loginSvc := service.NewLoginService(loginRepo, forgotPasswordRepo, clientRepo, employeeRepo, labRepo, storeRepo, cfg.JWT, emailOutbox, cfg.Email, cfg.Domains)
+	clientSvc := service.NewClientService(clientRepo, blobSvc, storeRepo, emailOutbox, forgotPasswordRepo, cfg.Email, cfg.Domains.Client)
 	clientLocationSvc := service.NewClientLocationService(clientLocationRepo)
-	employeeSvc := service.NewEmployeeService(employeeRepo)
-	labSvc := service.NewLabService(labRepo, blobSvc)
-	leadSvc := service.NewLeadService(leadRepo, leadUow, clientRepo, packageRepo, labRepo, blobSvc)
+	employeeSvc := service.NewEmployeeService(employeeRepo, emailOutbox, forgotPasswordRepo, cfg.Email, cfg.Domains.Employee)
+	labSvc := service.NewLabService(labRepo, blobSvc, emailOutbox, forgotPasswordRepo, cfg.Email, cfg.Domains.Lab)
+	storeSvc := service.NewStoreService(storeRepo, clientRepo, emailOutbox, forgotPasswordRepo, cfg.Email, cfg.Domains.Store)
+	leadSvc := service.NewLeadService(leadRepo, leadUow, clientRepo, packageRepo, labRepo, storeRepo, blobSvc, whatsappRepo, whatsappTemplateRepo)
 	testSvc := service.NewTestService(testRepo)
 
 	// Initialize Handlers
-	packageHandler := handlers.NewPackageHandler(packageSvc)
+	packageHandler := handlers.NewPackageHandler(packageSvc, storeSvc)
 	loginHandler := handlers.NewLoginHandler(loginSvc)
 	clientHandler := handlers.NewClientHandler(clientSvc)
 	clientLocationHandler := handlers.NewClientLocationHandler(clientLocationSvc)
 	employeeHandler := handlers.NewEmployeeHandler(employeeSvc)
 	labHandler := handlers.NewLabHandler(labSvc)
-	leadHandler := handlers.NewLeadHandler(leadSvc)
+	storeHandler := handlers.NewStoreHandler(storeSvc)
+	leadHandler := handlers.NewLeadHandler(leadSvc, storeSvc)
 	testHandler := handlers.NewTestHandler(testSvc)
 
 	// Initialize Gin
@@ -95,14 +119,15 @@ func Run() error {
 	registerMiddleware(r, dbReady)
 
 	registerRoutes(r, cfg.JWT.Secret, routeDeps{
-		packageHandler: packageHandler,
-		loginHandler:   loginHandler,
+		packageHandler:        packageHandler,
+		loginHandler:          loginHandler,
 		clientHandler:         clientHandler,
 		clientLocationHandler: clientLocationHandler,
 		employeeHandler:       employeeHandler,
 		labHandler:            labHandler,
-		leadHandler:    leadHandler,
-		testHandler:   testHandler,
+		storeHandler:          storeHandler,
+		leadHandler:           leadHandler,
+		testHandler:           testHandler,
 	})
 
 	// Azure App Service and cloud platforms set PORT env; default 8080

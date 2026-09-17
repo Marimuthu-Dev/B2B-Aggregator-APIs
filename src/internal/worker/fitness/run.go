@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"b2b-diagnostic-aggregator/apis/internal/config"
@@ -164,6 +166,15 @@ func processLead(ctx context.Context, d Deps, lead domain.Lead, log *slog.Logger
 		slog.String("chromium", chromium),
 		slog.String("templateDir", d.Config.TemplateDir),
 	)
+	if p := strings.TrimSpace(d.Config.ChromiumPath); p != "" {
+		depsShm := filepath.Join(filepath.Dir(filepath.Dir(filepath.Clean(p))), "chrome-linux-deps", "usr", "lib", "x86_64-linux-gnu", "libxcb-shm.so.0")
+		if _, err := os.Stat(depsShm); err != nil {
+			log.Warn("fitness cert: bundled libxcb-shm.so.0 not found next to chrome",
+				slog.String("expected", depsShm),
+				slog.String("err", err.Error()),
+			)
+		}
+	}
 	certPDF, err := fitnesscert.HTMLToPDF(ctx, html, d.Config.ChromiumPath, d.Config.TemplateDir)
 	if err != nil {
 		return fmt.Errorf("html to pdf: %w", err)

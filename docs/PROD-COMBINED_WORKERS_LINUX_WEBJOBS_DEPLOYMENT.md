@@ -1,9 +1,14 @@
-# PROD — Combined Linux WebJobs: `fitness-worker` + `email-worker` (single deploy)
+# PROD — Combined Linux WebJobs: `fitness-worker` + `email-worker` + `whatsapp-worker` (single deploy, 3 jobs)
 
-Deploy **both** triggered WebJobs in **one** package under `App_Data/jobs/triggered/`, so every release replaces **all** worker jobs together and nothing is left behind from an older single-job zip.
+Deploy **all three** triggered WebJobs in **one** package under `App_Data/jobs/triggered/`, so every release replaces **all** worker jobs together and nothing is left behind from an older single-job zip.
 
 **Target App Service (example):** `um-prod-worker-process`  
-**Single-job references:** [PROD — fitness-worker](./PROD-FITNESS_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md), [PROD — email-worker](./PROD-EMAIL_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md) (application settings, troubleshooting).
+**Single-job references:**
+- [PROD — fitness-worker](./PROD-FITNESS_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md)
+- [PROD — email-worker](./PROD-EMAIL_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md)
+- [WHATSAPP_WORKER_README.md](../../WHATSAPP_WORKER_README.md)
+
+See those files for application settings, SQL scripts, and troubleshooting.
 
 **Reusable build + zip:** `scripts/deploy-all-workers.sh` in this repository (from repo root).
 
@@ -14,7 +19,7 @@ Deploy **both** triggered WebJobs in **one** package under `App_Data/jobs/trigge
 | Approach | Behavior |
 |----------|----------|
 | **Portal → WebJobs → Add** (per job) | Each upload is its own zip; fine for small teams. |
-| **Combined layout** (this doc) | One tree: `App_Data/jobs/triggered/<job-name>/run.sh` + binaries (+ `templates/` for fitness). **Redeploy always includes every job** so you never overwrite only one half of production. |
+| **Combined layout** (this doc) | One tree: `App_Data/jobs/triggered/<job-name>/run.sh` + binaries (+ `templates/` for fitness). **Redeploy always includes every job** so you never overwrite only one half of production.** |
 
 Official layout: [Develop and deploy WebJobs](https://learn.microsoft.com/en-us/azure/app-service/webjobs-create).
 
@@ -29,7 +34,7 @@ Official layout: [Develop and deploy WebJobs](https://learn.microsoft.com/en-us/
 
 ---
 
-## Final folder layout (inside the zip)
+## Final folder layout (inside the zip) (3 jobs)
 
 ```text
 App_Data/
@@ -39,24 +44,44 @@ App_Data/
         run.sh                 # from src/run-fitness-worker.sh
         fitness-worker         # Linux amd64 binary
         templates/             # required for fitness-worker (HTML templates)
-        chrome-linux64/        # optional; only if you bundle Chrome for Testing
+        chrome-linux64/        # required for HTML→PDF (Chrome for Testing linux64)
+        chrome-linux-deps/     # required on App Service Code (bundled .so libs; no root apt)
       email-worker-job/
         run.sh                 # from src/run-email-worker.sh
         email-worker           # Linux amd64 binary
+      whatsapp-worker-job/   # <-- NEW 3rd job
+        run.sh                 # from src/run-whatsapp-worker.sh
+        whatsapp-worker      # Linux amd64 binary
 ```
 
-Each job directory name (`fitness-worker-job`, `email-worker-job`) becomes the WebJob name in the portal and in the SCM API.
+Each job directory name (`fitness-worker-job`, `email-worker-job`, `whatsapp-worker-job`) becomes the WebJob name in the portal and in the SCM API.
 
-**Do not** copy both the binary and the script onto the same destination path (a common mistake). Copy **`run-fitness-worker.sh` → `run.sh`** and **`fitness-worker`** as **two separate files** inside the same job folder (same for email).
+**Do not** copy both the binary and the script onto the same destination path (a common mistake). Copy **`run-*-worker.sh` → `run.sh`** and the binary as **two separate files** inside the same job folder (same for all 3 jobs).
 
 ---
 
-## Step 1 — Application settings (unchanged)
+## Step 1 — Application settings (unchanged + WhatsApp required — add WhatsApp env settings**
 
-Configure **`um-prod-worker-process`** exactly as the two single-job guides describe (DB, blob, fitness vars, email / ACS vars, `WEBSITE_SKIP_RUNNING_KUDUAGENT=false`, **Always On** where supported):
+Configure **`um-prod-worker-process`** exactly as the three single-job guides describe (DB, blob, fitness vars, email / ACS vars, WhatsApp vars, `WEBSITE_SKIP_RUNNING_KUDUAGENT=false`, **Always On** where supported):
 
 - [PROD — fitness-worker — Step 1](./PROD-FITNESS_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md#step-1-application-settings)
 - [PROD — email-worker — Step 1](./PROD-EMAIL_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md#step-1-application-settings-production)
+- [WHATSAPP_WORKER_README.md](../../WHATSAPP_WORKER_README.md)
+
+### WhatsApp worker — required env (see [WHATSAPP_WORKER_README.md](../../WHATSAPP_WORKER_README.md)):
+
+| Setting | Example | Notes |
+|---------|---------|-------|
+| `WHATSAPP_CPAAS_API_KEY` | `<32-char-key` | Mandatory — cpaaslink.com API key |
+| `WHATSAPP_CPAAS_ENDPOINT` | `https://cpaaslink.com/api/whatsapp/public/apikey` | Leave default; the worker dynamically swaps the suffix (`/apikey` ↔ `/mm-lite` based on each message's `TemplateType` |
+| `WHATSAPP_DEFAULT_TEMPLATE_NAME` | `medlyfe_default_template` | Used as default template name |
+| `WHATSAPP_CAMPAIGN_NAME` | `default_campaign` | default campaign name |
+| `WHATSAPP_WORKER_BATCH_SIZE` | `10 | rows per batch |
+| `WHATSAPP_WORKER_POLL_INTERVAL` | `1m` | Interval between polls when there was work in the previous batch |
+| `WHATSAPP_WORKER_IDLE_WAIT` | `5m` | Idle wait when the previous batch was empty |
+| `WHATSAPP_WORKER_SEND_TIMEOUT` | `30s` | HTTP timeout per message send |
+| `WHATSAPP_WORKER_SINGLE_BATCH` | `true` | **Must be `true` for triggered WebJob** — run one batch and exit** (the schedule runs it again).**) |
+| `WHATSAPP_USE_MM_LITE` | `false` | legacy global override — kept for backwards compat; TemplateType drives endpoint; TemplateType **per-message endpoint selection preferred over this global setting |
 
 `ACS_CONNECTION_STRING` must be the full ACS string: `endpoint=https://...;accesskey=...` (see [EMAIL_WORKER.md](./EMAIL_WORKER.md)).
 
@@ -66,38 +91,91 @@ Configure **`um-prod-worker-process`** exactly as the two single-job guides desc
 
 Go module root is **`src/`** (where `go.mod` lives).
 
-### Option B — Manual commands
+### Option A (recommended) — `scripts/deploy-all-workers.sh (from repo root)
 
 ```bash
+cd /mnt/d/Code/MMK_Projects/B2B-Diagnostic-Aggregator/GitHub/B2B-Aggregator-APIs
+./scripts/deploy-all-workers.sh
+```
+
+Output zip created at `build/worker-combined.zip`.
+
+### Option B — Manual commands
+
+Run in **WSL/bash on your laptop** (repo on `/mnt/d/...`). Do **not** run this in Azure Kudu SSH or plain Windows PowerShell — there is no `src/templates` or local `chrome-linux64` there.
+
+Preflight first
+
+```
 cd /mnt/d/Code/MMK_Projects/B2B-Diagnostic-Aggregator/GitHub/B2B-Aggregator-APIs/src
+pwd
+ls templates chrome-linux64/chrome chrome-linux-deps
+```
 
-# Binaries
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o fitness-worker ./cmd/fitness-worker
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o email-worker   ./cmd/email-worker
+```bash
+# WSL/bash — repo root
+REPO_ROOT="/mnt/d/Code/MMK_Projects/B2B-Diagnostic-Aggregator/GitHub/B2B-Aggregator-APIs
+SRC="$REPO_ROOT/src
+cd "$SRC"
 
-REPO_ROOT="$(cd .. && pwd)"
+# Preflight (must all succeed)
+ls -la templates/certificate_1.html chrome-linux64/chrome run-fitness-worker.sh run-whatsapp-worker.sh
+ls -d chrome-linux-deps/usr chrome-linux-deps/lib 2>/dev/null || ls -d chrome-linux-deps/usr
+# If chrome-linux-deps missing: (cd "$REPO_ROOT" && ./scripts/bundle-chrome-linux-deps.sh)
+
+# Binaries (3 workers)
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o fitness-worker  ./cmd/fitness-worker
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o email-worker    ./cmd/email-worker
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o whatsapp-worker ./cmd/whatsapp-worker
+
 BUILD="$REPO_ROOT/build/webjobs-combined"
 rm -rf "$BUILD"
 FITNESS_JOB="$BUILD/App_Data/jobs/triggered/fitness-worker-job"
 EMAIL_JOB="$BUILD/App_Data/jobs/triggered/email-worker-job"
-mkdir -p "$FITNESS_JOB" "$EMAIL_JOB"
+WHATSAPP_JOB="$BUILD/App_Data/jobs/triggered/whatsapp-worker-job"
+mkdir -p "$FITNESS_JOB" "$EMAIL_JOB" "$WHATSAPP_JOB"
 
-# Fitness job: binary + run.sh + templates (and optional Chromium tree)
-cp fitness-worker run-fitness-worker.sh "$FITNESS_JOB/"
+# Fitness job: binary + run.sh + templates + Chromium + deps
+cp "$SRC/fitness-worker" "$SRC/run-fitness-worker.sh" "$FITNESS_JOB/"
 mv "$FITNESS_JOB/run-fitness-worker.sh" "$FITNESS_JOB/run.sh"
-cp -r templates "$FITNESS_JOB/"
-# Optional: cp -r /path/to/chrome-linux64 "$FITNESS_JOB/"
+cp -r "$SRC/templates" "$FITNESS_JOB/"
+if [ ! -f "$SRC/chrome-linux64/chrome" ]; then
+  echo "ERROR: $SRC/chrome-linux64/chrome missing."
+  exit 1
+fi
+cp -a "$SRC/chrome-linux64" "$FITNESS_JOB/"
+if [ ! -d "$SRC/chrome-linux-deps/usr" ] && [ ! -d "$SRC/chrome-linux-deps/lib" ]; then
+  echo "ERROR: $SRC/chrome-linux-deps missing. Run: $REPO_ROOT/scripts/bundle-chrome-linux-deps.sh"
+  exit 1
+fi
+cp -a "$SRC/chrome-linux-deps" "$FITNESS_JOB/"
 
-# Email job: binary + run.sh only
-cp email-worker run-email-worker.sh "$EMAIL_JOB/"
+# Email job
+cp "$SRC/email-worker" "$SRC/run-email-worker.sh" "$EMAIL_JOB/"
 mv "$EMAIL_JOB/run-email-worker.sh" "$EMAIL_JOB/run.sh"
 
-chmod +x "$FITNESS_JOB/run.sh" "$FITNESS_JOB/fitness-worker" "$EMAIL_JOB/run.sh" "$EMAIL_JOB/email-worker"
+# WhatsApp job (3rd worker)
+cp "$SRC/whatsapp-worker" "$SRC/run-whatsapp-worker.sh" "$WHATSAPP_JOB/"
+mv "$WHATSAPP_JOB/run-whatsapp-worker.sh" "$WHATSAPP_JOB/run.sh"
+
+chmod +x "$FITNESS_JOB/run.sh" "$FITNESS_JOB/fitness-worker" "$FITNESS_JOB/chrome-linux64/chrome" \
+  "$EMAIL_JOB/run.sh" "$EMAIL_JOB/email-worker" \
+  "$WHATSAPP_JOB/run.sh" "$WHATSAPP_JOB/whatsapp-worker"
 
 mkdir -p "$REPO_ROOT/build"
 cd "$BUILD"
 zip -r "$REPO_ROOT/build/worker-combined.zip" App_Data
 ```
+
+**Before zip deploy:** confirm the fitness job folder (or zip) contains `chrome-linux64/chrome` **and** `chrome-linux-deps/` (shared libraries). App Service Kudu users are **not root** — `apt install chromium` will always fail with Permission denied; do not rely on apt on the server.
+
+App setting on the worker app:
+
+| Setting | Value |
+|--------|--------|
+| `CHROMIUM_PATH` | `./chrome-linux64/chrome` |
+
+`scripts/deploy-all-workers.sh` copies `src/chrome-linux64` and `src/chrome-linux-deps` when present. Build deps with `./scripts/bundle-chrome-linux-deps.sh` (once, or when Chrome libs change).
 
 ---
 
@@ -117,6 +195,14 @@ az webapp deployment source config-zip \
   --src build/worker-combined.zip
 ```
 
+```bash
+cd /mnt/d/Code/MMK_Projects/B2B-Diagnostic-Aggregator/GitHub/B2B-Aggregator-APIs
+az webapp deployment source config-zip \
+  --resource-group med-prod-rg-appservice \
+  --name med-prod-worker-process \
+  --src build/worker-combined.zip
+```
+
 3. **Use the deploy script** (`./scripts/deploy-all-workers.sh --deploy`), which passes an **absolute** path to Azure CLI.
 
 Microsoft recommends **`az webapp deploy`** instead of the deprecated `config-zip` (same `wwwroot` replace behavior for `type zip`):
@@ -126,6 +212,16 @@ cd /mnt/d/Code/MMK_Projects/B2B-Diagnostic-Aggregator/GitHub/B2B-Aggregator-APIs
 az webapp deploy \
   --resource-group um-prod-rg-appservice \
   --name um-prod-worker-process \
+  --src-path build/worker-combined.zip \
+  --type zip
+```
+
+
+```bash
+cd /mnt/d/Code/MMK_Projects/B2B-Diagnostic-Aggregator/GitHub/B2B-Aggregator-APIs
+az webapp deploy \
+  --resource-group med-prod-rg-appservice \
+  --name med-prod-worker-process \
   --src-path build/worker-combined.zip \
   --type zip
 ```
@@ -151,6 +247,7 @@ Order: `{second} {minute} {hour} {day} {month} {day-of-week}`.
 | Example | Meaning |
 |--------|---------|
 | `0 */10 * * * *` | At second **0**, every **10** minutes |
+| `0 */5 * * * *` | Every **5** minutes — recommended for WhatsApp (user-facing time sensitivity) |
 | `0 0 */2 * * *` | Every **2** hours at minute 0 |
 | `0 0 9 * * *` | Every day at **09:00** UTC |
 
@@ -163,6 +260,7 @@ Tune for production load; see [NCRONTAB expressions](https://learn.microsoft.com
 
    - `App_Data/jobs/triggered/fitness-worker-job/settings.job`
    - `App_Data/jobs/triggered/email-worker-job/settings.job`
+   - `App_Data/jobs/triggered/whatsapp-worker-job/settings.job` ← NEW
 
 3. **Minimal content** (same or different cron per job):
 
@@ -174,8 +272,9 @@ Tune for production load; see [NCRONTAB expressions](https://learn.microsoft.com
 
 4. **In this repository**, example files live under **`deploy/linux-webjobs/`**:
 
-   - `deploy/linux-webjobs/fitness-worker-job/settings.job`
-   - `deploy/linux-webjobs/email-worker-job/settings.job`
+   - `deploy/linux-webjobs/fitness-worker-job/settings.job` — every 10 min
+   - `deploy/linux-webjobs/email-worker-job/settings.job` — every 10 min
+   - `deploy/linux-webjobs/whatsapp-worker-job/settings.job` — every **5** min (default) ← NEW
 
    **`scripts/deploy-all-workers.sh`** copies those into the zip automatically when they exist. Edit the JSON there (or add the files) to match your production cadence, rebuild `build/worker-combined.zip`, and redeploy.
 
@@ -185,14 +284,14 @@ Tune for production load; see [NCRONTAB expressions](https://learn.microsoft.com
 
 1. Open [Azure Portal](https://portal.azure.com/) → your App Service (**`um-prod-worker-process`**).
 2. In the left menu, open **WebJobs** (under **Settings** or **Development Tools**, depending on portal version).
-3. Open **`fitness-worker-job`** (or **`email-worker-job`**).
+3. Open **`fitness-worker-job`** / **`email-worker-job`** / **`whatsapp-worker-job`**.
 4. If the UI offers **Schedule** / **NCRONTAB**, set the six-field expression and **Save**.  
    If the job was created only by dropping files and no schedule appears, use **Option A** or **Option C**.
 
 ### Option C — Edit on the server (Kudu)
 
 1. Portal → your app → **Development Tools** → **Advanced Tools (Go)** → **Debug console** → **Bash**.
-2. Go to `site/wwwroot/App_Data/jobs/triggered/fitness-worker-job/` (and the email job folder).
+2. Go to `site/wwwroot/App_Data/jobs/triggered/fitness-worker-job/` (and email / whatsapp job folders).
 3. Create or edit **`settings.job`** with the JSON above, **Save**.
 4. Restart the WebJob or the app if the schedule does not pick up immediately.
 
@@ -201,7 +300,11 @@ Tune for production load; see [NCRONTAB expressions](https://learn.microsoft.com
 ### First run sanity check
 
 - Trigger once manually: [Run a job on demand (SCM API)](#run-a-job-on-demand-scm-api) or Portal → WebJobs → **Run**.
-- Confirm application settings: **`FITNESS_CERT_WORKER_RUN_ONCE=true`**, **`EMAIL_WORKER_SINGLE_BATCH=true`** for batch WebJob runs (see [fitness](./PROD-FITNESS_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md) and [email](./PROD-EMAIL_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md) docs).
+- Confirm application settings:
+  - **`FITNESS_CERT_WORKER_RUN_ONCE=true`**
+  - **`EMAIL_WORKER_SINGLE_BATCH=true`**
+  - **`WHATSAPP_WORKER_SINGLE_BATCH=true`** ← NEW, must be set to `true` for triggered WebJob runs (batch WebJob runs (one batch + exit; schedule re-runs)
+- Run all 3 jobs **on demand once to verify binaries + env before trusting cron.
 
 ---
 
@@ -215,6 +318,9 @@ curl -X POST -u '{user}:{pass}' \
 
 curl -X POST -u '{user}:{pass}' \
   "https://um-prod-worker-process.scm.azurewebsites.net/api/triggeredwebjobs/email-worker-job/run"
+
+curl -X POST -u '{user}:{pass}' \
+  "https://um-prod-worker-process.scm.azurewebsites.net/api/triggeredwebjobs/whatsapp-worker-job/run"
 ```
 
 ---
@@ -222,13 +328,16 @@ curl -X POST -u '{user}:{pass}' \
 ## Checklist
 
 - [ ] **`WEBSITE_SKIP_RUNNING_KUDUAGENT=false`**, **Always On** (supported SKU) on the worker app.
-- [ ] All **fitness** and **email** application settings present ([fitness](./PROD-FITNESS_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md), [email](./PROD-EMAIL_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md)).
-- [ ] Combined zip contains **both** job folders; fitness folder includes **`templates/`**.
-- [ ] **`chmod +x`** on both `run.sh` files and both binaries before zipping (the script does this).
-- [ ] **`FITNESS_CERT_WORKER_RUN_ONCE=true`** and **`EMAIL_WORKER_SINGLE_BATCH=true`** for scheduled batch runs.
+- [ ] All **fitness** and **email** and **whatsapp** application settings present ([fitness](./PROD-FITNESS_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md), [email](./PROD-EMAIL_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md), [WHATSAPP_WORKER_README.md](../../WHATSAPP_WORKER_README.md)).
+- [ ] Combined zip contains **all three** job folders; fitness folder includes **`templates/`** and **`chrome-linux64/chrome`**.
+- [ ] App setting **`CHROMIUM_PATH=./chrome-linux64/chrome`** on the worker app.
+- [ ] **`chmod +x`** on all three `run.sh` files and all three binaries before zipping (the script does this).
+- [ ] **`FITNESS_CERT_WORKER_RUN_ONCE=true`** and **`EMAIL_WORKER_SINGLE_BATCH=true`** and **`WHATSAPP_WORKER_SINGLE_BATCH=true`** for scheduled batch runs.
 - [ ] **`ACS_CONNECTION_STRING`** uses `endpoint=...;accesskey=...`.
+- [ ] **`WHATSAPP_CPAAS_API_KEY`** is set (cpaaslink.com key, 32 char); endpoint set; default template; campaign; timeouts set.
 - [ ] Understand **`config-zip`** impact on **`wwwroot`** (see above).
 - [ ] Each job has **`settings.job`** in the zip (or you accept re-adding schedule after each deploy — see [Step 4](#step-4--schedules-settingsjob-and-first-run)).
+- [ ] WhatsApp DB objects exist: `MedLyfe.tbl_whatsapp_templates` + FK from `MedLyfe.tbl_WhatsApp.TemplateID` (see SQL in whatsapp_schema.sql).
 
 ---
 
@@ -236,4 +345,6 @@ curl -X POST -u '{user}:{pass}' \
 
 - [PROD — fitness-worker Linux WebJobs](./PROD-FITNESS_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md)
 - [PROD — email-worker Linux WebJobs](./PROD-EMAIL_WORKER_LINUX_WEBJOBS_DEPLOYMENT.md)
+- [WHATSAPP_WORKER_README.md](../../WHATSAPP_WORKER_README.md) — setup instructions, SQL, verification
 - [DEPLOYMENT-PROD.md](./DEPLOYMENT-PROD.md)
+- [src/deploy-webjob.sh](../../src/deploy-webjob.sh) — staging-targeted combined build+deploy (also 3 jobs)

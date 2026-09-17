@@ -1,6 +1,6 @@
 module b2b-diagnostic-aggregator/apis
 
-go 1.25.6
+go 1.27
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.20.0

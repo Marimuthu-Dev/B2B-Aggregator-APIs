@@ -50,9 +50,21 @@ func HTMLToPDF(ctx context.Context, htmlContent string, chromiumPath string, tem
 		chromedp.DisableGPU,
 		chromedp.Headless,
 		chromedp.Flag("allow-file-access-from-files", true),
+		// App Service: tiny /dev/shm and no D-Bus — required for stable headless Chrome.
+		chromedp.Flag("disable-dev-shm-usage", true),
+		chromedp.Flag("disable-setuid-sandbox", true),
+		chromedp.Env("DBUS_SESSION_BUS_ADDRESS=/dev/null"),
+		chromedp.Env("GSETTINGS_BACKEND=memory"),
 	)
 	if p := strings.TrimSpace(chromiumPath); p != "" {
-		opts = append([]chromedp.ExecAllocatorOption{chromedp.ExecPath(p)}, opts...)
+		opts = append(opts, chromedp.ExecPath(p))
+		if ld := chromeDepsLibraryPath(p); ld != "" {
+			// Ensure Chrome child process sees bundled .so files (App Service has no apt root).
+			if existing := strings.TrimSpace(os.Getenv("LD_LIBRARY_PATH")); existing != "" {
+				ld = ld + ":" + existing
+			}
+			opts = append(opts, chromedp.Env("LD_LIBRARY_PATH="+ld))
+		}
 	}
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(ctx, opts...)
 	defer cancelAlloc()
@@ -117,6 +129,29 @@ func HTMLToPDF(ctx context.Context, htmlContent string, chromiumPath string, tem
 		return nil, fmt.Errorf("html to pdf: %w", err)
 	}
 	return pdf, nil
+}
+
+// chromeDepsLibraryPath returns LD_LIBRARY_PATH entries for chrome-linux-deps next to chrome-linux64.
+// Layout: <job>/chrome-linux64/chrome and <job>/chrome-linux-deps/{lib,usr/lib}/x86_64-linux-gnu
+func chromeDepsLibraryPath(chromiumPath string) string {
+	chromeDir := filepath.Dir(filepath.Clean(chromiumPath))
+	jobDir := filepath.Dir(chromeDir)
+	depsRoot := filepath.Join(jobDir, "chrome-linux-deps")
+	if st, err := os.Stat(depsRoot); err != nil || !st.IsDir() {
+		return ""
+	}
+	var parts []string
+	for _, rel := range []string{
+		"lib/x86_64-linux-gnu",
+		"usr/lib/x86_64-linux-gnu",
+		"lib64",
+	} {
+		p := filepath.Join(depsRoot, rel)
+		if st, err := os.Stat(p); err == nil && st.IsDir() {
+			parts = append(parts, p)
+		}
+	}
+	return strings.Join(parts, ":")
 }
 
 func pathToFileURL(abs string) string {

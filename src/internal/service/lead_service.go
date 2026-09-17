@@ -14,6 +14,7 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/apperrors"
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
+	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 	"b2b-diagnostic-aggregator/apis/pkg/utils"
@@ -47,11 +48,14 @@ type leadService struct {
 	clientRepo  repository.ClientRepository
 	packageRepo repository.PackageRepository
 	labRepo     repository.LabRepository
+	storeRepo   repository.StoreRepository
 	blobs       BlobService
+	whatsappRepo *repository.WhatsAppRepository
+	whatsappTemplateRepo *repository.WhatsAppTemplateRepository
 }
 
-func NewLeadService(repo repository.LeadRepository, uow repository.LeadUnitOfWork, clientRepo repository.ClientRepository, packageRepo repository.PackageRepository, labRepo repository.LabRepository, blobs BlobService) LeadService {
-	return &leadService{repo: repo, uow: uow, clientRepo: clientRepo, packageRepo: packageRepo, labRepo: labRepo, blobs: blobs}
+func NewLeadService(repo repository.LeadRepository, uow repository.LeadUnitOfWork, clientRepo repository.ClientRepository, packageRepo repository.PackageRepository, labRepo repository.LabRepository, storeRepo repository.StoreRepository, blobs BlobService, whatsappRepo *repository.WhatsAppRepository, whatsappTemplateRepo *repository.WhatsAppTemplateRepository) LeadService {
+	return &leadService{repo: repo, uow: uow, clientRepo: clientRepo, packageRepo: packageRepo, labRepo: labRepo, storeRepo: storeRepo, blobs: blobs, whatsappRepo: whatsappRepo, whatsappTemplateRepo: whatsappTemplateRepo}
 }
 
 func (s *leadService) ListLeads(filter repository.LeadListFilter) ([]domain.Lead, int64, error) {
@@ -107,15 +111,33 @@ func (s *leadService) CreateLead(l *domain.Lead, createdBy int64) error {
 	if err := domain.ValidateLeadEmpID(l.EmpID); err != nil {
 		return apperrors.NewBadRequest(err.Error(), err)
 	}
+	l.StoreID = strings.TrimSpace(l.StoreID)
+	if err := domain.ValidateLeadStoreID(l.StoreID); err != nil {
+		return apperrors.NewBadRequest(err.Error(), err)
+	}
+	if !persistencemodels.HasLeadStoreMasterIDColumn() {
+		l.StoreMasterID = nil
+	} else if err := s.validateLeadStoreMasterID(l.ClientID, l.StoreMasterID); err != nil {
+		return err
+	}
+
+	if l.LeadStatusID > 5 && l.LabID == nil {
+		return apperrors.NewBadRequest("Lab is not assigned, so it may not be able to update..!", nil)
+	}
 
 	return s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
 		if err := leadRepo.Create(l); err != nil {
 			return err
 		}
 
+		statusName, err := leadRepo.FindLeadStatusNameByID(l.LeadStatusID)
+		if err != nil {
+			return err
+		}
+
 		history := &domain.LeadHistory{
 			LeadID:    l.LeadID,
-			Action:    domain.LeadActionCreate,
+			Action:    statusName,
 			CreatedBy: createdBy,
 		}
 
@@ -207,6 +229,20 @@ func (s *leadService) UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUp
 	if update.LabID != nil {
 		l.LabID = update.LabID
 	}
+	if persistencemodels.HasLeadStoreMasterIDColumn() {
+		if update.StoreMasterID != nil {
+			if *update.StoreMasterID <= 0 {
+				l.StoreMasterID = nil
+			} else {
+				l.StoreMasterID = update.StoreMasterID
+			}
+		}
+		if err := s.validateLeadStoreMasterID(l.ClientID, l.StoreMasterID); err != nil {
+			return nil, err
+		}
+	} else {
+		l.StoreMasterID = nil
+	}
 	if update.CollectionType != nil {
 		ct, err := domain.ParseLeadCollectionType(*update.CollectionType)
 		if err != nil {
@@ -220,14 +256,23 @@ func (s *leadService) UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUp
 	l.LastUpdatedOn = timeutil.FromTime(time.Now())
 	l.PatientID = s.GeneratePatientID(l.PatientName, l.ContactNumber)
 
+	if l.LeadStatusID > 5 && l.LabID == nil {
+		return nil, apperrors.NewBadRequest("Lab is not assigned, so it may not be able to update..!", nil)
+	}
+
 	err = s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
 		if err := leadRepo.Update(&l); err != nil {
 			return err
 		}
 
+		statusName, err := leadRepo.FindLeadStatusNameByID(l.LeadStatusID)
+		if err != nil {
+			return err
+		}
+
 		history := &domain.LeadHistory{
 			LeadID:    l.LeadID,
-			Action:    domain.LeadActionUpdate,
+			Action:    statusName,
 			CreatedBy: lastUpdatedBy,
 		}
 
@@ -240,6 +285,22 @@ func (s *leadService) UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUp
 	if err != nil {
 		return nil, err
 	}
+	
+	// WhatsApp Notification Logic
+	if update.AppointmentAt != nil && l.LabID != nil {
+		ctx := context.Background()
+		var eventType string
+		if existing.AppointmentAt == nil {
+			eventType = "lab_appointment_confirmation"
+		} else if existing.AppointmentAt.Unix() != update.AppointmentAt.Unix() {
+			eventType = "appointment_rescheduled"
+		}
+
+		if eventType != "" {
+			go s.queueWhatsAppMessage(ctx, &l, eventType, l.LabID)
+		}
+	}
+	
 	return &l, nil
 }
 
@@ -283,6 +344,16 @@ func (s *leadService) BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastU
 		st := timeutil.StoredFromTime(appt)
 		appointmentPersist = timeutil.StoredToTimePtr(&st)
 	}
+
+	var existingLeads []domain.Lead
+	if appointmentAt != nil {
+		for _, id := range leadIDs {
+			if l, err := s.repo.FindByID(id); err == nil && l != nil {
+				existingLeads = append(existingLeads, *l)
+			}
+		}
+	}
+
 	var affected int64
 	err := s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
 		n, err := leadRepo.UpdateStatusForIDs(leadIDs, statusID, lastUpdatedBy, labID, appointmentPersist)
@@ -306,6 +377,36 @@ func (s *leadService) BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastU
 
 		return nil
 	})
+	
+	if err == nil && appointmentAt != nil {
+		ctx := context.Background()
+		for _, l := range existingLeads {
+			currentLabID := l.LabID
+			if labID != nil {
+				currentLabID = labID
+			}
+			if currentLabID == nil {
+				continue
+			}
+			
+			var eventType string
+			if l.AppointmentAt == nil {
+				eventType = "lab_appointment_confirmation"
+			} else if l.AppointmentAt.Unix() != appointmentPersist.Unix() {
+				eventType = "appointment_rescheduled"
+			}
+			
+			if eventType != "" {
+				updatedLead := l
+				ap := timeutil.StoredFromTime(*appointmentPersist)
+				updatedLead.AppointmentAt = &ap
+				updatedLead.LabID = currentLabID
+				
+				go s.queueWhatsAppMessage(ctx, &updatedLead, eventType, currentLabID)
+			}
+		}
+	}
+	
 	return affected, err
 }
 
@@ -412,6 +513,26 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 		}
 		empID = strings.TrimSpace(empID)
 
+		storeID := at(row, "StoreID")
+		if err := domain.ValidateLeadStoreID(storeID); err != nil {
+			return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: %s", rowIdx+1, err.Error()), err)
+		}
+		storeID = strings.TrimSpace(storeID)
+
+		var storeMasterID *int64
+		if persistencemodels.HasLeadStoreMasterIDColumn() {
+			if raw := strings.TrimSpace(at(row, "StoreMasterID")); raw != "" {
+				id, parseErr := strconv.ParseInt(raw, 10, 64)
+				if parseErr != nil || id < 1 {
+					return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: StoreMasterID must be a positive integer", rowIdx+1), parseErr)
+				}
+				if err := s.validateLeadStoreMasterID(clientID, &id); err != nil {
+					return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: %s", rowIdx+1, err.Error()), err)
+				}
+				storeMasterID = &id
+			}
+		}
+
 		now := time.Now()
 		lead := &domain.Lead{
 			ClientID:       clientID,
@@ -427,6 +548,8 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 			StateID:        atInt32(row, "StateID"),
 			Pincode:        at(row, "Pincode"),
 			EmpID:          empID,
+			StoreID:        storeID,
+			StoreMasterID:  storeMasterID,
 			CollectionType: collectionType,
 			LeadStatusID:   leadStatusID,
 			CreatedBy:      createdBy,
@@ -551,8 +674,16 @@ func (s *leadService) GetLeadReportDownloadURL(ctx context.Context, leadID int64
 			return "", time.Time{}, apperrors.NewNotFound("Lead not found", nil)
 		}
 	}
+	if jwtUserType == utils.UserTypeStore {
+		if jwtUserID <= 0 {
+			return "", time.Time{}, apperrors.NewUnauthorized("Authentication required", nil)
+		}
+		if !domain.LeadBelongsToStore(jwtUserID, lead.StoreMasterID, lead.StoreID) {
+			return "", time.Time{}, apperrors.NewNotFound("Lead not found", nil)
+		}
+	}
 	// Client portal: below status 10, FIT may download; HOLD (IsFit=0) only if IsReportDownloadable; UNFIT (IsFit=2) never via flag; NULL / not assessed same as forbidden until approved.
-	if jwtUserType == utils.UserTypeClient && lead.LeadStatusID < domain.LeadStatusIDClientDownloadNoFitGate {
+	if (jwtUserType == utils.UserTypeClient || jwtUserType == utils.UserTypeStore) && lead.LeadStatusID < domain.LeadStatusIDClientDownloadNoFitGate {
 		if lead.IsFit == nil {
 			return "", time.Time{}, apperrors.NewForbidden("Report download is not allowed for this lead", nil)
 		}
@@ -642,7 +773,7 @@ func (s *leadService) ApproveLeadReport(leadID int64, req *dto.ApproveLeadReques
 	if same && !(isFit == domain.LeadFitFit && lead.LeadStatusID == domain.LeadStatusIDReportUploaded) {
 		return nil
 	}
-	return s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
+	err = s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
 		n, err := leadRepo.UpdateLeadReportApproval(leadID, userID, isFit, req.AllowDownload, certTobe, remarksPtr, req.BrandID)
 		if err != nil {
 			return err
@@ -656,4 +787,104 @@ func (s *leadService) ApproveLeadReport(leadID int64, req *dto.ApproveLeadReques
 			CreatedBy: userID,
 		})
 	})
+	
+	if err == nil && isFit == domain.LeadFitFit {
+		go s.queueWhatsAppMessage(context.Background(), lead, "lab_report_completed", lead.LabID)
+	}
+	
+	return err
+}
+
+func (s *leadService) validateLeadStoreMasterID(clientID int64, storeMasterID *int64) error {
+	if !persistencemodels.HasLeadStoreMasterIDColumn() {
+		return nil
+	}
+	if storeMasterID == nil {
+		return nil
+	}
+	if *storeMasterID < 1 {
+		return apperrors.NewBadRequest("StoreMasterID must be a positive integer", nil)
+	}
+	if s.storeRepo == nil {
+		return apperrors.NewInternal("Store lookup is not configured", nil)
+	}
+	store, err := s.storeRepo.FindByID(*storeMasterID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return apperrors.NewBadRequest("StoreMasterID does not match an existing store", err)
+		}
+		return err
+	}
+	if store.ClientID != clientID {
+		return apperrors.NewBadRequest("StoreMasterID does not belong to this client", nil)
+	}
+	return nil
+}
+
+func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lead, templateName string, labID *int64) {
+	if s.whatsappRepo == nil || s.whatsappTemplateRepo == nil {
+		slog.Warn("WhatsApp repos not configured, skipping notification", slog.Int64("leadID", lead.LeadID))
+		return
+	}
+	if lead.ContactNumber == "" {
+		slog.Warn("Lead has no contact number, skipping WhatsApp", slog.Int64("leadID", lead.LeadID))
+		return
+	}
+	
+	var labAddress, mapURL, packageName string
+	if labID != nil {
+		labAddress, mapURL, _ = s.labRepo.GetLabFullAddressAndMap(*labID)
+	}
+	if lead.PackageID != 0 {
+		if pkg, err := s.packageRepo.FindByID(int64(lead.PackageID)); err == nil && pkg != nil {
+			packageName = pkg.PackageName
+		}
+	}
+	
+	mapSection := ""
+	if mapURL != "" {
+		mapSection = fmt.Sprintf("Map: %s\n\n", mapURL)
+	}
+	
+	// Format text based on template
+	var text string
+	switch templateName {
+	case "lab_appointment_confirmation":
+		text = fmt.Sprintf("*Lab Appointment Confirmation*\n\n*Dear %s*,\n\nYour lab appointment has been confirmed.\n\n📅 Date: %s\n⏰ Time: %s\n\n📍 Location: %s\n\n%sLab Package Name: %s\n\nKindly arrive 10 minutes early with valid ID proof.\n\nThank you for choosing MedLyfe Health.",
+			lead.PatientName,
+			lead.AppointmentAt.Format("02-01-2006"),
+			lead.AppointmentAt.Format("03:04 PM"),
+			labAddress,
+			mapSection,
+			packageName)
+	case "appointment_rescheduled":
+		text = fmt.Sprintf("📅 *Appointment Rescheduled*\n\nDear %s,\n\nYour lab appointment has been rescheduled.\n\n📅 New Date: %s\n⏰ New Time: %s\n\n📍 Location: %s\n\n%sLab Package Name: %s\n\nPlease arrive 10 minutes before with valid ID Proof\n\nThank you for choosing MedLyfe Health.",
+			lead.PatientName,
+			lead.AppointmentAt.Format("02-01-2006"),
+			lead.AppointmentAt.Format("03:04 PM"),
+			labAddress,
+			mapSection,
+			packageName)
+	case "lab_report_completed":
+		text = fmt.Sprintf("📄 *Lab Report Completed*\n\nDear %s,\n\nYour lab report is now ready.\nPlease click on below link to download your report.\n\n%s\n\nThank you for choosing MedLyfe Health.",
+			lead.PatientName,
+			lead.ReportURL)
+	default:
+		slog.Error("Unknown WhatsApp template", slog.String("templateName", templateName))
+		return
+	}
+
+	msg := domain.QueuedWhatsApp{
+		ClientID:     lead.ClientID,
+		FromMobile:   "System", // Default fallback if not available
+		ToMobile:     lead.ContactNumber,
+		WhatsAppText: text,
+		TemplateName: templateName,
+		CreatedBy:    lead.LastUpdatedBy,
+	}
+	
+	err := s.whatsappRepo.EnqueueWithTemplate(ctx, msg, s.whatsappTemplateRepo)
+	if err != nil {
+		slog.Error("Failed to queue WhatsApp message", slog.Any("err", err), slog.Int64("leadID", lead.LeadID))
+	}
 }

@@ -14,7 +14,7 @@ type PackageTestMapping struct {
 }
 
 func (PackageTestMapping) TableName() string {
-	return "MediAdmin.tbl_PackageTestMapping"
+	return Table("tbl_PackageTestMapping")
 }
 
 type PackageClientMapping struct {
@@ -30,7 +30,7 @@ type PackageClientMapping struct {
 }
 
 func (PackageClientMapping) TableName() string {
-	return "MediAdmin.tbl_PackageClientMapping"
+	return Table("tbl_PackageClientMapping")
 }
 
 type PackageLabMapping struct {
@@ -46,5 +46,5 @@ type PackageLabMapping struct {
 }
 
 func (PackageLabMapping) TableName() string {
-	return "MediAdmin.tbl_PackageLabMapping"
+	return Table("tbl_PackageLabMapping")
 }

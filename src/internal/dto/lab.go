@@ -32,6 +32,7 @@ type LabRequest struct {
 	ServicesID                 *FlexArrayString `json:"ServicesID" binding:"omitempty"`
 	CollectionPincodes         *FlexArrayString `json:"CollectionPincodes" binding:"omitempty"`
 	LabGrade                   *string          `json:"LabGrade" binding:"omitempty"`
+	MapLocationURL             *string          `json:"MapLocationURL" binding:"omitempty"`
 	IsActive                   *bool            `binding:"omitempty"`
 }
 
@@ -61,6 +62,7 @@ type LabUpdateRequest struct {
 	ServicesID                 *FlexArrayString `json:"ServicesID"`
 	CollectionPincodes         *FlexArrayString `json:"CollectionPincodes"`
 	LabGrade                   *string          `json:"LabGrade"`
+	MapLocationURL             *string          `json:"MapLocationURL"`
 	IsActive                   *bool           `json:"IsActive"`
 }
 
@@ -69,7 +71,7 @@ func (r LabUpdateRequest) HasAtLeastOneField() bool {
 		r.ContactPerson1Name != nil || r.ContactPerson1Number != nil || r.ContactPerson1EmailID != nil || r.ContactPerson1Designation != nil ||
 		r.ContactPerson1Name1 != nil || r.ContactPerson1Number1 != nil || r.ContactPerson1EmailID1 != nil || r.ContactPerson1Designation1 != nil ||
 		r.CategoryID != nil || r.GSTIN_UIN != nil || r.PANNumber != nil || r.MOUStartDate != nil || r.MOUEndDate != nil ||
-		r.AccreditationID != nil || r.AccreditationExpirationDate != nil || r.CollectionTypes != nil || r.ServicesID != nil || r.CollectionPincodes != nil || r.LabGrade != nil || r.IsActive != nil
+		r.AccreditationID != nil || r.AccreditationExpirationDate != nil || r.CollectionTypes != nil || r.ServicesID != nil || r.CollectionPincodes != nil || r.LabGrade != nil || r.MapLocationURL != nil || r.IsActive != nil
 }
 
 // Getters for FlexDate/FlexArrayString so service receives *time.Time and *string without depending on flex types.
@@ -113,6 +115,7 @@ func (r LabRequest) ToDomain() domain.Lab {
 		ServicesID:                 r.ServicesID.ToStringPtr(),
 		CollectionPincodes:         r.CollectionPincodes.ToStringPtr(),
 		LabGrade:                   r.LabGrade,
+		MapLocationURL:             r.MapLocationURL,
 		IsActive:                   r.IsActive,
 	}
 }

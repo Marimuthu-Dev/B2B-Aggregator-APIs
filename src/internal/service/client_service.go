@@ -9,8 +9,10 @@ import (
 	"time"
 
 	"b2b-diagnostic-aggregator/apis/internal/apperrors"
+	"b2b-diagnostic-aggregator/apis/internal/config"
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
+	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 
@@ -27,19 +29,40 @@ type ClientService interface {
 	UpdateClientWithMoU(ctx context.Context, id int64, update *dto.ClientUpdateRequest, lastUpdatedBy int64, mou *multipart.FileHeader) (*domain.Client, error)
 	DeleteClient(id int64) error
 	GetActiveClients() ([]domain.Client, error)
-	GetClientsByCity(cityID int8) ([]domain.Client, error)
-	GetClientsByState(stateID int8) ([]domain.Client, error)
+	GetClientsByCity(cityID int16) ([]domain.Client, error)
+	GetClientsByState(stateID int16) ([]domain.Client, error)
 	GetClientMoUDownloadURL(ctx context.Context, clientID int64) (*dto.ClientMoUDownloadURLResponse, error)
 	GetClientBrandMappingsByClientID(clientID int64) ([]domain.ClientBrandMappingItem, error)
 }
 
 type clientService struct {
-	repo  repository.ClientRepository
-	blobs BlobService
+	repo       repository.ClientRepository
+	blobs      BlobService
+	storeRepo  repository.StoreRepository
+	emails     *repository.EmailOutboxRepository
+	forgotRepo repository.ForgotPasswordRepository
+	emailCfg   config.OutboundEmailConfig
+	portalURL  string
 }
 
-func NewClientService(repo repository.ClientRepository, blobs BlobService) ClientService {
-	return &clientService{repo: repo, blobs: blobs}
+func NewClientService(
+	repo repository.ClientRepository,
+	blobs BlobService,
+	storeRepo repository.StoreRepository,
+	emails *repository.EmailOutboxRepository,
+	forgotRepo repository.ForgotPasswordRepository,
+	emailCfg config.OutboundEmailConfig,
+	clientPortalURL string,
+) ClientService {
+	return &clientService{
+		repo:       repo,
+		blobs:      blobs,
+		storeRepo:  storeRepo,
+		emails:     emails,
+		forgotRepo: forgotRepo,
+		emailCfg:   emailCfg,
+		portalURL:  clientPortalURL,
+	}
 }
 
 func (s *clientService) ListClients(filter repository.ClientListFilter) ([]domain.Client, int64, error) {
@@ -67,12 +90,19 @@ func (s *clientService) GetClientBrandMappingsByClientID(clientID int64) ([]doma
 }
 
 func (s *clientService) CreateClient(c *domain.Client, createdBy int64, brandNames []string) error {
+	if err := s.ensureClientMobileUnique(c.ContactPerson1Number, 0); err != nil {
+		return err
+	}
 	now := time.Now()
 	c.CreatedBy = createdBy
 	c.CreatedOn = timeutil.FromTime(now)
 	c.LastUpdatedBy = createdBy
 	c.LastUpdatedOn = timeutil.FromTime(now)
-	return s.repo.Create(c, brandNames)
+	if err := s.repo.Create(c, brandNames); err != nil {
+		return err
+	}
+	s.queueClientCreatedEmail(context.Background(), c)
+	return nil
 }
 
 func (s *clientService) CreateClientWithMoU(ctx context.Context, c *domain.Client, createdBy int64, mou *multipart.FileHeader, brandNames []string) error {
@@ -84,6 +114,9 @@ func (s *clientService) CreateClientWithMoU(ctx context.Context, c *domain.Clien
 			return apperrors.NewBadRequest(err.Error(), err)
 		}
 	}
+	if err := s.ensureClientMobileUnique(c.ContactPerson1Number, 0); err != nil {
+		return err
+	}
 
 	now := time.Now()
 	c.CreatedBy = createdBy
@@ -94,6 +127,7 @@ func (s *clientService) CreateClientWithMoU(ctx context.Context, c *domain.Clien
 		return err
 	}
 	if mou == nil {
+		s.queueClientCreatedEmail(ctx, c)
 		return nil
 	}
 
@@ -116,6 +150,7 @@ func (s *clientService) CreateClientWithMoU(ctx context.Context, c *domain.Clien
 		return apperrors.NewInternal("Failed to save MoU document URL", err)
 	}
 	c.MoUDocumentURL = &url
+	s.queueClientCreatedEmail(ctx, c)
 	return nil
 }
 
@@ -207,6 +242,9 @@ func applyClientUpdatePatch(c *domain.Client, update *dto.ClientUpdateRequest) {
 	if update.IsAcitve != nil {
 		c.IsAcitve = *update.IsAcitve
 	}
+	if update.IsStoreLoginEnabled != nil {
+		c.IsStoreLoginEnabled = *update.IsStoreLoginEnabled
+	}
 	if update.MOUStartDate != nil {
 		c.MOUStartDate = timeutil.FromTimePtr(update.MOUStartDate)
 	}
@@ -237,6 +275,9 @@ func (s *clientService) UpdateClient(id int64, update *dto.ClientUpdateRequest, 
 
 	c := *existing
 	applyClientUpdatePatch(&c, update)
+	if err := s.ensureClientMobileUnique(c.ContactPerson1Number, id); err != nil {
+		return nil, err
+	}
 	c.ClientID = id
 	c.LastUpdatedBy = lastUpdatedBy
 	c.LastUpdatedOn = timeutil.FromTime(time.Now())
@@ -278,6 +319,9 @@ func (s *clientService) UpdateClientWithMoU(ctx context.Context, id int64, updat
 	if hasFields && !hasFile {
 		c := *existing
 		applyClientUpdatePatch(&c, update)
+		if err := s.ensureClientMobileUnique(c.ContactPerson1Number, id); err != nil {
+			return nil, err
+		}
 		c.ClientID = id
 		c.LastUpdatedBy = lastUpdatedBy
 		c.LastUpdatedOn = timeutil.FromTime(time.Now())
@@ -294,6 +338,9 @@ func (s *clientService) UpdateClientWithMoU(ctx context.Context, id int64, updat
 	if hasFields {
 		c := *existing
 		applyClientUpdatePatch(&c, update)
+		if err := s.ensureClientMobileUnique(c.ContactPerson1Number, id); err != nil {
+			return nil, err
+		}
 		c.ClientID = id
 		c.LastUpdatedBy = lastUpdatedBy
 		c.LastUpdatedOn = timeutil.FromTime(time.Now())
@@ -366,11 +413,11 @@ func (s *clientService) GetActiveClients() ([]domain.Client, error) {
 	return s.repo.FindAllActive()
 }
 
-func (s *clientService) GetClientsByCity(cityID int8) ([]domain.Client, error) {
+func (s *clientService) GetClientsByCity(cityID int16) ([]domain.Client, error) {
 	return s.repo.FindByCity(cityID)
 }
 
-func (s *clientService) GetClientsByState(stateID int8) ([]domain.Client, error) {
+func (s *clientService) GetClientsByState(stateID int16) ([]domain.Client, error) {
 	return s.repo.FindByState(stateID)
 }
 
@@ -394,4 +441,37 @@ func (s *clientService) GetClientMoUDownloadURL(ctx context.Context, clientID in
 		return nil, apperrors.NewInternal("Failed to generate download link", err)
 	}
 	return &dto.ClientMoUDownloadURLResponse{URL: urlStr, ExpiresAt: exp}, nil
+}
+
+func (s *clientService) ensureClientMobileUnique(mobile string, excludeClientID int64) error {
+	mobile = strings.TrimSpace(mobile)
+	if mobile == "" {
+		return nil
+	}
+	taken, err := s.repo.ExistsByContactPerson1Number(mobile, excludeClientID)
+	if err != nil {
+		return err
+	}
+	if taken {
+		return apperrors.NewBadRequest("ContactPerson1Number mobile already exists with system", nil)
+	}
+	return s.ensureClientMobileNotUsedByStore(mobile)
+}
+
+func (s *clientService) ensureClientMobileNotUsedByStore(mobile string) error {
+	if !persistencemodels.HasStoreMasterTable() {
+		return nil
+	}
+	mobile = strings.TrimSpace(mobile)
+	if mobile == "" || s.storeRepo == nil {
+		return nil
+	}
+	taken, err := s.storeRepo.ExistsByContactNumber(mobile, 0)
+	if err != nil {
+		return err
+	}
+	if taken {
+		return apperrors.NewBadRequest("ContactPerson1Number is already used by a store login", nil)
+	}
+	return nil
 }

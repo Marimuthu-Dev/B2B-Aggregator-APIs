@@ -19,6 +19,17 @@ type Config struct {
 	Log         LogConfig
 	Domains     DomainURLs
 	AzureBlob   AzureBlobConfig
+	Email       OutboundEmailConfig
+}
+
+// OutboundEmailConfig is used when the API inserts rows into {DB_SCHEMA}.tbl_Emails.
+type OutboundEmailConfig struct {
+	FromAddress  string
+	CCAddress    string
+	BCCAddress   string
+	SupportPhone string
+	SupportEmail string
+	LogoURL      string
 }
 
 const defaultMoUMaxBytes = 5 * 1024 * 1024
@@ -61,10 +72,11 @@ type DBConfig struct {
 	User                   string
 	Password               string
 	Database               string
-	PoolMax                int // max open connections to the database
-	PoolMin                int // max idle connections kept in the pool (reuse)
-	IdleTimeout            int // max time a connection can be idle before closed (ms)
-	ConnMaxLifetime        int // max time a connection may be reused (ms); 0 = no limit
+	Schema                 string // SQL Server schema prefix (DB_SCHEMA); e.g. MediAdmin
+	PoolMax                int    // max open connections to the database
+	PoolMin                int    // max idle connections kept in the pool (reuse)
+	IdleTimeout            int    // max time a connection can be idle before closed (ms)
+	ConnMaxLifetime        int    // max time a connection may be reused (ms); 0 = no limit
 	Encrypt                bool
 	TrustServerCertificate bool
 }
@@ -84,6 +96,7 @@ type DomainURLs struct {
 	Client   string
 	Employee string
 	Lab      string
+	Store    string
 }
 
 func LoadConfig() *Config {
@@ -94,6 +107,11 @@ func LoadConfig() *Config {
 	_ = godotenv.Load("../.env")
 	_ = godotenv.Load("../../.env")
 
+	dbSchema := strings.TrimSpace(getEnv("DB_SCHEMA", "MediAdmin"))
+	if dbSchema == "" {
+		dbSchema = "MediAdmin"
+	}
+
 	return &Config{
 		Environment: getEnv("ENVIRONMENT", "development"),
 		Port:        getEnvAsInt("PORT", 8080),
@@ -103,6 +121,7 @@ func LoadConfig() *Config {
 			User:                   getEnv("DB_USER", ""),
 			Password:               getEnv("DB_PASSWORD", ""),
 			Database:               getEnv("DB_DATABASE_NAME", ""),
+			Schema:                 dbSchema,
 			PoolMax:                getEnvAsInt("DB_POOL_MAX", 25),
 			PoolMin:                getEnvAsInt("DB_POOL_MIN", 5),
 			IdleTimeout:            getEnvAsInt("DB_IDLE_TIMEOUT", 30000),
@@ -123,8 +142,37 @@ func LoadConfig() *Config {
 			Client:   getEnv("CLIENT_DOMAIN_URL", ""),
 			Employee: getEnv("EMPLOYEE_DOMAIN_URL", ""),
 			Lab:      getEnv("LAB_DOMAIN_URL", ""),
+			Store:    getEnv("STORE_DOMAIN_URL", ""),
 		},
 		AzureBlob: loadAzureBlobConfig(),
+		Email:     loadOutboundEmailConfig(),
+	}
+}
+
+func loadOutboundEmailConfig() OutboundEmailConfig {
+	from := strings.TrimSpace(getEnv("EMAIL_FROM_ADDRESS", "support@urmediconnect.com"))
+	if from == "" {
+		from = "support@urmediconnect.com"
+	}
+	logo := strings.TrimSpace(getEnv("EMAIL_LOGO_URL", "https://urmediconnect.com/img/logo.jpeg"))
+	if logo == "" {
+		logo = "https://urmediconnect.com/img/logo.jpeg"
+	}
+	supportEmail := strings.TrimSpace(getEnv("EMAIL_SUPPORT_EMAIL", "support@urmediconnect.com"))
+	if supportEmail == "" {
+		supportEmail = "support@urmediconnect.com"
+	}
+	supportPhone := strings.TrimSpace(getEnv("EMAIL_SUPPORT_PHONE", "+91 9036302806"))
+	if supportPhone == "" {
+		supportPhone = "+91 9036302806"
+	}
+	return OutboundEmailConfig{
+		FromAddress:  from,
+		CCAddress:    strings.TrimSpace(getEnv("EMAIL_CC_ADDRESS", "")),
+		BCCAddress:   strings.TrimSpace(getEnv("EMAIL_BCC_ADDRESS", "")),
+		SupportPhone: supportPhone,
+		SupportEmail: supportEmail,
+		LogoURL:      logo,
 	}
 }
 

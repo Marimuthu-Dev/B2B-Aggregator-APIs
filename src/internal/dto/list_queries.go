@@ -15,8 +15,8 @@ type MouListQuery struct {
 
 type ClientListQuery struct {
 	PaginationQuery
-	CityID   *int8 `form:"cityId" binding:"omitempty,min=1"`
-	StateID  *int8 `form:"stateId" binding:"omitempty,min=1"`
+	CityID   *int16 `form:"cityId" binding:"omitempty,min=1"`
+	StateID  *int16 `form:"stateId" binding:"omitempty,min=1"`
 	IsActive *bool `form:"isActive" binding:"omitempty"`
 	MouListQuery
 	Search string `form:"search" binding:"omitempty"`
@@ -115,7 +115,15 @@ type LeadListQuery struct {
 	StatusID         *int8   `form:"statusId" binding:"omitempty,min=1"`
 	PackageID        *int    `form:"packageId" binding:"omitempty,min=1"`
 	CollectionType   *string `form:"collectionType" binding:"omitempty"`
-	// Search matches PatientName, ContactNumber, or EmailID (substring, LIKE).
+	// StoreID filters by tbl_Leads.StoreID (exact match after trim). Free-text field; not StoreMasterID.
+	StoreID *string `form:"storeId" binding:"omitempty"`
+	// StoreMasterID filters by tbl_Leads.StoreMasterID (FK to tbl_StoreMaster.StoreID).
+	StoreMasterID *int64 `form:"storeMasterId" binding:"omitempty,min=1"`
+	// StoreCityID filters by tbl_StoreMaster.CityID (joined on l.StoreMasterID = sm.StoreID).
+	StoreCityID *int16 `form:"storeCityId" binding:"omitempty,min=1"`
+	// StoreStateID filters by tbl_StoreMaster.StateID (joined on l.StoreMasterID = sm.StoreID).
+	StoreStateID *int16 `form:"storeStateId" binding:"omitempty,min=1"`
+	// Search matches PatientName, ContactNumber, EmailID, or StoreID (substring, LIKE).
 	Search string `form:"search" binding:"omitempty"`
 	// FitnessStatus filters by tbl_Leads.IsFit (Empty | Not Assessed | On Hold | Fit | UnFit); see domain.ParseLeadListFitnessFilter.
 	FitnessStatus string `form:"fitnessStatus" binding:"omitempty"`

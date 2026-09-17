@@ -19,8 +19,8 @@ const MultipartFormMaxMemory int64 = 6 << 20 // 6 MiB
 type ClientCreateForm struct {
 	ClientName                string  `form:"ClientName" binding:"required"`
 	Address                   string  `form:"Address" binding:"required"`
-	CityID                    int8    `form:"CityID" binding:"required"`
-	StateID                   int8    `form:"StateID" binding:"required"`
+	CityID                    int16   `form:"CityID" binding:"required"`
+	StateID                   int16   `form:"StateID" binding:"required"`
 	Pincode                   string  `form:"Pincode" binding:"required"`
 	ContactPerson1Name        string  `form:"ContactPerson1Name" binding:"required"`
 	ContactPerson1Number      string  `form:"ContactPerson1Number" binding:"required"`
@@ -38,6 +38,7 @@ type ClientCreateForm struct {
 	BillingPincode            *string `form:"BillingPincode"`
 	ClientTypeID              *int8   `form:"ClientTypeID"`
 	IsAcitve                  bool     `form:"IsAcitve"`
+	IsStoreLoginEnabled       bool     `form:"IsStoreLoginEnabled"`
 	MOUStartDate              string   `form:"MOUStartDate"`
 	MOUEndDate                string   `form:"MOUEndDate"`
 	Brands                    []string `form:"Brands"`
@@ -95,6 +96,7 @@ func (f ClientCreateForm) toClientRequest() (ClientRequest, error) {
 		BillingPincode:            f.BillingPincode,
 		ClientTypeID:              f.ClientTypeID,
 		IsAcitve:                  f.IsAcitve,
+		IsStoreLoginEnabled:       boolPtr(f.IsStoreLoginEnabled),
 		Brands:                    f.Brands,
 	}
 	if strings.TrimSpace(f.MOUStartDate) != "" {
@@ -151,14 +153,14 @@ func buildClientUpdateRequestFromForm(c *gin.Context) (*ClientUpdateRequest, err
 		req.Address = stringPtr(v)
 	}
 	if v, ok := firstFormValue(vals, "CityID"); ok {
-		if n, err := strconv.ParseInt(v, 10, 8); err == nil {
-			x := int8(n)
+		if n, err := strconv.ParseInt(v, 10, 16); err == nil {
+			x := int16(n)
 			req.CityID = &x
 		}
 	}
 	if v, ok := firstFormValue(vals, "StateID"); ok {
-		if n, err := strconv.ParseInt(v, 10, 8); err == nil {
-			x := int8(n)
+		if n, err := strconv.ParseInt(v, 10, 16); err == nil {
+			x := int16(n)
 			req.StateID = &x
 		}
 	}
@@ -216,6 +218,11 @@ func buildClientUpdateRequestFromForm(c *gin.Context) (*ClientUpdateRequest, err
 	if v, ok := firstFormValue(vals, "IsAcitve"); ok {
 		if b, err := strconv.ParseBool(v); err == nil {
 			req.IsAcitve = &b
+		}
+	}
+	if v, ok := firstFormValue(vals, "IsStoreLoginEnabled"); ok {
+		if b, err := strconv.ParseBool(v); err == nil {
+			req.IsStoreLoginEnabled = &b
 		}
 	}
 	if v, ok := firstFormValue(vals, "MOUStartDate"); ok && strings.TrimSpace(v) != "" {
@@ -276,4 +283,8 @@ func stringPtr(s string) *string {
 		return &p
 	}
 	return &s
+}
+
+func boolPtr(v bool) *bool {
+	return &v
 }

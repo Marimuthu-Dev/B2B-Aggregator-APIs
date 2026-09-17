@@ -34,6 +34,7 @@ func mapLabToDomain(p persistencemodels.Lab) domain.Lab {
 		ServicesID:                 p.ServicesID,
 		CollectionPincodes:         p.CollectionPincodes,
 		LabGrade:                   p.LabGrade,
+		MapLocationURL:             p.MapLocationURL,
 		IsActive:                   p.IsActive,
 		CreatedBy:                  p.CreatedBy,
 		CreatedOn:                  timeutil.FromTimePtr(p.CreatedOn),
@@ -43,6 +44,10 @@ func mapLabToDomain(p persistencemodels.Lab) domain.Lab {
 }
 
 func mapLabToPersistence(d domain.Lab) persistencemodels.Lab {
+	mapURL := d.MapLocationURL
+	if !persistencemodels.HasLabMapLocationURLColumn() {
+		mapURL = nil
+	}
 	return persistencemodels.Lab{
 		LabID:                      d.LabID,
 		LabName:                    d.LabName,
@@ -70,6 +75,7 @@ func mapLabToPersistence(d domain.Lab) persistencemodels.Lab {
 		ServicesID:                 d.ServicesID,
 		CollectionPincodes:         d.CollectionPincodes,
 		LabGrade:                   d.LabGrade,
+		MapLocationURL:             mapURL,
 		IsActive:                   d.IsActive,
 		CreatedBy:                  d.CreatedBy,
 		CreatedOn:                  timeutil.ToTimePtr(d.CreatedOn),

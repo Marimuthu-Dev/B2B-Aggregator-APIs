@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"b2b-diagnostic-aggregator/apis/internal/timeutil"
@@ -103,6 +104,28 @@ func ValidateLeadEmpID(s string) error {
 	return nil
 }
 
+// LeadStoreIDMaxLen matches MediAdmin.tbl_Leads.StoreID (varchar(15)).
+const LeadStoreIDMaxLen = 15
+
+// ValidateLeadStoreID returns an error when s exceeds LeadStoreIDMaxLen (empty is allowed).
+func ValidateLeadStoreID(s string) error {
+	if len(strings.TrimSpace(s)) > LeadStoreIDMaxLen {
+		return fmt.Errorf("StoreID must be at most %d characters", LeadStoreIDMaxLen)
+	}
+	return nil
+}
+
+// LeadBelongsToStore is true when StoreMasterID or varchar StoreID matches the store JWT userId.
+func LeadBelongsToStore(storeID int64, storeMasterID *int64, storeIDText string) bool {
+	if storeID <= 0 {
+		return false
+	}
+	if storeMasterID != nil && *storeMasterID == storeID {
+		return true
+	}
+	return strings.TrimSpace(storeIDText) == strconv.FormatInt(storeID, 10)
+}
+
 // LeadStatusIDDefault is the initial status for new leads when the client omits LeadStatusID (JSON zero / empty CSV).
 const LeadStatusIDDefault int8 = 1
 
@@ -149,6 +172,11 @@ type Lead struct {
 	StateName                     string `json:"StateName,omitempty"`
 	Pincode                       string
 	EmpID                         string `json:"EmpID"`
+	StoreID                       string `json:"StoreID"`
+	StoreMasterID                 *int64 `json:"StoreMasterID,omitempty"`
+	// StoreName and StoreCity come from tbl_StoreMaster (MedLyfe only). Omitted on other schemas.
+	StoreName                     string `json:"StoreName,omitempty"`
+	StoreCity                     string `json:"StoreCity,omitempty"`
 	CollectionType                string `json:"CollectionType"`
 	LeadStatusID                  int8
 	AppointmentAt                 *timeutil.StoredTime `json:"AppointmentAt"`

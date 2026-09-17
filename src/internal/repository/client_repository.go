@@ -15,6 +15,7 @@ type ClientRepository interface {
 	List(filter ClientListFilter) ([]domain.Client, int64, error)
 	FindByID(id int64) (*domain.Client, error)
 	ExistsByID(id int64) (bool, error)
+	ExistsByContactPerson1Number(contactNumber string, excludeClientID int64) (bool, error)
 	Create(c *domain.Client, brandNames []string) error
 	DeleteBrandMappingsByClientID(clientID int64) error
 	Update(c *domain.Client, syncBrands bool, brandNames []string) error
@@ -22,8 +23,8 @@ type ClientRepository interface {
 	Delete(id int64) error
 	FindAllActive() ([]domain.Client, error)
 	FindByContactNumber(contactNumber string) (*domain.Client, error)
-	FindByCity(cityID int8) ([]domain.Client, error)
-	FindByState(stateID int8) ([]domain.Client, error)
+	FindByCity(cityID int16) ([]domain.Client, error)
+	FindByState(stateID int16) ([]domain.Client, error)
 	FindActiveBrandMappingsByClientID(clientID int64) ([]domain.ClientBrandMappingItem, error)
 }
 
@@ -113,6 +114,23 @@ func (r *clientRepository) ExistsByID(id int64) (bool, error) {
 	return count > 0, nil
 }
 
+func (r *clientRepository) ExistsByContactPerson1Number(contactNumber string, excludeClientID int64) (bool, error) {
+	contactNumber = strings.TrimSpace(contactNumber)
+	if contactNumber == "" {
+		return false, nil
+	}
+	q := r.db.Model(&persistencemodels.Client{}).Where("ContactPerson1Number = ?", contactNumber)
+	if excludeClientID > 0 {
+		q = q.Where("ClientID <> ?", excludeClientID)
+	}
+	var count int64
+	// Do not use Limit() with Count(): SQL Server rejects ORDER BY on an aggregate.
+	if err := q.Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 func (r *clientRepository) Create(c *domain.Client, brandNames []string) error {
 	brands := NormalizeClientBrandNames(brandNames)
 	return r.db.Transaction(func(tx *gorm.DB) error {
@@ -195,7 +213,7 @@ func (r *clientRepository) FindByContactNumber(contactNumber string) (*domain.Cl
 	return &domainClient, nil
 }
 
-func (r *clientRepository) FindByCity(cityID int8) ([]domain.Client, error) {
+func (r *clientRepository) FindByCity(cityID int16) ([]domain.Client, error) {
 	var clients []persistencemodels.Client
 	err := r.db.Where("CityID = ?", cityID).Find(&clients).Error
 	return mapClientsToDomain(clients), err
@@ -221,7 +239,7 @@ func (r *clientRepository) FindActiveBrandMappingsByClientID(clientID int64) ([]
 	return out, nil
 }
 
-func (r *clientRepository) FindByState(stateID int8) ([]domain.Client, error) {
+func (r *clientRepository) FindByState(stateID int16) ([]domain.Client, error) {
 	var clients []persistencemodels.Client
 	err := r.db.Where("StateID = ?", stateID).Find(&clients).Error
 	return mapClientsToDomain(clients), err

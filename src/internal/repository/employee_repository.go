@@ -2,10 +2,11 @@ package repository
 
 import (
 	"fmt"
+	"strings"
 
 	"b2b-diagnostic-aggregator/apis/internal/domain"
-	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
+	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 
 	"gorm.io/gorm"
 )
@@ -15,6 +16,7 @@ type EmployeeRepository interface {
 	FindByID(id int64) (*domain.Employee, error)
 	FindByMobileNumber(mobileNumber string) (*domain.Employee, error)
 	ExistsByID(id int64) (bool, error)
+	ExistsByMobileNumber(mobileNumber string, excludeUID int64) (bool, error)
 	Create(e *domain.Employee) error
 	Update(e *domain.Employee) error
 	Delete(id int64) error
@@ -30,7 +32,7 @@ func NewEmployeeRepository(db *gorm.DB) EmployeeRepository {
 
 func (r *employeeRepository) FindAll() ([]domain.Employee, error) {
 	var list []persistencemodels.Employee
-	if err := r.db.Find(&list).Error; err != nil {
+	if err := r.db.Where("IsActive = ?", true).Find(&list).Error; err != nil {
 		return nil, err
 	}
 	return mapEmployeesToDomain(list), nil
@@ -38,7 +40,7 @@ func (r *employeeRepository) FindAll() ([]domain.Employee, error) {
 
 func (r *employeeRepository) FindByID(id int64) (*domain.Employee, error) {
 	var m persistencemodels.Employee
-	if err := r.db.First(&m, id).Error; err != nil {
+	if err := r.db.Where("UID = ? AND IsActive = ?", id, true).First(&m).Error; err != nil {
 		return nil, err
 	}
 	d := mapEmployeeToDomain(m)
@@ -47,14 +49,14 @@ func (r *employeeRepository) FindByID(id int64) (*domain.Employee, error) {
 
 func (r *employeeRepository) FindByMobileNumber(mobileNumber string) (*domain.Employee, error) {
 	var m persistencemodels.Employee
-	if err := r.db.Where("MobileNumber = ?", mobileNumber).First(&m).Error; err != nil {
+	if err := r.db.Where("MobileNumber = ? AND IsActive = ?", mobileNumber, true).First(&m).Error; err != nil {
 		return nil, err
 	}
 	d := mapEmployeeToDomain(m)
 
 	// Console log: print DB record details (excluding mobile number)
-	fmt.Printf("Employee DB record: UID=%d FullName=%s Address=%s CityID=%d StateID=%d Pincode=%s CompanyEmailID=%s Designation=%s Department=%s CreatedBy=%d CreatedOn=%v LastUpdatedBy=%d LastUpdatedOn=%v\n",
-		d.UID, d.FullName, d.Address, d.CityID, d.StateID, d.Pincode, d.CompanyEmailID, d.Designation, d.Department, d.CreatedBy, d.CreatedOn.ToTime(), d.LastUpdatedBy, d.LastUpdatedOn.ToTime())
+	fmt.Printf("Employee DB record: UID=%d FullName=%s Address=%s CityID=%d StateID=%d Pincode=%s CompanyEmailID=%s Designation=%s Department=%s IsActive=%v IsPriceViewAccess=%v CreatedBy=%d CreatedOn=%v LastUpdatedBy=%d LastUpdatedOn=%v\n",
+		d.UID, d.FullName, d.Address, d.CityID, d.StateID, d.Pincode, d.CompanyEmailID, d.Designation, d.Department, d.IsActive, d.IsPriceViewAccess, d.CreatedBy, d.CreatedOn.ToTime(), d.LastUpdatedBy, d.LastUpdatedOn.ToTime())
 
 	return &d, nil
 }
@@ -62,6 +64,23 @@ func (r *employeeRepository) FindByMobileNumber(mobileNumber string) (*domain.Em
 func (r *employeeRepository) ExistsByID(id int64) (bool, error) {
 	var count int64
 	if err := r.db.Model(&persistencemodels.Employee{}).Where("UID = ?", id).Limit(1).Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (r *employeeRepository) ExistsByMobileNumber(mobileNumber string, excludeUID int64) (bool, error) {
+	mobileNumber = strings.TrimSpace(mobileNumber)
+	if mobileNumber == "" {
+		return false, nil
+	}
+	q := r.db.Model(&persistencemodels.Employee{}).Where("MobileNumber = ?", mobileNumber)
+	if excludeUID > 0 {
+		q = q.Where("UID <> ?", excludeUID)
+	}
+	var count int64
+	// Do not use Limit() with Count(): SQL Server rejects ORDER BY on an aggregate.
+	if err := q.Count(&count).Error; err != nil {
 		return false, err
 	}
 	return count > 0, nil
@@ -100,8 +119,10 @@ func mapEmployeeToDomain(p persistencemodels.Employee) domain.Employee {
 		MobileNumber:   p.MobileNumber,
 		CompanyEmailID: p.CompanyEmailID,
 		Designation:    p.Designation,
-		Department:     p.Department,
-		CreatedBy:      p.CreatedBy,
+		Department:        p.Department,
+		IsActive:         p.IsActive,
+		IsPriceViewAccess: p.IsPriceViewAccess,
+		CreatedBy:         p.CreatedBy,
 		CreatedOn:      timeutil.FromTime(p.CreatedOn),
 		LastUpdatedBy:  p.LastUpdatedBy,
 		LastUpdatedOn:  timeutil.FromTime(p.LastUpdatedOn),
@@ -119,8 +140,10 @@ func mapEmployeeToPersistence(d domain.Employee) persistencemodels.Employee {
 		MobileNumber:   d.MobileNumber,
 		CompanyEmailID: d.CompanyEmailID,
 		Designation:    d.Designation,
-		Department:     d.Department,
-		CreatedBy:      d.CreatedBy,
+		Department:        d.Department,
+		IsActive:         d.IsActive,
+		IsPriceViewAccess: d.IsPriceViewAccess,
+		CreatedBy:         d.CreatedBy,
 		CreatedOn:      d.CreatedOn.ToTime(),
 		LastUpdatedBy:  d.LastUpdatedBy,
 		LastUpdatedOn:  d.LastUpdatedOn.ToTime(),

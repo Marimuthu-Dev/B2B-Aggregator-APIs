@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"b2b-diagnostic-aggregator/apis/pkg/utils"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -73,4 +75,13 @@ func GetUserType(c *gin.Context) (int, bool) {
 	default:
 		return 0, false
 	}
+}
+
+// GetStoreID returns jwt.userId when userType is store (4). Query/body storeId must not override this.
+func GetStoreID(c *gin.Context) (int64, bool) {
+	userType, ok := GetUserType(c)
+	if !ok || userType != utils.UserTypeStore {
+		return 0, false
+	}
+	return GetUserID(c)
 }

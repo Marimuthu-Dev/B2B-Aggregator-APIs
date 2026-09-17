@@ -6,14 +6,16 @@ type Employee struct {
 	UID            int64
 	FullName       string
 	Address        string
-	CityID         int8
-	StateID        int8
+	CityID         int16
+	StateID        int16
 	Pincode        string
 	MobileNumber   string
 	CompanyEmailID string
 	Designation    string
-	Department     string
-	CreatedBy      int64
+	Department        string
+	IsActive         bool
+	IsPriceViewAccess bool
+	CreatedBy         int64
 	CreatedOn      timeutil.ISTTime
 	LastUpdatedBy  int64
 	LastUpdatedOn  timeutil.ISTTime

@@ -7,5 +7,5 @@ type StateMaster struct {
 }
 
 func (StateMaster) TableName() string {
-	return "MediAdmin.tbl_StateMaster"
+	return Table("tbl_StateMaster")
 }

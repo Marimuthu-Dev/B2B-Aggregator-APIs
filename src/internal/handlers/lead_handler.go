@@ -10,6 +10,7 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
 	"b2b-diagnostic-aggregator/apis/internal/middleware"
+	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/service"
 	"b2b-diagnostic-aggregator/apis/internal/timeutil"
@@ -19,11 +20,12 @@ import (
 )
 
 type LeadHandler struct {
-	svc service.LeadService
+	svc      service.LeadService
+	storeSvc service.StoreService
 }
 
-func NewLeadHandler(svc service.LeadService) *LeadHandler {
-	return &LeadHandler{svc: svc}
+func NewLeadHandler(svc service.LeadService, storeSvc service.StoreService) *LeadHandler {
+	return &LeadHandler{svc: svc, storeSvc: storeSvc}
 }
 
 func (h *LeadHandler) GetAll(c *gin.Context) {
@@ -66,6 +68,11 @@ func (h *LeadHandler) GetAll(c *gin.Context) {
 		StatusID:       query.StatusID,
 		PackageID:      query.PackageID,
 		CollectionType: query.CollectionType,
+		StoreID:          query.StoreID,
+		StoreMasterID:    query.StoreMasterID,
+		StoreCityID:      query.StoreCityID,
+		StoreStateID:     query.StoreStateID,
+		RestrictToStoreID: storeIDFromJWT(c),
 		Search:                    query.Search,
 		FitnessStatus:             fitnessFilter,
 		AppointmentAtMin: apptMin,
@@ -113,6 +120,10 @@ func (h *LeadHandler) Create(c *gin.Context) {
 		return
 	}
 	lead := req.ToDomain()
+	if err := h.applyLeadCreateScopeFromJWT(c, &lead); err != nil {
+		respondError(c, err)
+		return
+	}
 	if err := h.svc.CreateLead(&lead, userID); err != nil {
 		respondError(c, err)
 		return
@@ -139,6 +150,19 @@ func (h *LeadHandler) Update(c *gin.Context) {
 	}
 	if !req.HasAtLeastOneField() {
 		respondError(c, apperrors.NewBadRequest("At least one field is required in the payload to update", nil))
+		return
+	}
+	existing, err := h.svc.GetLeadByID(params.ID)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	if !leadDetailAccessibleByJWT(c, existing) {
+		respondError(c, apperrors.NewNotFound("Lead not found", nil))
+		return
+	}
+	if err := applyLeadUpdateScopeFromJWT(c, &req); err != nil {
+		respondError(c, err)
 		return
 	}
 	lead, err := h.svc.UpdateLead(params.ID, &req, userID)
@@ -378,7 +402,21 @@ func applyLeadListScopeFromJWT(c *gin.Context, q *dto.LeadListQuery) {
 		q.ClientID = &userID
 	case utils.UserTypeLab:
 		q.LabID = &userID
+	case utils.UserTypeStore:
+		q.ClientID = nil
+		q.LabID = nil
+		q.StoreMasterID = &userID
+		sid := strconv.FormatInt(userID, 10)
+		q.StoreID = &sid
 	}
+}
+
+func storeIDFromJWT(c *gin.Context) *int64 {
+	id, ok := middleware.GetStoreID(c)
+	if !ok || id <= 0 {
+		return nil
+	}
+	return &id
 }
 
 // requireLeadListJWTSatisfied ensures client/lab callers always have a forced filter (no unscoped list).
@@ -394,6 +432,10 @@ func requireLeadListJWTSatisfied(c *gin.Context, q *dto.LeadListQuery) error {
 		}
 	case utils.UserTypeLab:
 		if q.LabID == nil {
+			return apperrors.NewUnauthorized("Authentication required", nil)
+		}
+	case utils.UserTypeStore:
+		if q.StoreID == nil && q.StoreMasterID == nil {
 			return apperrors.NewUnauthorized("Authentication required", nil)
 		}
 	}
@@ -420,6 +462,8 @@ func leadDetailAccessibleByJWT(c *gin.Context, d *domain.LeadDetail) bool {
 			return false
 		}
 		return *d.LabID == userID
+	case utils.UserTypeStore:
+		return domain.LeadBelongsToStore(userID, d.StoreMasterID, d.StoreID)
 	default:
 		return false
 	}
@@ -477,6 +521,22 @@ func enrichLeadListQueryFromPascalCaseKeys(c *gin.Context, q *dto.LeadListQuery)
 			q.Search = s
 		}
 	}
+	if q.StoreID == nil {
+		if s := strings.TrimSpace(c.Query("StoreID")); s != "" {
+			q.StoreID = &s
+		} else if s := strings.TrimSpace(c.Query("storeid")); s != "" {
+			q.StoreID = &s
+		}
+	}
+	if err := mergePositiveInt64QueryMulti(c, &q.StoreMasterID, "StoreMasterID", "storeMasterID", "storemasterid"); err != nil {
+		return err
+	}
+	if err := mergePositiveInt16QueryMulti(c, &q.StoreCityID, "StoreCityID", "storeCityID", "storecityid"); err != nil {
+		return err
+	}
+	if err := mergePositiveInt16QueryMulti(c, &q.StoreStateID, "StoreStateID", "storeStateID", "storestateid"); err != nil {
+		return err
+	}
 	if strings.TrimSpace(q.FitnessStatus) == "" {
 		if s := strings.TrimSpace(c.Query("FitnessStatus")); s != "" {
 			q.FitnessStatus = s
@@ -519,6 +579,61 @@ func mergeLeadCollectionTypeQueryParam(c *gin.Context, q *dto.LeadListQuery) err
 }
 
 // mergePositiveInt64QueryMulti sets *dest from the first non-empty query key among keys (order preserved).
+func (h *LeadHandler) applyLeadCreateScopeFromJWT(c *gin.Context, lead *domain.Lead) error {
+	userID, idOK := middleware.GetUserID(c)
+	userType, typeOK := middleware.GetUserType(c)
+	if !idOK || !typeOK || userID <= 0 {
+		return apperrors.NewUnauthorized("Authentication required", nil)
+	}
+	switch userType {
+	case utils.UserTypeEmployee:
+		return nil
+	case utils.UserTypeClient:
+		if lead.ClientID != userID {
+			return apperrors.NewForbidden("You are not authorized for this activity.", nil)
+		}
+		return nil
+	case utils.UserTypeStore:
+		if !persistencemodels.HasStoreMasterTable() {
+			return apperrors.NewForbidden("You are not authorized for this activity.", nil)
+		}
+		store, err := h.storeSvc.GetStoreByID(userID)
+		if err != nil {
+			return err
+		}
+		lead.ClientID = store.ClientID
+		sid := store.StoreID
+		lead.StoreMasterID = &sid
+		lead.StoreID = strconv.FormatInt(store.StoreID, 10)
+		return nil
+	default:
+		return apperrors.NewForbidden("You are not authorized for this activity.", nil)
+	}
+}
+
+func applyLeadUpdateScopeFromJWT(c *gin.Context, req *dto.LeadUpdateRequest) error {
+	userID, idOK := middleware.GetUserID(c)
+	userType, typeOK := middleware.GetUserType(c)
+	if !idOK || !typeOK || userID <= 0 {
+		return apperrors.NewUnauthorized("Authentication required", nil)
+	}
+	switch userType {
+	case utils.UserTypeEmployee:
+		return nil
+	case utils.UserTypeClient:
+		if req.ClientID != nil && *req.ClientID != userID {
+			return apperrors.NewForbidden("You are not authorized for this activity.", nil)
+		}
+		return nil
+	case utils.UserTypeStore:
+		req.ClientID = nil
+		req.StoreMasterID = nil
+		return nil
+	default:
+		return apperrors.NewForbidden("You are not authorized for this activity.", nil)
+	}
+}
+
 func mergePositiveInt64QueryMulti(c *gin.Context, dest **int64, keys ...string) error {
 	if *dest != nil {
 		return nil
@@ -552,6 +667,26 @@ func mergePositiveIntQueryMulti(c *gin.Context, dest **int, keys ...string) erro
 			return apperrors.NewBadRequest("Invalid query parameter "+key+": must be a positive integer", err)
 		}
 		v := int(n64)
+		*dest = &v
+		return nil
+	}
+	return nil
+}
+
+func mergePositiveInt16QueryMulti(c *gin.Context, dest **int16, keys ...string) error {
+	if *dest != nil {
+		return nil
+	}
+	for _, key := range keys {
+		raw := strings.TrimSpace(c.Query(key))
+		if raw == "" {
+			continue
+		}
+		n64, err := strconv.ParseInt(raw, 10, 16)
+		if err != nil || n64 < 1 {
+			return apperrors.NewBadRequest("Invalid query parameter "+key+": must be a positive integer", err)
+		}
+		v := int16(n64)
 		*dest = &v
 		return nil
 	}

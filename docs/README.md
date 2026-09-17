@@ -4,7 +4,9 @@ This folder contains all project documentation.
 
 ## Documentation index
 
-- **DEPLOYMENT.md** – Setup and deployment to Azure (WSL, Docker, Azure CLI, ACR, container deploy, Application settings, binary/zip deploy, troubleshooting). Use this for deploying the Go API to Azure App Service.
+- **DEPLOYMENT.md** – Setup and deployment to Azure (WSL, Docker, Azure CLI, ACR, container deploy, Application settings, binary/zip deploy, troubleshooting). Use this for deploying the Go API to Azure App Service (staging).
+- **DEPLOYMENT-PROD.md** – Production container deploy for UrMediConnect (`um-prod-api`).
+- **DEPLOYMENT-PROD-MED.md** – Production container deploy for Med client (`med-prod-api`, plan `med-prod-appservice-plan-linux`, RG `med-prod-rg-appservice`).
 - **GoLang_Technical_Handbook.md** – Go language and architecture guide for the project (concurrency, patterns, testing, performance).
 - **SONARQUBE.md** – How to run the SonarQube (or SonarCloud) scanner and optional coverage for the Go project.
 

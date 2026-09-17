@@ -15,11 +15,12 @@ import (
 )
 
 type PackageHandler struct {
-	svc service.PackageService
+	svc      service.PackageService
+	storeSvc service.StoreService
 }
 
-func NewPackageHandler(svc service.PackageService) *PackageHandler {
-	return &PackageHandler{svc: svc}
+func NewPackageHandler(svc service.PackageService, storeSvc service.StoreService) *PackageHandler {
+	return &PackageHandler{svc: svc, storeSvc: storeSvc}
 }
 
 func (h *PackageHandler) GetAll(c *gin.Context) {
@@ -229,6 +230,17 @@ func (h *PackageHandler) GetAllPackageClientMappings(c *gin.Context) {
 			return
 		}
 		clientID = &userID
+	case utils.UserTypeStore:
+		if !idOK || userID <= 0 {
+			respondError(c, apperrors.NewUnauthorized("Authentication required", nil))
+			return
+		}
+		store, err := h.storeSvc.GetStoreByID(userID)
+		if err != nil {
+			respondError(c, err)
+			return
+		}
+		clientID = &store.ClientID
 	case utils.UserTypeEmployee:
 		var query dto.PackageClientMappingListQuery
 		if !middleware.BindQuery(c, &query) {
