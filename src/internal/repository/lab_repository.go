@@ -24,7 +24,7 @@ type LabRepository interface {
 	FindByContactNumber(contactNumber string) (*domain.Lab, error)
 	FindByCity(cityID uint8) ([]domain.Lab, error)
 	FindByState(stateID uint8) ([]domain.Lab, error)
-	GetLabFullAddress(id int64) (string, error)
+	GetLabFullAddressAndMap(id int64) (string, string, error)
 }
 
 type labRepository struct {
@@ -197,18 +197,22 @@ func (r *labRepository) FindByState(stateID uint8) ([]domain.Lab, error) {
 	return mapLabsToDomain(labs), err
 }
 
-func (r *labRepository) GetLabFullAddress(id int64) (string, error) {
-	var address string
+func (r *labRepository) GetLabFullAddressAndMap(id int64) (string, string, error) {
+	var result struct {
+		Address        string
+		MapLocationURL string
+	}
 	query := fmt.Sprintf(`
-		SELECT COALESCE(l.Address, '') + ', ' + COALESCE(c.CityName, '') + ', ' + COALESCE(s.StateName, '')
+		SELECT COALESCE(l.Address, '') + ', ' + COALESCE(c.CityName, '') + ', ' + COALESCE(s.StateName, '') as Address,
+		       COALESCE(l.MapLocationURL, '') as MapLocationURL
 		FROM %s l
 		LEFT JOIN %s c ON l.CityID = c.CityID
 		LEFT JOIN %s s ON l.StateID = s.StateID
 		WHERE l.LabID = ?
 	`, persistencemodels.Table("tbl_LabMaster"), persistencemodels.Table("tbl_CityMaster"), persistencemodels.Table("tbl_StateMaster"))
-	err := r.db.Raw(query, id).Row().Scan(&address)
+	err := r.db.Raw(query, id).Scan(&result).Error
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	return strings.Trim(strings.TrimSpace(address), ","), nil
+	return strings.Trim(strings.TrimSpace(result.Address), ","), result.MapLocationURL, nil
 }

@@ -297,8 +297,7 @@ func (s *leadService) UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUp
 		}
 
 		if eventType != "" {
-			address, _ := s.labRepo.GetLabFullAddress(*l.LabID)
-			go s.queueWhatsAppMessage(ctx, &l, eventType, address)
+			go s.queueWhatsAppMessage(ctx, &l, eventType, l.LabID)
 		}
 	}
 	
@@ -398,14 +397,12 @@ func (s *leadService) BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastU
 			}
 			
 			if eventType != "" {
-				address, _ := s.labRepo.GetLabFullAddress(*currentLabID)
-				
 				updatedLead := l
 				ap := timeutil.StoredFromTime(*appointmentPersist)
 				updatedLead.AppointmentAt = &ap
 				updatedLead.LabID = currentLabID
 				
-				go s.queueWhatsAppMessage(ctx, &updatedLead, eventType, address)
+				go s.queueWhatsAppMessage(ctx, &updatedLead, eventType, currentLabID)
 			}
 		}
 	}
@@ -776,7 +773,7 @@ func (s *leadService) ApproveLeadReport(leadID int64, req *dto.ApproveLeadReques
 	if same && !(isFit == domain.LeadFitFit && lead.LeadStatusID == domain.LeadStatusIDReportUploaded) {
 		return nil
 	}
-	return s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
+	err = s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
 		n, err := leadRepo.UpdateLeadReportApproval(leadID, userID, isFit, req.AllowDownload, certTobe, remarksPtr, req.BrandID)
 		if err != nil {
 			return err
@@ -791,8 +788,8 @@ func (s *leadService) ApproveLeadReport(leadID int64, req *dto.ApproveLeadReques
 		})
 	})
 	
-	if err == nil {
-		go s.queueWhatsAppMessage(context.Background(), lead, "lab_report_completed", "")
+	if err == nil && isFit == domain.LeadFitFit {
+		go s.queueWhatsAppMessage(context.Background(), lead, "lab_report_completed", lead.LabID)
 	}
 	
 	return err
@@ -824,7 +821,7 @@ func (s *leadService) validateLeadStoreMasterID(clientID int64, storeMasterID *i
 	return nil
 }
 
-func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lead, templateName string, labAddress string) {
+func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lead, templateName string, labID *int64) {
 	if s.whatsappRepo == nil || s.whatsappTemplateRepo == nil {
 		slog.Warn("WhatsApp repos not configured, skipping notification", slog.Int64("leadID", lead.LeadID))
 		return
@@ -834,23 +831,42 @@ func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lea
 		return
 	}
 	
+	var labAddress, mapURL, packageName string
+	if labID != nil {
+		labAddress, mapURL, _ = s.labRepo.GetLabFullAddressAndMap(*labID)
+	}
+	if lead.PackageID != 0 {
+		if pkg, err := s.packageRepo.FindByID(int64(lead.PackageID)); err == nil && pkg != nil {
+			packageName = pkg.PackageName
+		}
+	}
+	
+	mapSection := ""
+	if mapURL != "" {
+		mapSection = fmt.Sprintf("Map: %s\n\n", mapURL)
+	}
+	
 	// Format text based on template
 	var text string
 	switch templateName {
 	case "lab_appointment_confirmation":
-		text = fmt.Sprintf("Dear %s, Your lab appointment has been confirmed. Date: %s Time: %s Location: %s",
+		text = fmt.Sprintf("*Lab Appointment Confirmation*\n\n*Dear %s*,\n\nYour lab appointment has been confirmed.\n\n📅 Date: %s\n⏰ Time: %s\n\n📍 Location: %s\n\n%sLab Package Name: %s\n\nKindly arrive 10 minutes early with valid ID proof.\n\nThank you for choosing MedLyfe Health.",
 			lead.PatientName,
 			lead.AppointmentAt.Format("02-01-2006"),
 			lead.AppointmentAt.Format("03:04 PM"),
-			labAddress)
+			labAddress,
+			mapSection,
+			packageName)
 	case "appointment_rescheduled":
-		text = fmt.Sprintf("Dear %s, Your lab appointment has been rescheduled. New Date: %s New Time: %s Location: %s",
+		text = fmt.Sprintf("📅 *Appointment Rescheduled*\n\nDear %s,\n\nYour lab appointment has been rescheduled.\n\n📅 New Date: %s\n⏰ New Time: %s\n\n📍 Location: %s\n\n%sLab Package Name: %s\n\nPlease arrive 10 minutes before with valid ID Proof\n\nThank you for choosing MedLyfe Health.",
 			lead.PatientName,
 			lead.AppointmentAt.Format("02-01-2006"),
 			lead.AppointmentAt.Format("03:04 PM"),
-			labAddress)
+			labAddress,
+			mapSection,
+			packageName)
 	case "lab_report_completed":
-		text = fmt.Sprintf("Dear %s, Your lab report is now ready. Please click on below link to download your report. %s",
+		text = fmt.Sprintf("📄 *Lab Report Completed*\n\nDear %s,\n\nYour lab report is now ready.\nPlease click on below link to download your report.\n\n%s\n\nThank you for choosing MedLyfe Health.",
 			lead.PatientName,
 			lead.ReportURL)
 	default:
