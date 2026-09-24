@@ -10,12 +10,13 @@ import (
 )
 
 type leadJoinedNames struct {
-	LabName    sql.NullString
-	ClientName sql.NullString
-	CityName   sql.NullString
-	StateName  sql.NullString
-	StoreName  sql.NullString
-	StoreCity  sql.NullString
+	LabName     sql.NullString
+	ClientName  sql.NullString
+	CityName    sql.NullString
+	StateName   sql.NullString
+	StoreName   sql.NullString
+	StoreCity   sql.NullString
+	PackageName sql.NullString
 }
 
 func mapLeadToDomainWithOptionalJoinedNames(p persistencemodels.Lead, names leadJoinedNames) domain.Lead {
@@ -31,6 +32,9 @@ func mapLeadToDomainWithOptionalJoinedNames(p persistencemodels.Lead, names lead
 	}
 	if names.StateName.Valid {
 		d.StateName = strings.TrimSpace(names.StateName.String)
+	}
+	if names.PackageName.Valid {
+		d.PackageName = strings.TrimSpace(names.PackageName.String)
 	}
 	if persistencemodels.HasStoreMasterTable() {
 		if names.StoreName.Valid {

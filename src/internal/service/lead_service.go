@@ -59,7 +59,36 @@ func NewLeadService(repo repository.LeadRepository, uow repository.LeadUnitOfWor
 }
 
 func (s *leadService) ListLeads(filter repository.LeadListFilter) ([]domain.Lead, int64, error) {
-	return s.repo.List(filter)
+	leads, total, err := s.repo.List(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	if len(leads) > 0 {
+		pkgIDsMap := make(map[int64]bool)
+		for _, l := range leads {
+			if l.PackageID > 0 {
+				pkgIDsMap[int64(l.PackageID)] = true
+			}
+		}
+		var testsMap map[int64][]string
+		if len(pkgIDsMap) > 0 {
+			pkgIDs := make([]int64, 0, len(pkgIDsMap))
+			for pid := range pkgIDsMap {
+				pkgIDs = append(pkgIDs, pid)
+			}
+			testsMap, _ = s.packageRepo.FindActiveTestNamesByPackageIDs(pkgIDs)
+		}
+		for i := range leads {
+			if testsMap != nil {
+				if t, ok := testsMap[int64(leads[i].PackageID)]; ok && t != nil {
+					leads[i].Tests = t
+					continue
+				}
+			}
+			leads[i].Tests = []string{}
+		}
+	}
+	return leads, total, nil
 }
 
 func (s *leadService) GetLeadByID(id int64) (*domain.LeadDetail, error) {
@@ -71,17 +100,27 @@ func (s *leadService) GetLeadByID(id int64) (*domain.LeadDetail, error) {
 		return nil, err
 	}
 	detail := &domain.LeadDetail{Lead: *lead}
-	if lead.ClientID != 0 {
+	if lead.ClientID != 0 && detail.ClientName == "" {
 		if client, _ := s.clientRepo.FindByID(lead.ClientID); client != nil {
 			detail.ClientName = client.ClientName
 		}
 	}
 	if lead.PackageID != 0 {
-		if pkg, _ := s.packageRepo.FindByID(int64(lead.PackageID)); pkg != nil {
-			detail.PackageName = pkg.PackageName
+		if detail.PackageName == "" {
+			if pkg, _ := s.packageRepo.FindByID(int64(lead.PackageID)); pkg != nil {
+				detail.PackageName = pkg.PackageName
+			}
+		}
+		if testsMap, _ := s.packageRepo.FindActiveTestNamesByPackageIDs([]int64{int64(lead.PackageID)}); testsMap != nil {
+			if t, ok := testsMap[int64(lead.PackageID)]; ok && t != nil {
+				detail.Tests = t
+			}
 		}
 	}
-	if lead.LabID != nil && *lead.LabID != 0 {
+	if detail.Tests == nil {
+		detail.Tests = []string{}
+	}
+	if lead.LabID != nil && *lead.LabID != 0 && detail.LabName == "" {
 		if lab, err := s.labRepo.FindByID(*lead.LabID); err == nil && lab != nil {
 			detail.LabName = lab.LabName
 		}

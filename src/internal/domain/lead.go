@@ -163,6 +163,8 @@ type Lead struct {
 	Age                           int8
 	Gender                        string
 	PackageID                     int
+	PackageName                   string   `json:"PackageName,omitempty"`
+	Tests                         []string `json:"Tests"`
 	ContactNumber                 string
 	Emailid                       string
 	Address                       string
@@ -197,10 +199,9 @@ type Lead struct {
 	LastUpdatedOn                 timeutil.ISTTime
 }
 
-// LeadDetail is lead with resolved PackageName for API response (ClientName is on embedded Lead).
+// LeadDetail is lead with resolved PackageName and Tests for API response (ClientName is on embedded Lead).
 type LeadDetail struct {
 	Lead
-	PackageName string `json:"PackageName,omitempty"`
 }
 
 type LeadHistory struct {
