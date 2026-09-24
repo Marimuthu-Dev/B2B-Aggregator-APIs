@@ -11,6 +11,7 @@ import (
 
 	"b2b-diagnostic-aggregator/apis/internal/apperrors"
 	"b2b-diagnostic-aggregator/apis/internal/config"
+	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/dto"
 	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
@@ -114,11 +115,13 @@ func (s *loginService) resolveUserByMobileNumber(domainName, mobileNumber string
 		}
 		return s.resolveStoreByMobileNumber(mobileNumber)
 	case utils.UserTypeStore:
-		fmt.Println("[LOGIN] Service.resolveUserByMobileNumber: resolving store by contact number")
+		fmt.Println("[LOGIN] Service.resolveUserByMobileNumber: resolving store by email ID")
 		if !persistencemodels.HasStoreMasterTable() {
 			return 0, 0, nil, apperrors.NewNotFound("User not found", nil)
 		}
-		return s.resolveStoreByMobileNumber(mobileNumber)
+		// Note: emailID is passed via the mobileNumber field in the resolver for backward-compat;
+		// for store domain the caller should use resolveStoreByEmailID directly.
+		return s.resolveStoreByEmailID(mobileNumber)
 	case utils.UserTypeEmployee:
 		fmt.Println("[LOGIN] Service.resolveUserByMobileNumber: resolving employee by mobile number")
 		employee, err := s.employeeRepo.FindByMobileNumber(mobileNumber)
@@ -155,6 +158,25 @@ func (s *loginService) resolveStoreByMobileNumber(mobileNumber string) (int64, i
 		fmt.Printf("[LOGIN] Service.resolveStoreByMobileNumber: store not found: %v\n", err)
 		return 0, 0, nil, apperrors.NewNotFound("User not found", err)
 	}
+	return s.validateAndReturnStore(store)
+}
+
+func (s *loginService) resolveStoreByEmailID(emailID string) (int64, int, interface{}, error) {
+	if !persistencemodels.HasStoreMasterTable() {
+		return 0, 0, nil, apperrors.NewNotFound("User not found", nil)
+	}
+	store, err := s.storeRepo.FindByEmailID(emailID)
+	if err != nil {
+		fmt.Printf("[LOGIN] Service.resolveStoreByEmailID: store not found by email: %v\n", err)
+		return 0, 0, nil, apperrors.NewNotFound("User not found", err)
+	}
+	return s.validateAndReturnStore(store)
+}
+
+func (s *loginService) validateAndReturnStore(store *domain.Store) (int64, int, interface{}, error) {
+	if store == nil {
+		return 0, 0, nil, apperrors.NewNotFound("User not found", nil)
+	}
 	if !store.IsActive {
 		return 0, 0, nil, apperrors.NewUnauthorized("Invalid credentials", errors.New("store inactive"))
 	}
@@ -163,7 +185,7 @@ func (s *loginService) resolveStoreByMobileNumber(mobileNumber string) (int64, i
 		return 0, 0, nil, apperrors.NewUnauthorized("Invalid credentials", errors.New("store login disabled"))
 	}
 	store.ClientName = parent.ClientName
-	fmt.Printf("[LOGIN] Service.resolveStoreByMobileNumber: store found StoreID=%d ClientID=%d\n", store.StoreID, store.ClientID)
+	fmt.Printf("[LOGIN] Service.validateAndReturnStore: store found StoreID=%d ClientID=%d\n", store.StoreID, store.ClientID)
 	return store.StoreID, utils.UserTypeStore, store, nil
 }
 
@@ -174,11 +196,22 @@ func (s *loginService) Login(req dto.LoginRequest) (*dto.LoginResponse, error) {
 	var userTypeStr string
 	var userData interface{}
 
-	if req.Domain != "" && req.MobileNumber != "" {
-		fmt.Println("[LOGIN] Service.Login: using domain + mobileNumber path")
-		uid, ut, ud, err := s.resolveUserByMobileNumber(req.Domain, req.MobileNumber)
+	if req.Domain != "" && (req.MobileNumber != "" || req.EmailID != "") {
+		fmt.Println("[LOGIN] Service.Login: using domain + identifier path")
+		var uid int64
+		var ut int
+		var ud interface{}
+		var err error
+		// Check if it's a store domain and email is provided
+		userTypeForDomain := utils.GetUserTypeFromDomain(req.Domain)
+		if userTypeForDomain == utils.UserTypeStore && req.EmailID != "" {
+			fmt.Println("[LOGIN] Service.Login: store domain with emailId, resolving by email")
+			uid, ut, ud, err = s.resolveStoreByEmailID(req.EmailID)
+		} else {
+			uid, ut, ud, err = s.resolveUserByMobileNumber(req.Domain, req.MobileNumber)
+		}
 		if err != nil {
-			fmt.Printf("[LOGIN] Service.Login: resolveUserByMobileNumber failed: %v\n", err)
+			fmt.Printf("[LOGIN] Service.Login: resolve user failed: %v\n", err)
 			return nil, err
 		}
 		userID, userType, userData = uid, ut, ud

@@ -1,9 +1,11 @@
 package dto
 
-// LoginRequest supports domain + mobileNumber + password (Node-style) or legacy userId + password
+// LoginRequest supports domain + mobileNumber + password (Node-style) or legacy userId + password.
+// For store portal (UserType=4 / domain="store"): emailId is used instead of mobileNumber.
 type LoginRequest struct {
 	Domain       string `json:"-"`            // from X-Domain header
-	MobileNumber string `json:"mobileNumber"` // required when using domain
+	MobileNumber string `json:"mobileNumber"` // required when using domain for non-store portals
+	EmailID      string `json:"emailId"`      // required when using domain for store portal (UserType=4)
 	Password     string `json:"Password" binding:"required"`
 	UserID       int64  `json:"userId"` // legacy: optional when domain+mobileNumber provided
 }

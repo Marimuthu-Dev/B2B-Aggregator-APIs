@@ -46,16 +46,31 @@ func (h *LoginHandler) Login(c *gin.Context) {
 	}
 	req.Domain = domain
 	req.MobileNumber = strings.TrimSpace(req.MobileNumber)
-	fmt.Printf("[LOGIN] Handler.Login: bound request domain=%q mobileNumber=%q userId=%d\n", req.Domain, req.MobileNumber, req.UserID)
+	req.EmailID = strings.TrimSpace(req.EmailID)
+	fmt.Printf("[LOGIN] Handler.Login: bound request domain=%q mobileNumber=%q emailId=%q userId=%d\n", req.Domain, req.MobileNumber, req.EmailID, req.UserID)
 
-	if req.Domain != "" && req.MobileNumber == "" {
-		fmt.Println("[LOGIN] Handler.Login: validation failed - mobileNumber required when X-Domain present")
-		respondError(c, apperrors.NewBadRequest("mobileNumber is required when using X-Domain", nil))
-		return
+	if req.Domain != "" {
+		isStoreDomain := strings.ToLower(req.Domain) == "4" || strings.ToLower(req.Domain) == "store" ||
+			strings.HasPrefix(strings.ToLower(req.Domain), "store.")
+		if isStoreDomain {
+			// Store portal: email ID is required
+			if req.EmailID == "" {
+				fmt.Println("[LOGIN] Handler.Login: validation failed - emailId required for store portal")
+				respondError(c, apperrors.NewBadRequest("emailId is required for store portal login", nil))
+				return
+			}
+		} else {
+			// Other portals: mobile number is required
+			if req.MobileNumber == "" {
+				fmt.Println("[LOGIN] Handler.Login: validation failed - mobileNumber required when X-Domain present")
+				respondError(c, apperrors.NewBadRequest("mobileNumber is required when using X-Domain", nil))
+				return
+			}
+		}
 	}
 	if req.Domain == "" && req.UserID == 0 {
-		fmt.Println("[LOGIN] Handler.Login: validation failed - need X-Domain+mobileNumber or userId")
-		respondError(c, apperrors.NewBadRequest("either X-Domain + mobileNumber or userId is required", nil))
+		fmt.Println("[LOGIN] Handler.Login: validation failed - need X-Domain+mobileNumber/emailId or userId")
+		respondError(c, apperrors.NewBadRequest("either X-Domain + mobileNumber/emailId or userId is required", nil))
 		return
 	}
 

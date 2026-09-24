@@ -30,6 +30,7 @@ type StoreRepository interface {
 	Update(s *domain.Store) error
 	FindByID(id int64) (*domain.Store, error)
 	FindByContactNumber(contactNumber string) (*domain.Store, error)
+	FindByEmailID(emailID string) (*domain.Store, error)
 	ExistsByContactNumber(contactNumber string, excludeStoreID int64) (bool, error)
 	ExistsByEmailID(emailID string, excludeStoreID int64) (bool, error)
 	List(filter StoreListFilter) ([]domain.Store, int64, error)
@@ -111,6 +112,19 @@ func (r *storeRepository) FindByContactNumber(contactNumber string) (*domain.Sto
 	}
 	var row persistencemodels.Store
 	err := r.db.Where("ContactNumber = ?", contactNumber).First(&row).Error
+	if err != nil {
+		return nil, err
+	}
+	d := mapStoreToDomain(row)
+	return &d, nil
+}
+
+func (r *storeRepository) FindByEmailID(emailID string) (*domain.Store, error) {
+	if !persistencemodels.HasStoreMasterTable() {
+		return nil, gorm.ErrRecordNotFound
+	}
+	var row persistencemodels.Store
+	err := r.db.Where("EmailID = ?", emailID).First(&row).Error
 	if err != nil {
 		return nil, err
 	}
