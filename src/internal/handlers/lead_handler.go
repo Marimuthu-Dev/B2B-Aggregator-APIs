@@ -43,6 +43,9 @@ func (h *LeadHandler) GetAll(c *gin.Context) {
 		return
 	}
 	page := query.PaginationQuery.Normalize("createdOn", 0)
+	if c.Query("export") == "true" || c.Query("all") == "true" || c.Query("pageSize") == "0" {
+		page.PageSize = 0
+	}
 	fitnessFilter := domain.LeadListFitnessFilterNone
 	if raw := strings.TrimSpace(query.FitnessStatus); raw != "" {
 		var err error

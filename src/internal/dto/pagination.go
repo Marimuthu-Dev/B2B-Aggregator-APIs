@@ -3,9 +3,9 @@ package dto
 import "strings"
 
 type PaginationQuery struct {
-	Page     int    `form:"page" binding:"omitempty,min=1"`
-	PageSize int    `form:"pageSize" binding:"omitempty,min=1,max=1000"`
-	SortBy   string `form:"sortBy" binding:"omitempty"`
+	Page      int    `form:"page" binding:"omitempty,min=1"`
+	PageSize  int    `form:"pageSize" binding:"omitempty,min=0,max=100000"`
+	SortBy    string `form:"sortBy" binding:"omitempty"`
 	SortOrder string `form:"sortOrder" binding:"omitempty,oneof=asc desc ASC DESC"`
 }
 

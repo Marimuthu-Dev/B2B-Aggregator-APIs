@@ -98,14 +98,18 @@ func (r *leadRepository) List(filter LeadListFilter) ([]domain.Lead, int64, erro
 	sortColumn := "l." + mapLeadSortColumn(filter.SortBy)
 	order := normalizeSortOrder(filter.SortOrder)
 	offset := (filter.Page - 1) * filter.PageSize
+	if offset < 0 {
+		offset = 0
+	}
 
 	var rows []leadListScan
-	err := gormLead(r.leadListJoinedQuery(filter)).
+	dbQuery := gormLead(r.leadListJoinedQuery(filter)).
 		Select(leadListSelectColumns()).
-		Order(sortColumn + " " + order).
-		Limit(filter.PageSize).
-		Offset(offset).
-		Find(&rows).Error
+		Order(sortColumn + " " + order)
+	if filter.PageSize > 0 {
+		dbQuery = dbQuery.Limit(filter.PageSize).Offset(offset)
+	}
+	err := dbQuery.Find(&rows).Error
 	if err != nil {
 		return nil, 0, err
 	}
