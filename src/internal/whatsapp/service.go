@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -212,7 +213,15 @@ func (s *Service) postSend(ctx context.Context, payload whatsappRequest, endpoin
 		return fmt.Errorf("marshal whatsapp json: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewReader(body))
+	fullURL := u.String()
+	curlCmd := fmt.Sprintf("curl -X POST '%s' -H 'Content-Type: application/json' -d '%s'", fullURL, strings.ReplaceAll(string(body), "'", "'\\''"))
+
+	slog.Info("whatsapp 3rd party api call curl",
+		slog.String("templateName", payload.TemplateName),
+		slog.String("curl", curlCmd),
+	)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fullURL, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("new request: %w", err)
 	}
@@ -221,13 +230,13 @@ func (s *Service) postSend(ctx context.Context, payload whatsappRequest, endpoin
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("http send: %w", err)
+		return fmt.Errorf("http send: %w | curl: %s", err, curlCmd)
 	}
 	defer resp.Body.Close()
 
 	var response whatsappResponse
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return fmt.Errorf("decode response: %w", err)
+		return fmt.Errorf("decode response: %w | curl: %s", err, curlCmd)
 	}
 
 	if response.Status == "Success" && response.Code == "011" {
@@ -235,8 +244,8 @@ func (s *Service) postSend(ctx context.Context, payload whatsappRequest, endpoin
 	}
 
 	if resp.StatusCode == http.StatusTooManyRequests {
-		return fmt.Errorf("whatsapp API rate limited: code=%s description=%s", response.Code, response.Description)
+		return fmt.Errorf("whatsapp API rate limited: code=%s description=%s | curl: %s", response.Code, response.Description, curlCmd)
 	}
 
-	return fmt.Errorf("whatsapp API failed: status=%s code=%s description=%s", response.Status, response.Code, response.Description)
+	return fmt.Errorf("whatsapp API failed: status=%s code=%s description=%s | curl: %s", response.Status, response.Code, response.Description, curlCmd)
 }
