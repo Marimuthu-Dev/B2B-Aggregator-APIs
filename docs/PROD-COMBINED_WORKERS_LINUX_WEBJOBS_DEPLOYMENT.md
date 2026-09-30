@@ -114,7 +114,7 @@ ls templates chrome-linux64/chrome chrome-linux-deps
 
 ```bash
 # WSL/bash — repo root
-REPO_ROOT="/mnt/d/Code/MMK_Projects/B2B-Diagnostic-Aggregator/GitHub/B2B-Aggregator-APIs
+REPO_ROOT="/mnt/d/Code/MMK_Projects/B2B-Diagnostic-Aggregator/GitHub/B2B-Aggregator/B2B-Aggregator-APIs"
 SRC="$REPO_ROOT/src
 cd "$SRC"
 

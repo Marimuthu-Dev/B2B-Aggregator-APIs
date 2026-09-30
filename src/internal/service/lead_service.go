@@ -880,34 +880,104 @@ func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lea
 		}
 	}
 	
-	mapSection := ""
-	if mapURL != "" {
-		mapSection = fmt.Sprintf("Map: %s\n\n", mapURL)
+	appointmentDate := ""
+	appointmentTime := ""
+	if lead.AppointmentAt != nil {
+		appointmentDate = lead.AppointmentAt.Format("02-01-2006")
+		appointmentTime = lead.AppointmentAt.Format("03:04 PM")
 	}
+
+	hasMap := strings.TrimSpace(mapURL) != ""
 	
-	// Format text based on template
+	// Format text based on template and map presence
 	var text string
+	var resolvedTemplateName string
+
 	switch templateName {
-	case "lab_appointment_confirmation":
-		text = fmt.Sprintf("*Lab Appointment Confirmation*\n\n*Dear %s*,\n\nYour lab appointment has been confirmed.\n\n📅 Date: %s\n⏰ Time: %s\n\n📍 Location: %s\n\n%sLab Package Name: %s\n\nKindly arrive 10 minutes early with valid ID proof.\n\nThank you for choosing MedLyfe Health.",
-			lead.PatientName,
-			lead.AppointmentAt.Format("02-01-2006"),
-			lead.AppointmentAt.Format("03:04 PM"),
-			labAddress,
-			mapSection,
-			packageName)
+	case "lab_appointment_confirmation", "appointment_confirmed":
+		if hasMap {
+			resolvedTemplateName = "appointment_confirmed_with_map"
+			text = fmt.Sprintf("Dear %s,\nYour lab appointment has been confirmed.\n\nDate: %s\nTime: %s\nLocation: %s\nMap: %s\nLab Package Name: %s\n\nKindly arrive 10 minutes early with valid ID proof.\n\nThank you for choosing MedLyfe Health.",
+				lead.PatientName,
+				appointmentDate,
+				appointmentTime,
+				labAddress,
+				strings.TrimSpace(mapURL),
+				packageName)
+		} else {
+			resolvedTemplateName = "appointment_confirmed_without_map"
+			text = fmt.Sprintf("Dear %s,\nYour lab appointment has been confirmed.\n\nDate: %s\nTime: %s\nLocation: %s\nLab Package Name: %s\n\nKindly arrive 10 minutes early with valid ID proof.\n\nThank you for choosing MedLyfe Health.",
+				lead.PatientName,
+				appointmentDate,
+				appointmentTime,
+				labAddress,
+				packageName)
+		}
+
 	case "appointment_rescheduled":
-		text = fmt.Sprintf("📅 *Appointment Rescheduled*\n\nDear %s,\n\nYour lab appointment has been rescheduled.\n\n📅 New Date: %s\n⏰ New Time: %s\n\n📍 Location: %s\n\n%sLab Package Name: %s\n\nPlease arrive 10 minutes before with valid ID Proof\n\nThank you for choosing MedLyfe Health.",
-			lead.PatientName,
-			lead.AppointmentAt.Format("02-01-2006"),
-			lead.AppointmentAt.Format("03:04 PM"),
-			labAddress,
-			mapSection,
-			packageName)
-	case "lab_report_completed":
-		text = fmt.Sprintf("📄 *Lab Report Completed*\n\nDear %s,\n\nYour lab report is now ready.\nPlease click on below link to download your report.\n\n%s\n\nThank you for choosing MedLyfe Health.",
+		if hasMap {
+			resolvedTemplateName = "appointment_rescheduled_with_map"
+			text = fmt.Sprintf("Dear %s,\nYour lab appointment has been rescheduled.\n\nNew Date: %s\nNew Time: %s\nLocation: %s\nMap: %s\nLab Package Name: %s\n\nPlease arrive 10 minutes before with valid ID Proof.\n\nThank you for choosing MedLyfe Health.",
+				lead.PatientName,
+				appointmentDate,
+				appointmentTime,
+				labAddress,
+				strings.TrimSpace(mapURL),
+				packageName)
+		} else {
+			resolvedTemplateName = "appointment_rescheduled_without_map"
+			text = fmt.Sprintf("Dear %s,\nYour lab appointment has been rescheduled.\n\nNew Date: %s\nNew Time: %s\nLocation: %s\nLab Package Name: %s\n\nPlease arrive 10 minutes before with valid ID Proof.\n\nThank you for choosing MedLyfe Health.",
+				lead.PatientName,
+				appointmentDate,
+				appointmentTime,
+				labAddress,
+				packageName)
+		}
+
+	case "lab_report_completed", "lab_report_ready":
+		resolvedTemplateName = "lab_report_ready"
+		text = fmt.Sprintf("Dear %s,\nYour lab report is now ready.\nPlease click on below link to download your report. %s\n\nThank you for choosing MedLyfe Health.",
 			lead.PatientName,
 			lead.ReportURL)
+
+	case "appointment_confirmed_with_map":
+		resolvedTemplateName = "appointment_confirmed_with_map"
+		text = fmt.Sprintf("Dear %s,\nYour lab appointment has been confirmed.\n\nDate: %s\nTime: %s\nLocation: %s\nMap: %s\nLab Package Name: %s\n\nKindly arrive 10 minutes early with valid ID proof.\n\nThank you for choosing MedLyfe Health.",
+			lead.PatientName,
+			appointmentDate,
+			appointmentTime,
+			labAddress,
+			strings.TrimSpace(mapURL),
+			packageName)
+
+	case "appointment_confirmed_without_map":
+		resolvedTemplateName = "appointment_confirmed_without_map"
+		text = fmt.Sprintf("Dear %s,\nYour lab appointment has been confirmed.\n\nDate: %s\nTime: %s\nLocation: %s\nLab Package Name: %s\n\nKindly arrive 10 minutes early with valid ID proof.\n\nThank you for choosing MedLyfe Health.",
+			lead.PatientName,
+			appointmentDate,
+			appointmentTime,
+			labAddress,
+			packageName)
+
+	case "appointment_rescheduled_with_map":
+		resolvedTemplateName = "appointment_rescheduled_with_map"
+		text = fmt.Sprintf("Dear %s,\nYour lab appointment has been rescheduled.\n\nNew Date: %s\nNew Time: %s\nLocation: %s\nMap: %s\nLab Package Name: %s\n\nPlease arrive 10 minutes before with valid ID Proof.\n\nThank you for choosing MedLyfe Health.",
+			lead.PatientName,
+			appointmentDate,
+			appointmentTime,
+			labAddress,
+			strings.TrimSpace(mapURL),
+			packageName)
+
+	case "appointment_rescheduled_without_map":
+		resolvedTemplateName = "appointment_rescheduled_without_map"
+		text = fmt.Sprintf("Dear %s,\nYour lab appointment has been rescheduled.\n\nNew Date: %s\nNew Time: %s\nLocation: %s\nLab Package Name: %s\n\nPlease arrive 10 minutes before with valid ID Proof.\n\nThank you for choosing MedLyfe Health.",
+			lead.PatientName,
+			appointmentDate,
+			appointmentTime,
+			labAddress,
+			packageName)
+
 	default:
 		slog.Error("Unknown WhatsApp template", slog.String("templateName", templateName))
 		return
@@ -918,7 +988,7 @@ func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lea
 		FromMobile:   "System", // Default fallback if not available
 		ToMobile:     lead.ContactNumber,
 		WhatsAppText: text,
-		TemplateName: templateName,
+		TemplateName: resolvedTemplateName,
 		CreatedBy:    lead.LastUpdatedBy,
 	}
 	

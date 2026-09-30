@@ -111,7 +111,7 @@ cd "$BUILD"
 zip -qr "$OUTPUT_ZIP" App_Data
 
 echo "Done. Zip layout (first 60 lines):"
-unzip -l "$OUTPUT_ZIP" | head -n 60
+unzip -l "$OUTPUT_ZIP" 2>/dev/null | head -n 60 || true
 
 if [ "$DO_DEPLOY" -eq 1 ]; then
   if [ -z "$AZURE_RESOURCE_GROUP" ] || [ -z "$AZURE_WEBAPP_NAME" ]; then
