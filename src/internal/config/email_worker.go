@@ -21,6 +21,8 @@ type EmailWorkerConfig struct {
 	IdleWait            time.Duration
 	SendTimeout         time.Duration
 	ACSAPIVersion       string
+	RateLimitWait       time.Duration
+	InterSendDelay      time.Duration
 }
 
 // LoadEmailWorkerConfig reads worker settings from the environment.
@@ -35,6 +37,8 @@ func LoadEmailWorkerConfig() (EmailWorkerConfig, error) {
 		IdleWait:            time.Duration(getEnvAsInt("EMAIL_IDLE_WAIT_SECONDS", 60)) * time.Second,
 		SendTimeout:         time.Duration(getEnvAsInt("EMAIL_SEND_TIMEOUT_SECONDS", 60)) * time.Second,
 		ACSAPIVersion:       strings.TrimSpace(getEnv("ACS_EMAIL_API_VERSION", "")),
+		RateLimitWait:       time.Duration(getEnvAsInt("EMAIL_RATE_LIMIT_WAIT_MINUTES", 60)) * time.Minute,
+		InterSendDelay:      time.Duration(getEnvAsInt("EMAIL_INTER_SEND_DELAY_MS", 500)) * time.Millisecond,
 	}
 	if c.ACSConnectionString == "" {
 		return c, errors.New("ACS_CONNECTION_STRING is required")
@@ -50,6 +54,12 @@ func LoadEmailWorkerConfig() (EmailWorkerConfig, error) {
 	}
 	if c.SendTimeout < time.Second {
 		c.SendTimeout = time.Second
+	}
+	if c.RateLimitWait < time.Minute {
+		c.RateLimitWait = time.Minute
+	}
+	if c.InterSendDelay < 0 {
+		c.InterSendDelay = 0
 	}
 	return c, nil
 }

@@ -57,6 +57,8 @@ func main() {
 		slog.Duration("pollIntervalAfterWork", wc.PollInterval),
 		slog.Duration("idleWaitWhenEmpty", wc.IdleWait),
 		slog.Duration("sendTimeout", wc.SendTimeout),
+		slog.Duration("rateLimitWait", wc.RateLimitWait),
+		slog.Duration("interSendDelay", wc.InterSendDelay),
 	)
 
 	dbGorm, err := config.ConnectDatabase(appCfg.DB)

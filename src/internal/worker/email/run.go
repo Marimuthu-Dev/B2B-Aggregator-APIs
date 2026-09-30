@@ -48,9 +48,12 @@ func RunLoop(ctx context.Context, d Deps) error {
 		if err != nil {
 			log.Error("email worker batch failed", slog.String("error", err.Error()))
 			// If rate limited, wait longer before retrying
-			if strings.Contains(err.Error(), "rate limit") {
+			if strings.Contains(err.Error(), "rate limit") || strings.Contains(err.Error(), "TooManyRequests") {
 				log.Info("rate limit detected, waiting longer before retry")
-				wait := 10 * time.Minute // Wait 10 minutes for rate limit to reset
+				wait := d.Config.RateLimitWait
+				if wait <= 0 {
+					wait = 60 * time.Minute
+				}
 				log.Info("next iteration scheduled",
 					slog.Duration("wait", wait),
 					slog.Bool("hadRowsInPreviousCycle", foundRows),
@@ -70,6 +73,7 @@ func RunLoop(ctx context.Context, d Deps) error {
 					case <-ticker.C:
 						log.Info("heartbeat: waiting for rate limit to reset...")
 					case <-timer.C:
+						timer.Stop()
 						ticker.Stop()
 						break WaitLoop
 					}
@@ -125,7 +129,15 @@ func RunOnce(ctx context.Context, d Deps) (foundRows bool, err error) {
 	log.Info("successfully fetched pending emails", slog.Int("count", len(emails)))
 	
 	rateLimited := false
-	for _, e := range emails {
+	for i, e := range emails {
+		if i > 0 && d.Config.InterSendDelay > 0 {
+			select {
+			case <-ctx.Done():
+				return true, ctx.Err()
+			case <-time.After(d.Config.InterSendDelay):
+			}
+		}
+
 		log.Info("processing email", slog.Int64("emailID", e.EmailID))
 		log.Info("attempting to send email via ACS", slog.Int64("emailID", e.EmailID))
 		sendCtx, cancel := context.WithTimeout(ctx, d.Config.SendTimeout)
