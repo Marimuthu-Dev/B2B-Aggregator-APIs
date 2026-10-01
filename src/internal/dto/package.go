@@ -21,17 +21,18 @@ type PackageStatusUpdateRequest struct {
 }
 
 type PackageClientMappingRequest struct {
-	PackageID int64 `json:"PackageID" binding:"required"`
-	ClientID  int64 `json:"ClientID" binding:"required"`
-	Price     int   `json:"Price" binding:"required,min=0,max=32767"`
-	IsActive  *bool   `json:"IsActive"`
+	PackageID          int64  `json:"PackageID" binding:"required"`
+	ClientID           int64  `json:"ClientID" binding:"required"`
+	DisplayPackageName string `json:"DisplayPackageName"`
+	Price              int    `json:"Price" binding:"required,min=0,max=32767"`
+	IsActive           *bool  `json:"IsActive"`
 }
 
 type PackageLabMappingRequest struct {
 	PackageID int64 `json:"PackageID" binding:"required"`
 	LabID     int64 `json:"LabID" binding:"required"`
 	Price     int   `json:"Price" binding:"required,min=0,max=32767"`
-	IsActive  *bool   `json:"IsActive"`
+	IsActive  *bool `json:"IsActive"`
 }
 
 // PackageLabMappingListQuery is optional filters for GET /packages/lab-mapping.
@@ -50,7 +51,9 @@ type PackageClientMappingListQuery struct {
 }
 
 type PackageMappingStatusUpdateRequest struct {
-	IsActive *bool `json:"IsActive" binding:"required"` // pointer so required allows false (validator treats value-type required as "non-zero")
+	DisplayPackageName *string `json:"DisplayPackageName"`
+	Price              *int    `json:"Price" binding:"omitempty,min=0,max=32767"`
+	IsActive           *bool   `json:"IsActive"`
 }
 
 func (r PackageRequest) ToDomain() domain.Package {

@@ -18,15 +18,16 @@ func (PackageTestMapping) TableName() string {
 }
 
 type PackageClientMapping struct {
-	PackageClientID int64     `gorm:"primaryKey;column:PackageClientID;autoIncrement"`
-	PackageID       int64     `gorm:"column:PackageID;not null"`
-	ClientID        int64     `gorm:"column:ClientID;not null"`
-	Price           int       `gorm:"column:Price;type:smallint;not null"`
-	IsActive        bool      `gorm:"column:IsActive;not null;default:true"`
-	CreatedBy       int64     `gorm:"column:CreatedBy;not null"`
-	CreatedOn       time.Time `gorm:"column:CreatedOn;not null;default:GETDATE()"`
-	LastUpdatedBy   int64     `gorm:"column:LastUpdatedBy;not null"`
-	LastUpdatedOn   time.Time `gorm:"column:LastUpdatedOn;not null;default:GETDATE()"`
+	PackageClientID    int64     `gorm:"primaryKey;column:PackageClientID;autoIncrement"`
+	PackageID          int64     `gorm:"column:PackageID;not null"`
+	ClientID           int64     `gorm:"column:ClientID;not null"`
+	DisplayPackageName string    `gorm:"column:DisplayPackageName;type:nvarchar(255)"`
+	Price              int       `gorm:"column:Price;type:smallint;not null"`
+	IsActive           bool      `gorm:"column:IsActive;not null;default:true"`
+	CreatedBy          int64     `gorm:"column:CreatedBy;not null"`
+	CreatedOn          time.Time `gorm:"column:CreatedOn;not null;default:GETDATE()"`
+	LastUpdatedBy      int64     `gorm:"column:LastUpdatedBy;not null"`
+	LastUpdatedOn      time.Time `gorm:"column:LastUpdatedOn;not null;default:GETDATE()"`
 }
 
 func (PackageClientMapping) TableName() string {

@@ -30,18 +30,19 @@ type TestInPackage struct {
 
 // PackageClientMappingView is package-client mapping with names for list response.
 type PackageClientMappingView struct {
-	PackageClientID int64     `json:"PackageClientID"`
-	PackageID       int64     `json:"PackageID"`
-	ClientID        int64     `json:"ClientID"`
-	Price           int       `json:"Price"`
-	IsActive        bool      `json:"IsActive"`
-	CreatedBy       int64     `json:"CreatedBy"`
-	CreatedOn       timeutil.ISTTime `json:"CreatedOn"`
-	LastUpdatedBy   int64           `json:"LastUpdatedBy"`
-	LastUpdatedOn   timeutil.ISTTime `json:"LastUpdatedOn"`
-	PackageName     string    `json:"PackageName,omitempty"`
-	ClientName      string    `json:"ClientName,omitempty"`
-	Tests           []string  `json:"Tests"`
+	PackageClientID    int64            `json:"PackageClientID"`
+	PackageID          int64            `json:"PackageID"`
+	ClientID           int64            `json:"ClientID"`
+	DisplayPackageName string           `json:"DisplayPackageName"`
+	Price              int              `json:"Price"`
+	IsActive           bool             `json:"IsActive"`
+	CreatedBy          int64            `json:"CreatedBy"`
+	CreatedOn          timeutil.ISTTime `json:"CreatedOn"`
+	LastUpdatedBy      int64            `json:"LastUpdatedBy"`
+	LastUpdatedOn      timeutil.ISTTime `json:"LastUpdatedOn"`
+	PackageName        string           `json:"PackageName,omitempty"`
+	ClientName         string           `json:"ClientName,omitempty"`
+	Tests              []string         `json:"Tests"`
 }
 
 // PackageLabMappingView is package-lab mapping with names for list response.

@@ -23,9 +23,9 @@ type PackageService interface {
 	CreatePackageWithTests(p *domain.Package, testIDs []int64, createdBy int64) (*CreatePackageWithTestsResult, error)
 	GetAllPackagesWithTestsDetails() ([]domain.PackageWithTestsDetail, error)
 	UpdatePackageStatus(packageID int64, isActive bool, lastUpdatedBy int64) (*UpdatePackageStatusResult, error)
-	CreatePackageClientMapping(packageID int64, clientID int64, price int, createdBy, lastUpdatedBy int64) (*PackageClientMappingResult, error)
+	CreatePackageClientMapping(packageID int64, clientID int64, displayPackageName string, price int, createdBy, lastUpdatedBy int64) (*PackageClientMappingResult, error)
 	GetAllPackageClientMappings(clientID *int64) ([]domain.PackageClientMappingView, error)
-	UpdatePackageClientMappingStatus(id int64, isActive bool, lastUpdatedBy int64) (*PackageClientMappingUpdateResult, error)
+	UpdatePackageClientMappingStatus(id int64, displayPackageName *string, price *int, isActive *bool, lastUpdatedBy int64) (*PackageClientMappingUpdateResult, error)
 	CreatePackageLabMapping(packageID int64, labID int64, price int, createdBy, lastUpdatedBy int64) (*PackageLabMappingResult, error)
 	GetAllPackageLabMappings(filter repository.PackageLabMappingListFilter) ([]domain.PackageLabMappingView, error)
 	UpdatePackageLabMappingStatus(id int64, isActive bool, lastUpdatedBy int64) (*PackageLabMappingUpdateResult, error)
@@ -269,25 +269,22 @@ func (s *packageService) UpdatePackageStatus(packageID int64, isActive bool, las
 	}, nil
 }
 
-func (s *packageService) CreatePackageClientMapping(packageID int64, clientID int64, price int, createdBy, lastUpdatedBy int64) (*PackageClientMappingResult, error) {
-	if _, err := s.repo.FindByID(packageID); err != nil {
+func (s *packageService) CreatePackageClientMapping(packageID int64, clientID int64, displayPackageName string, price int, createdBy, lastUpdatedBy int64) (*PackageClientMappingResult, error) {
+	pkg, err := s.repo.FindByID(packageID)
+	if err != nil || pkg == nil {
 		return nil, apperrors.NewNotFound("Package not found", err)
 	}
-	if _, err := s.clientRepo.FindByID(clientID); err != nil {
+	cli, err := s.clientRepo.FindByID(clientID)
+	if err != nil || cli == nil {
 		return nil, apperrors.NewNotFound("Client not found", err)
+	}
+	if displayPackageName == "" {
+		displayPackageName = pkg.PackageName
 	}
 	existing, _ := s.clientMapRepo.FindByPackageAndClient(packageID, clientID)
 	if existing != nil {
 		testsByPkg, _ := s.repo.FindActiveTestNamesByPackageIDs([]int64{packageID})
-		v := mappingToClientView(existing, "", "", testsForPackage(testsByPkg, packageID))
-		pkg, _ := s.repo.FindByID(packageID)
-		cli, _ := s.clientRepo.FindByID(clientID)
-		if pkg != nil {
-			v.PackageName = pkg.PackageName
-		}
-		if cli != nil {
-			v.ClientName = cli.ClientName
-		}
+		v := mappingToClientView(existing, pkg.PackageName, cli.ClientName, testsForPackage(testsByPkg, packageID))
 		return &PackageClientMappingResult{
 			RetVal:  2,
 			Mapping: v,
@@ -295,22 +292,14 @@ func (s *packageService) CreatePackageClientMapping(packageID int64, clientID in
 		}, nil
 	}
 	m := &persistencemodels.PackageClientMapping{
-		PackageID: packageID, ClientID: clientID, Price: price,
+		PackageID: packageID, ClientID: clientID, DisplayPackageName: displayPackageName, Price: price,
 		IsActive: true, CreatedBy: createdBy, LastUpdatedBy: lastUpdatedBy,
 	}
 	if err := s.clientMapRepo.Create(m); err != nil {
 		return nil, err
 	}
 	testsByPkg, _ := s.repo.FindActiveTestNamesByPackageIDs([]int64{packageID})
-	v := mappingToClientView(m, "", "", testsForPackage(testsByPkg, packageID))
-	pkg, _ := s.repo.FindByID(packageID)
-	cli, _ := s.clientRepo.FindByID(clientID)
-	if pkg != nil {
-		v.PackageName = pkg.PackageName
-	}
-	if cli != nil {
-		v.ClientName = cli.ClientName
-	}
+	v := mappingToClientView(m, pkg.PackageName, cli.ClientName, testsForPackage(testsByPkg, packageID))
 	return &PackageClientMappingResult{RetVal: 1, Mapping: v, Message: "Package-Client mapping created successfully"}, nil
 }
 
@@ -321,19 +310,24 @@ func mappingToClientView(m *persistencemodels.PackageClientMapping, pkgName, cli
 	if tests == nil {
 		tests = []string{}
 	}
+	dispName := m.DisplayPackageName
+	if dispName == "" {
+		dispName = pkgName
+	}
 	return &domain.PackageClientMappingView{
-		PackageClientID: m.PackageClientID,
-		PackageID:       m.PackageID,
-		ClientID:        m.ClientID,
-		Price:           m.Price,
-		IsActive:        m.IsActive,
-		CreatedBy:       m.CreatedBy,
-		CreatedOn:       timeutil.FromTime(m.CreatedOn),
-		LastUpdatedBy:   m.LastUpdatedBy,
-		LastUpdatedOn:   timeutil.FromTime(m.LastUpdatedOn),
-		PackageName:     pkgName,
-		ClientName:      clientName,
-		Tests:           tests,
+		PackageClientID:    m.PackageClientID,
+		PackageID:          m.PackageID,
+		ClientID:           m.ClientID,
+		DisplayPackageName: dispName,
+		Price:              m.Price,
+		IsActive:           m.IsActive,
+		CreatedBy:          m.CreatedBy,
+		CreatedOn:          timeutil.FromTime(m.CreatedOn),
+		LastUpdatedBy:      m.LastUpdatedBy,
+		LastUpdatedOn:      timeutil.FromTime(m.LastUpdatedOn),
+		PackageName:        pkgName,
+		ClientName:         clientName,
+		Tests:              tests,
 	}
 }
 
@@ -390,32 +384,40 @@ func (s *packageService) GetAllPackageClientMappings(clientID *int64) ([]domain.
 	return out, nil
 }
 
-func (s *packageService) UpdatePackageClientMappingStatus(id int64, isActive bool, lastUpdatedBy int64) (*PackageClientMappingUpdateResult, error) {
+func (s *packageService) UpdatePackageClientMappingStatus(id int64, displayPackageName *string, price *int, isActive *bool, lastUpdatedBy int64) (*PackageClientMappingUpdateResult, error) {
 	m, err := s.clientMapRepo.FindByID(id)
 	if err != nil || m == nil {
 		return nil, apperrors.NewNotFound("Package-Client mapping not found", gorm.ErrRecordNotFound)
 	}
-	if isActive {
-		pkg, _ := s.repo.FindByID(m.PackageID)
-		if pkg != nil && !pkg.IsActive {
-			testsByPkg, _ := s.repo.FindActiveTestNamesByPackageIDs([]int64{m.PackageID})
-			v := mappingToClientView(m, "", "", testsForPackage(testsByPkg, m.PackageID))
-			pkg2, _ := s.repo.FindByID(m.PackageID)
-			cli, _ := s.clientRepo.FindByID(m.ClientID)
-			if pkg2 != nil {
-				v.PackageName = pkg2.PackageName
-			}
-			if cli != nil {
-				v.ClientName = cli.ClientName
-			}
-			return &PackageClientMappingUpdateResult{
-				RetVal:  2,
-				Mapping: v,
-				Message: "Cannot activate client mapping because the package is inactive",
-			}, nil
-		}
+	if displayPackageName != nil {
+		m.DisplayPackageName = *displayPackageName
 	}
-	m.IsActive = isActive
+	if price != nil {
+		m.Price = *price
+	}
+	if isActive != nil {
+		if *isActive {
+			pkg, _ := s.repo.FindByID(m.PackageID)
+			if pkg != nil && !pkg.IsActive {
+				testsByPkg, _ := s.repo.FindActiveTestNamesByPackageIDs([]int64{m.PackageID})
+				v := mappingToClientView(m, "", "", testsForPackage(testsByPkg, m.PackageID))
+				pkg2, _ := s.repo.FindByID(m.PackageID)
+				cli, _ := s.clientRepo.FindByID(m.ClientID)
+				if pkg2 != nil {
+					v.PackageName = pkg2.PackageName
+				}
+				if cli != nil {
+					v.ClientName = cli.ClientName
+				}
+				return &PackageClientMappingUpdateResult{
+					RetVal:  2,
+					Mapping: v,
+					Message: "Cannot activate client mapping because the package is inactive",
+				}, nil
+			}
+		}
+		m.IsActive = *isActive
+	}
 	m.LastUpdatedBy = lastUpdatedBy
 	if err := s.clientMapRepo.Update(m); err != nil {
 		return nil, err
@@ -430,7 +432,7 @@ func (s *packageService) UpdatePackageClientMappingStatus(id int64, isActive boo
 	if cli != nil {
 		v.ClientName = cli.ClientName
 	}
-	return &PackageClientMappingUpdateResult{RetVal: 1, Mapping: v, Message: "Package-Client mapping status updated successfully"}, nil
+	return &PackageClientMappingUpdateResult{RetVal: 1, Mapping: v, Message: "Package-Client mapping updated successfully"}, nil
 }
 
 func (s *packageService) CreatePackageLabMapping(packageID int64, labID int64, price int, createdBy, lastUpdatedBy int64) (*PackageLabMappingResult, error) {

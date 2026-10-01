@@ -197,7 +197,7 @@ func (h *PackageHandler) CreatePackageClientMapping(c *gin.Context) {
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
-	result, err := h.svc.CreatePackageClientMapping(req.PackageID, req.ClientID, req.Price, userID, userID)
+	result, err := h.svc.CreatePackageClientMapping(req.PackageID, req.ClientID, req.DisplayPackageName, req.Price, userID, userID)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -277,11 +277,11 @@ func (h *PackageHandler) UpdatePackageClientMappingStatus(c *gin.Context) {
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
-	if req.IsActive == nil {
-		respondError(c, apperrors.NewBadRequest("IsActive is required", nil))
+	if req.DisplayPackageName == nil && req.Price == nil && req.IsActive == nil {
+		respondError(c, apperrors.NewBadRequest("At least one field to update is required", nil))
 		return
 	}
-	result, err := h.svc.UpdatePackageClientMappingStatus(params.ID, *req.IsActive, userID)
+	result, err := h.svc.UpdatePackageClientMappingStatus(params.ID, req.DisplayPackageName, req.Price, req.IsActive, userID)
 	if err != nil {
 		respondError(c, err)
 		return
