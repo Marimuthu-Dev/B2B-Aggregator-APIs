@@ -20,6 +20,8 @@ type Lead struct {
 	StoreID                       *string    `gorm:"column:StoreID;type:varchar(15)"`
 	// StoreMasterID exists only on MedLyfe.tbl_Leads. GORM omits it when DB_SCHEMA is not MedLyfe.
 	StoreMasterID                 *int64     `gorm:"column:StoreMasterID"`
+	// EmploymentTypeID exists only on MedLyfe.tbl_Leads. GORM omits it when DB_SCHEMA is not MedLyfe.
+	EmploymentTypeID              *uint8     `gorm:"column:EmploymentTypeID"`
 	CollectionType                string     `gorm:"column:CollectionType;type:varchar(10);not null;default:Center"`
 	LeadStatusID                  int8       `gorm:"column:LeadStatusID;not null"`
 	LabID                         *int64     `gorm:"column:LabID"`

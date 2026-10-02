@@ -159,6 +159,9 @@ func (s *leadService) CreateLead(l *domain.Lead, createdBy int64) error {
 	} else if err := s.validateLeadStoreMasterID(l.ClientID, l.StoreMasterID); err != nil {
 		return err
 	}
+	if !persistencemodels.HasLeadEmploymentTypeIDColumn() {
+		l.EmploymentTypeID = nil
+	}
 
 	if l.LeadStatusID > 5 && l.LabID == nil {
 		return apperrors.NewBadRequest("Lab is not assigned, so it may not be able to update..!", nil)
@@ -281,6 +284,17 @@ func (s *leadService) UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUp
 		}
 	} else {
 		l.StoreMasterID = nil
+	}
+	if persistencemodels.HasLeadEmploymentTypeIDColumn() {
+		if update.EmploymentTypeID != nil {
+			if *update.EmploymentTypeID == 0 {
+				l.EmploymentTypeID = nil
+			} else {
+				l.EmploymentTypeID = update.EmploymentTypeID
+			}
+		}
+	} else {
+		l.EmploymentTypeID = nil
 	}
 	if update.CollectionType != nil {
 		ct, err := domain.ParseLeadCollectionType(*update.CollectionType)
@@ -572,29 +586,53 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 			}
 		}
 
+		var employmentTypeID *uint8
+		if persistencemodels.HasLeadEmploymentTypeIDColumn() {
+			etRaw := strings.TrimSpace(at(row, "EmploymentType"))
+			if etRaw == "" {
+				etRaw = strings.TrimSpace(at(row, "Employment Type"))
+			}
+			if etRaw == "" {
+				etRaw = strings.TrimSpace(at(row, "EmploymentTypeID"))
+			}
+			if etRaw != "" {
+				switch strings.ToLower(etRaw) {
+				case "new", "1":
+					val := uint8(1)
+					employmentTypeID = &val
+				case "existing", "2":
+					val := uint8(2)
+					employmentTypeID = &val
+				default:
+					return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: Invalid EmploymentType %q (must be 'New' or 'Existing')", rowIdx+1, etRaw), nil)
+				}
+			}
+		}
+
 		now := time.Now()
 		lead := &domain.Lead{
-			ClientID:       clientID,
-			PatientID:      s.GeneratePatientID(patientName, contactNumber),
-			PatientName:    patientName,
-			Age:            atInt8(row, "Age"),
-			Gender:         at(row, "Gender"),
-			PackageID:      int(packageID),
-			ContactNumber:  contactNumber,
-			Emailid:        at(row, "Emailid"),
-			Address:        at(row, "Address"),
-			CityID:         atInt32(row, "CityID"),
-			StateID:        atInt32(row, "StateID"),
-			Pincode:        at(row, "Pincode"),
-			EmpID:          empID,
-			StoreID:        storeID,
-			StoreMasterID:  storeMasterID,
-			CollectionType: collectionType,
-			LeadStatusID:   leadStatusID,
-			CreatedBy:      createdBy,
-			CreatedOn:      timeutil.FromTime(now),
-			LastUpdatedBy:  createdBy,
-			LastUpdatedOn:  timeutil.FromTime(now),
+			ClientID:         clientID,
+			PatientID:        s.GeneratePatientID(patientName, contactNumber),
+			PatientName:      patientName,
+			Age:              atInt8(row, "Age"),
+			Gender:           at(row, "Gender"),
+			PackageID:        int(packageID),
+			ContactNumber:    contactNumber,
+			Emailid:          at(row, "Emailid"),
+			Address:          at(row, "Address"),
+			CityID:           atInt32(row, "CityID"),
+			StateID:          atInt32(row, "StateID"),
+			Pincode:          at(row, "Pincode"),
+			EmpID:            empID,
+			StoreID:          storeID,
+			StoreMasterID:    storeMasterID,
+			EmploymentTypeID: employmentTypeID,
+			CollectionType:   collectionType,
+			LeadStatusID:     leadStatusID,
+			CreatedBy:        createdBy,
+			CreatedOn:        timeutil.FromTime(now),
+			LastUpdatedBy:    createdBy,
+			LastUpdatedOn:    timeutil.FromTime(now),
 		}
 
 		err := s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {

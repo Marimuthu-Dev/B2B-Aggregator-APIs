@@ -76,6 +76,7 @@ func Run() error {
 	
 	packageSvc := service.NewPackageService(packageRepo, testRepo, packageClientMapRepo, packageLabMapRepo, clientRepo, labRepo)
 	storeRepo := repository.NewStoreRepository(db)
+	employmentTypeRepo := repository.NewEmploymentTypeRepository(db)
 	var blobSvc service.BlobService
 	ab := cfg.AzureBlob
 	blobConfigured := strings.TrimSpace(ab.ConnectionString) != "" ||
@@ -100,6 +101,7 @@ func Run() error {
 	storeSvc := service.NewStoreService(storeRepo, clientRepo, emailOutbox, forgotPasswordRepo, cfg.Email, cfg.Domains.Store)
 	leadSvc := service.NewLeadService(leadRepo, leadUow, clientRepo, packageRepo, labRepo, storeRepo, blobSvc, whatsappRepo, whatsappTemplateRepo)
 	testSvc := service.NewTestService(testRepo)
+	employmentTypeSvc := service.NewEmploymentTypeService(employmentTypeRepo)
 
 	// Initialize Handlers
 	packageHandler := handlers.NewPackageHandler(packageSvc, storeSvc)
@@ -111,6 +113,7 @@ func Run() error {
 	storeHandler := handlers.NewStoreHandler(storeSvc)
 	leadHandler := handlers.NewLeadHandler(leadSvc, storeSvc)
 	testHandler := handlers.NewTestHandler(testSvc)
+	employmentTypeHandler := handlers.NewEmploymentTypeHandler(employmentTypeSvc)
 
 	// Initialize Gin
 	r := gin.Default()
@@ -128,6 +131,7 @@ func Run() error {
 		storeHandler:          storeHandler,
 		leadHandler:           leadHandler,
 		testHandler:           testHandler,
+		employmentTypeHandler: employmentTypeHandler,
 	})
 
 	// Azure App Service and cloud platforms set PORT env; default 8080

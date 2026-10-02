@@ -60,3 +60,14 @@ func HasLeadStoreMasterIDColumn() bool {
 func HasLabMapLocationURLColumn() bool {
 	return IsMedLyfeSchema()
 }
+
+// HasEmploymentTypeMasterTable is true when tbl_EmploymentTypeMaster exists (MedLyfe only).
+func HasEmploymentTypeMasterTable() bool {
+	return IsMedLyfeSchema()
+}
+
+// HasLeadEmploymentTypeIDColumn is true when tbl_Leads includes EmploymentTypeID (MedLyfe only).
+func HasLeadEmploymentTypeIDColumn() bool {
+	return IsMedLyfeSchema()
+}
+

@@ -10,13 +10,14 @@ import (
 )
 
 type leadJoinedNames struct {
-	LabName     sql.NullString
-	ClientName  sql.NullString
-	CityName    sql.NullString
-	StateName   sql.NullString
-	StoreName   sql.NullString
-	StoreCity   sql.NullString
-	PackageName sql.NullString
+	LabName            sql.NullString
+	ClientName         sql.NullString
+	CityName           sql.NullString
+	StateName          sql.NullString
+	StoreName          sql.NullString
+	StoreCity          sql.NullString
+	PackageName        sql.NullString
+	EmploymentTypeName sql.NullString
 }
 
 func mapLeadToDomainWithOptionalJoinedNames(p persistencemodels.Lead, names leadJoinedNames) domain.Lead {
@@ -44,6 +45,11 @@ func mapLeadToDomainWithOptionalJoinedNames(p persistencemodels.Lead, names lead
 			d.StoreCity = strings.TrimSpace(names.StoreCity.String)
 		}
 	}
+	if persistencemodels.HasEmploymentTypeMasterTable() {
+		if names.EmploymentTypeName.Valid {
+			d.EmploymentTypeName = strings.TrimSpace(names.EmploymentTypeName.String)
+		}
+	}
 	return d
 }
 
@@ -65,6 +71,7 @@ func mapLeadToDomain(p persistencemodels.Lead) domain.Lead {
 		EmpID:                         derefString(p.EmpID),
 		StoreID:                       derefString(p.StoreID),
 		StoreMasterID:                 p.StoreMasterID,
+		EmploymentTypeID:              p.EmploymentTypeID,
 		CollectionType:                p.CollectionType,
 		LeadStatusID:                  p.LeadStatusID,
 		AppointmentAt:                 timeutil.StoredFromTimePtr(p.AppointmentAt),
@@ -90,6 +97,10 @@ func mapLeadToPersistence(d domain.Lead) persistencemodels.Lead {
 	if !persistencemodels.HasLeadStoreMasterIDColumn() {
 		storeMasterID = nil
 	}
+	employmentTypeID := d.EmploymentTypeID
+	if !persistencemodels.HasLeadEmploymentTypeIDColumn() {
+		employmentTypeID = nil
+	}
 	return persistencemodels.Lead{
 		LeadID:                        d.LeadID,
 		ClientID:                      d.ClientID,
@@ -107,6 +118,7 @@ func mapLeadToPersistence(d domain.Lead) persistencemodels.Lead {
 		EmpID:                         stringPtrOrNil(d.EmpID),
 		StoreID:                       stringPtrOrNil(d.StoreID),
 		StoreMasterID:                 storeMasterID,
+		EmploymentTypeID:              employmentTypeID,
 		CollectionType:                d.CollectionType,
 		LeadStatusID:                  d.LeadStatusID,
 		AppointmentAt:                 timeutil.StoredToTimePtr(d.AppointmentAt),

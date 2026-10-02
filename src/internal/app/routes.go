@@ -46,6 +46,7 @@ type routeDeps struct {
 	storeHandler          *handlers.StoreHandler
 	leadHandler           *handlers.LeadHandler
 	testHandler           *handlers.TestHandler
+	employmentTypeHandler *handlers.EmploymentTypeHandler
 }
 
 func registerPublicRoutes(r *gin.Engine, deps routeDeps) {
@@ -74,8 +75,9 @@ func registerProtectedRoutes(r *gin.Engine, jwtSecret string, deps routeDeps) {
 		registerEmployeeRoutes(api, deps.employeeHandler)
 		registerLabRoutes(api, deps.labHandler)
 		registerStoreRoutes(api, deps.storeHandler)
-		registerLeadRoutes(api, deps.leadHandler)
+		registerLeadRoutes(api, deps.leadHandler, deps.employmentTypeHandler)
 		registerTestRoutes(api, deps.testHandler)
+		registerEmploymentTypeRoutes(api, deps.employmentTypeHandler)
 	}
 }
 
@@ -170,11 +172,14 @@ func registerStoreRoutes(api *gin.RouterGroup, handler *handlers.StoreHandler) {
 	}
 }
 
-func registerLeadRoutes(api *gin.RouterGroup, handler *handlers.LeadHandler) {
+func registerLeadRoutes(api *gin.RouterGroup, handler *handlers.LeadHandler, etHandler *handlers.EmploymentTypeHandler) {
 	leads := api.Group("/leads")
 	{
 		leads.GET("", handler.GetAll)
 		leads.GET("/", handler.GetAll)
+		if etHandler != nil {
+			leads.GET("/employment-types", etHandler.GetActive)
+		}
 		leads.GET("/:id", handler.GetByID)
 		leads.POST("", handler.Create)
 		leads.POST("/", handler.Create)
@@ -185,6 +190,14 @@ func registerLeadRoutes(api *gin.RouterGroup, handler *handlers.LeadHandler) {
 		leads.POST("/:id/reports/upload", handler.UploadReport)
 		leads.POST("/:id/reports/approve", handler.ApproveReport)
 		leads.GET("/:id/reports/download-url", handler.GetReportDownloadURL)
+	}
+}
+
+func registerEmploymentTypeRoutes(api *gin.RouterGroup, handler *handlers.EmploymentTypeHandler) {
+	types := api.Group("/employment-types")
+	{
+		types.GET("", handler.GetActive)
+		types.GET("/", handler.GetActive)
 	}
 }
 

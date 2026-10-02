@@ -47,38 +47,44 @@ type leadRepository struct {
 	db *gorm.DB
 }
 
-// leadListScan is tbl_Leads with optional names from LEFT JOINs to lab, client, city, state, package, and (MedLyfe) store masters.
+// leadListScan is tbl_Leads with optional names from LEFT JOINs to lab, client, city, state, package, and (MedLyfe) store/employment_type masters.
 type leadListScan struct {
 	persistencemodels.Lead
-	JoinedLabName     sql.NullString `gorm:"column:joined_lab_name"`
-	JoinedClientName  sql.NullString `gorm:"column:joined_client_name"`
-	JoinedCityName    sql.NullString `gorm:"column:joined_city_name"`
-	JoinedStateName   sql.NullString `gorm:"column:joined_state_name"`
-	JoinedStoreName   sql.NullString `gorm:"column:joined_store_name"`
-	JoinedStoreCity   sql.NullString `gorm:"column:joined_store_city"`
-	JoinedPackageName sql.NullString `gorm:"column:joined_package_name"`
+	JoinedLabName            sql.NullString `gorm:"column:joined_lab_name"`
+	JoinedClientName         sql.NullString `gorm:"column:joined_client_name"`
+	JoinedCityName           sql.NullString `gorm:"column:joined_city_name"`
+	JoinedStateName          sql.NullString `gorm:"column:joined_state_name"`
+	JoinedStoreName          sql.NullString `gorm:"column:joined_store_name"`
+	JoinedStoreCity          sql.NullString `gorm:"column:joined_store_city"`
+	JoinedPackageName        sql.NullString `gorm:"column:joined_package_name"`
+	JoinedEmploymentTypeName sql.NullString `gorm:"column:joined_employment_type_name"`
 }
 
-// leadByIDLocationScan is used for FindByID city/state names (and MedLyfe store name/city); lab/client filled in service.
+// leadByIDLocationScan is used for FindByID city/state names (and MedLyfe store name/city / employment type); lab/client filled in service.
 type leadByIDLocationScan struct {
 	persistencemodels.Lead
-	JoinedCityName    sql.NullString `gorm:"column:joined_city_name"`
-	JoinedStateName   sql.NullString `gorm:"column:joined_state_name"`
-	JoinedStoreName   sql.NullString `gorm:"column:joined_store_name"`
-	JoinedStoreCity   sql.NullString `gorm:"column:joined_store_city"`
-	JoinedPackageName sql.NullString `gorm:"column:joined_package_name"`
+	JoinedCityName           sql.NullString `gorm:"column:joined_city_name"`
+	JoinedStateName          sql.NullString `gorm:"column:joined_state_name"`
+	JoinedStoreName          sql.NullString `gorm:"column:joined_store_name"`
+	JoinedStoreCity          sql.NullString `gorm:"column:joined_store_city"`
+	JoinedPackageName        sql.NullString `gorm:"column:joined_package_name"`
+	JoinedEmploymentTypeName sql.NullString `gorm:"column:joined_employment_type_name"`
 }
 
 func NewLeadRepository(db *gorm.DB) LeadRepository {
 	return &leadRepository{db: db}
 }
 
-// gormLead omits StoreMasterID unless DB_SCHEMA is MedLyfe (column is absent on other schemas).
+// gormLead omits StoreMasterID / EmploymentTypeID unless DB_SCHEMA is MedLyfe (columns are absent on other schemas).
 func gormLead(db *gorm.DB) *gorm.DB {
-	if persistencemodels.HasLeadStoreMasterIDColumn() {
-		return db
+	d := db
+	if !persistencemodels.HasLeadStoreMasterIDColumn() {
+		d = d.Omit("StoreMasterID")
 	}
-	return db.Omit("StoreMasterID")
+	if !persistencemodels.HasLeadEmploymentTypeIDColumn() {
+		d = d.Omit("EmploymentTypeID")
+	}
+	return d
 }
 
 func (r *leadRepository) FindAll() ([]domain.Lead, error) {
@@ -117,13 +123,14 @@ func (r *leadRepository) List(filter LeadListFilter) ([]domain.Lead, int64, erro
 	out := make([]domain.Lead, len(rows))
 	for i := range rows {
 		out[i] = mapLeadToDomainWithOptionalJoinedNames(rows[i].Lead, leadJoinedNames{
-			LabName:     rows[i].JoinedLabName,
-			ClientName:  rows[i].JoinedClientName,
-			CityName:    rows[i].JoinedCityName,
-			StateName:   rows[i].JoinedStateName,
-			StoreName:   rows[i].JoinedStoreName,
-			StoreCity:   rows[i].JoinedStoreCity,
-			PackageName: rows[i].JoinedPackageName,
+			LabName:            rows[i].JoinedLabName,
+			ClientName:         rows[i].JoinedClientName,
+			CityName:           rows[i].JoinedCityName,
+			StateName:          rows[i].JoinedStateName,
+			StoreName:          rows[i].JoinedStoreName,
+			StoreCity:          rows[i].JoinedStoreCity,
+			PackageName:        rows[i].JoinedPackageName,
+			EmploymentTypeName: rows[i].JoinedEmploymentTypeName,
 		})
 	}
 	return out, total, nil
@@ -133,6 +140,9 @@ func leadListSelectColumns() string {
 	cols := "l.*, lm.LabName AS joined_lab_name, cm.ClientName AS joined_client_name, ctm.CityName AS joined_city_name, stm.StateName AS joined_state_name, pm.PackageName AS joined_package_name"
 	if persistencemodels.HasStoreMasterTable() {
 		cols += ", sm.StoreName AS joined_store_name, smctm.CityName AS joined_store_city"
+	}
+	if persistencemodels.HasEmploymentTypeMasterTable() {
+		cols += ", et.EmploymentTypeName AS joined_employment_type_name"
 	}
 	return cols
 }
@@ -154,6 +164,10 @@ func (r *leadRepository) leadListJoinedQuery(filter LeadListFilter) *gorm.DB {
 		storeTable := persistencemodels.Store{}.TableName()
 		q = q.Joins("LEFT JOIN " + storeTable + " AS sm ON l.StoreMasterID = sm.StoreID").
 			Joins("LEFT JOIN " + cityTable + " AS smctm ON sm.CityID = smctm.CityID")
+	}
+	if persistencemodels.HasEmploymentTypeMasterTable() {
+		etTable := persistencemodels.EmploymentTypeMaster{}.TableName()
+		q = q.Joins("LEFT JOIN " + etTable + " AS et ON l.EmploymentTypeID = et.EmploymentTypeID")
 	}
 	if filter.LeadID != nil {
 		q = q.Where("l.LeadID = ?", *filter.LeadID)
@@ -258,17 +272,23 @@ func (r *leadRepository) FindByID(id int64) (*domain.Lead, error) {
 			Joins("LEFT JOIN "+cityTable+" AS smctm ON sm.CityID = smctm.CityID")
 		selectCols += ", sm.StoreName AS joined_store_name, smctm.CityName AS joined_store_city"
 	}
+	if persistencemodels.HasEmploymentTypeMasterTable() {
+		etTable := persistencemodels.EmploymentTypeMaster{}.TableName()
+		q = q.Joins("LEFT JOIN "+etTable+" AS et ON l.EmploymentTypeID = et.EmploymentTypeID")
+		selectCols += ", et.EmploymentTypeName AS joined_employment_type_name"
+	}
 	var row leadByIDLocationScan
 	err := q.Where("l.LeadID = ?", id).Select(selectCols).First(&row).Error
 	if err != nil {
 		return nil, err
 	}
 	domainLead := mapLeadToDomainWithOptionalJoinedNames(row.Lead, leadJoinedNames{
-		CityName:    row.JoinedCityName,
-		StateName:   row.JoinedStateName,
-		StoreName:   row.JoinedStoreName,
-		StoreCity:   row.JoinedStoreCity,
-		PackageName: row.JoinedPackageName,
+		CityName:           row.JoinedCityName,
+		StateName:          row.JoinedStateName,
+		StoreName:          row.JoinedStoreName,
+		StoreCity:          row.JoinedStoreCity,
+		PackageName:        row.JoinedPackageName,
+		EmploymentTypeName: row.JoinedEmploymentTypeName,
 	})
 	return &domainLead, nil
 }
