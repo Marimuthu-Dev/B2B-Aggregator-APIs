@@ -76,8 +76,9 @@ func (h *LeadHandler) GetAll(c *gin.Context) {
 		StoreCityID:      query.StoreCityID,
 		StoreStateID:     query.StoreStateID,
 		RestrictToStoreID: storeIDFromJWT(c),
-		Search:                    query.Search,
-		FitnessStatus:             fitnessFilter,
+		EmploymentTypeID:  query.EmploymentTypeID,
+		Search:            query.Search,
+		FitnessStatus:     fitnessFilter,
 		AppointmentAtMin: apptMin,
 		AppointmentAtMax: apptMax,
 	}

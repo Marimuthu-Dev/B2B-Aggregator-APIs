@@ -204,6 +204,9 @@ func (r *leadRepository) leadListJoinedQuery(filter LeadListFilter) *gorm.DB {
 			q = q.Where("l.StoreMasterID = ?", *filter.StoreMasterID)
 		}
 	}
+	if filter.EmploymentTypeID != nil && persistencemodels.HasLeadEmploymentTypeIDColumn() {
+		q = q.Where("l.EmploymentTypeID = ?", *filter.EmploymentTypeID)
+	}
 	if persistencemodels.HasStoreMasterTable() {
 		if filter.StoreCityID != nil {
 			q = q.Where("sm.CityID = ?", *filter.StoreCityID)

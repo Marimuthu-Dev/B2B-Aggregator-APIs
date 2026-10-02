@@ -125,6 +125,8 @@ type LeadListQuery struct {
 	StoreStateID *int16 `form:"storeStateId" binding:"omitempty,min=1"`
 	// Search matches PatientName, ContactNumber, EmailID, or StoreID (substring, LIKE).
 	Search string `form:"search" binding:"omitempty"`
+	// EmploymentTypeID filters by tbl_Leads.EmploymentTypeID.
+	EmploymentTypeID *int16 `form:"employmentTypeId" binding:"omitempty,min=1"`
 	// FitnessStatus filters by tbl_Leads.IsFit (Empty | Not Assessed | On Hold | Fit | UnFit); see domain.ParseLeadListFitnessFilter.
 	FitnessStatus string `form:"fitnessStatus" binding:"omitempty"`
 	// AppointmentAtFrom / AppointmentAtTo filter by l.AppointmentAt (IST calendar day, YYYY-MM-DD); either or both.
