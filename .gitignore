@@ -25,3 +25,4 @@ run-whatsapp-worker.bat
 run-whatsapp-worker.sh
 WHATSAPP_WORKER_README.md
 WHATSAPP_WORKER_VERIFICATION.md
+scripts/sql/employment_type_master.sql
