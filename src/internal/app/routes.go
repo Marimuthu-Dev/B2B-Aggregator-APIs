@@ -47,6 +47,7 @@ type routeDeps struct {
 	leadHandler           *handlers.LeadHandler
 	testHandler           *handlers.TestHandler
 	employmentTypeHandler *handlers.EmploymentTypeHandler
+	dashboardHandler      *handlers.DashboardHandler
 }
 
 func registerPublicRoutes(r *gin.Engine, deps routeDeps) {
@@ -78,6 +79,7 @@ func registerProtectedRoutes(r *gin.Engine, jwtSecret string, deps routeDeps) {
 		registerLeadRoutes(api, deps.leadHandler, deps.employmentTypeHandler)
 		registerTestRoutes(api, deps.testHandler)
 		registerEmploymentTypeRoutes(api, deps.employmentTypeHandler)
+		registerDashboardRoutes(api, deps.dashboardHandler)
 	}
 }
 
@@ -190,6 +192,17 @@ func registerLeadRoutes(api *gin.RouterGroup, handler *handlers.LeadHandler, etH
 		leads.POST("/:id/reports/upload", handler.UploadReport)
 		leads.POST("/:id/reports/approve", handler.ApproveReport)
 		leads.GET("/:id/reports/download-url", handler.GetReportDownloadURL)
+	}
+}
+
+func registerDashboardRoutes(api *gin.RouterGroup, handler *handlers.DashboardHandler) {
+	if handler == nil {
+		return
+	}
+	dashboard := api.Group("/dashboard")
+	{
+		dashboard.GET("/lab-tracking", handler.GetLabTracking)
+		dashboard.GET("/lab-tracking/filters", handler.GetLabTrackingFilters)
 	}
 }
 

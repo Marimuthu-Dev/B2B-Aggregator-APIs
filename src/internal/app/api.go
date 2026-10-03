@@ -57,6 +57,7 @@ func Run() error {
 	leadRepo := repository.NewLeadRepository(db)
 	leadUow := repository.NewLeadUnitOfWork(db)
 	testRepo := repository.NewTestRepository(db)
+	dashboardRepo := repository.NewDashboardRepository(db)
 
 	var sqlDB *sql.DB
 	if db != nil {
@@ -102,6 +103,7 @@ func Run() error {
 	leadSvc := service.NewLeadService(leadRepo, leadUow, clientRepo, packageRepo, labRepo, storeRepo, blobSvc, whatsappRepo, whatsappTemplateRepo)
 	testSvc := service.NewTestService(testRepo)
 	employmentTypeSvc := service.NewEmploymentTypeService(employmentTypeRepo)
+	dashboardSvc := service.NewDashboardService(dashboardRepo)
 
 	// Initialize Handlers
 	packageHandler := handlers.NewPackageHandler(packageSvc, storeSvc)
@@ -114,6 +116,7 @@ func Run() error {
 	leadHandler := handlers.NewLeadHandler(leadSvc, storeSvc)
 	testHandler := handlers.NewTestHandler(testSvc)
 	employmentTypeHandler := handlers.NewEmploymentTypeHandler(employmentTypeSvc)
+	dashboardHandler := handlers.NewDashboardHandler(dashboardSvc)
 
 	// Initialize Gin
 	r := gin.Default()
@@ -132,6 +135,7 @@ func Run() error {
 		leadHandler:           leadHandler,
 		testHandler:           testHandler,
 		employmentTypeHandler: employmentTypeHandler,
+		dashboardHandler:      dashboardHandler,
 	})
 
 	// Azure App Service and cloud platforms set PORT env; default 8080
