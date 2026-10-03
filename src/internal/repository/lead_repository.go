@@ -58,6 +58,7 @@ type leadListScan struct {
 	JoinedStoreCity          sql.NullString `gorm:"column:joined_store_city"`
 	JoinedPackageName        sql.NullString `gorm:"column:joined_package_name"`
 	JoinedEmploymentTypeName sql.NullString `gorm:"column:joined_employment_type_name"`
+	JoinedLeadStatusName     sql.NullString `gorm:"column:joined_lead_status_name"`
 }
 
 // leadByIDLocationScan is used for FindByID city/state names (and MedLyfe store name/city / employment type); lab/client filled in service.
@@ -131,13 +132,14 @@ func (r *leadRepository) List(filter LeadListFilter) ([]domain.Lead, int64, erro
 			StoreCity:          rows[i].JoinedStoreCity,
 			PackageName:        rows[i].JoinedPackageName,
 			EmploymentTypeName: rows[i].JoinedEmploymentTypeName,
+			LeadStatusName:     rows[i].JoinedLeadStatusName,
 		})
 	}
 	return out, total, nil
 }
 
 func leadListSelectColumns() string {
-	cols := "l.*, lm.LabName AS joined_lab_name, cm.ClientName AS joined_client_name, ctm.CityName AS joined_city_name, stm.StateName AS joined_state_name, pm.PackageName AS joined_package_name"
+	cols := "l.*, lm.LabName AS joined_lab_name, cm.ClientName AS joined_client_name, ctm.CityName AS joined_city_name, stm.StateName AS joined_state_name, pm.PackageName AS joined_package_name, lsm.LeadStatusName AS joined_lead_status_name"
 	if persistencemodels.HasStoreMasterTable() {
 		cols += ", sm.StoreName AS joined_store_name, smctm.CityName AS joined_store_city"
 	}
@@ -154,12 +156,14 @@ func (r *leadRepository) leadListJoinedQuery(filter LeadListFilter) *gorm.DB {
 	cityTable := persistencemodels.CityMaster{}.TableName()
 	stateTable := persistencemodels.StateMaster{}.TableName()
 	packageTable := persistencemodels.Package{}.TableName()
+	statusTable := persistencemodels.Table("tbl_LeadStatusMaster")
 	q := r.db.Table(leadTable + " AS l").
 		Joins("LEFT JOIN " + labTable + " AS lm ON l.LabID = lm.LabID").
 		Joins("LEFT JOIN " + clientTable + " AS cm ON l.ClientID = cm.ClientID").
 		Joins("LEFT JOIN " + cityTable + " AS ctm ON l.CityID = ctm.CityID").
 		Joins("LEFT JOIN " + stateTable + " AS stm ON l.StateID = stm.StateID").
-		Joins("LEFT JOIN " + packageTable + " AS pm ON l.PackageID = pm.PackageID")
+		Joins("LEFT JOIN " + packageTable + " AS pm ON l.PackageID = pm.PackageID").
+		Joins("LEFT JOIN " + statusTable + " AS lsm ON l.LeadStatusID = lsm.LeadStatusID")
 	if persistencemodels.HasStoreMasterTable() {
 		storeTable := persistencemodels.Store{}.TableName()
 		q = q.Joins("LEFT JOIN " + storeTable + " AS sm ON l.StoreMasterID = sm.StoreID").

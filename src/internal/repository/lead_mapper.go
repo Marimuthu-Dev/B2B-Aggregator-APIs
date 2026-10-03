@@ -18,6 +18,7 @@ type leadJoinedNames struct {
 	StoreCity          sql.NullString
 	PackageName        sql.NullString
 	EmploymentTypeName sql.NullString
+	LeadStatusName     sql.NullString
 }
 
 func mapLeadToDomainWithOptionalJoinedNames(p persistencemodels.Lead, names leadJoinedNames) domain.Lead {
@@ -36,6 +37,9 @@ func mapLeadToDomainWithOptionalJoinedNames(p persistencemodels.Lead, names lead
 	}
 	if names.PackageName.Valid {
 		d.PackageName = strings.TrimSpace(names.PackageName.String)
+	}
+	if names.LeadStatusName.Valid {
+		d.JoinedLeadStatusName = strings.TrimSpace(names.LeadStatusName.String)
 	}
 	if persistencemodels.HasStoreMasterTable() {
 		if names.StoreName.Valid {

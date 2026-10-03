@@ -183,6 +183,7 @@ type Lead struct {
 	EmploymentTypeName            string `json:"EmploymentTypeName,omitempty"`
 	CollectionType                string `json:"CollectionType"`
 	LeadStatusID                  int8
+	JoinedLeadStatusName          string               `json:"JoinedLeadStatusName,omitempty"`
 	AppointmentAt                 *timeutil.StoredTime `json:"AppointmentAt"`
 	LabID                         *int64               `json:"LabID,omitempty"`
 	BrandID                       *int64               `json:"BrandID,omitempty"`
