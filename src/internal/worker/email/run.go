@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -53,6 +55,14 @@ func RunLoop(ctx context.Context, d Deps) error {
 				wait := d.Config.RateLimitWait
 				if wait <= 0 {
 					wait = 60 * time.Minute
+				}
+				// Try to extract seconds from ACS error message e.g., "Please try again after 3703 seconds"
+				re := regexp.MustCompile(`(?i)after (\d+) seconds`)
+				if matches := re.FindStringSubmatch(err.Error()); len(matches) > 1 {
+					if sec, parseErr := strconv.Atoi(matches[1]); parseErr == nil {
+						// Add 5 seconds buffer to ensure the limit has expired
+						wait = time.Duration(sec+5) * time.Second
+					}
 				}
 				log.Info("next iteration scheduled",
 					slog.Duration("wait", wait),
@@ -129,6 +139,7 @@ func RunOnce(ctx context.Context, d Deps) (foundRows bool, err error) {
 	log.Info("successfully fetched pending emails", slog.Int("count", len(emails)))
 	
 	rateLimited := false
+	var rateLimitErr error
 	for i, e := range emails {
 		if i > 0 && d.Config.InterSendDelay > 0 {
 			select {
@@ -163,8 +174,9 @@ func RunOnce(ctx context.Context, d Deps) (foundRows bool, err error) {
 				slog.String("error", sendErr.Error()),
 			)
 			rateLimited = true
+			rateLimitErr = sendErr
 			// Don't mark as failure - keep it for retry after rate limit expires
-			continue
+			break
 		}
 		
 		log.Error("send failed",
@@ -181,7 +193,7 @@ func RunOnce(ctx context.Context, d Deps) (foundRows bool, err error) {
 	
 	// If rate limited, return an error to trigger longer wait in the main loop
 	if rateLimited {
-		return true, errors.New("ACS rate limit exceeded")
+		return true, errors.New("ACS rate limit exceeded: " + rateLimitErr.Error())
 	}
 	
 	return true, nil
