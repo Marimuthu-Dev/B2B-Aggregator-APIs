@@ -78,14 +78,17 @@ func NewLeadRepository(db *gorm.DB) LeadRepository {
 
 // gormLead omits StoreMasterID / EmploymentTypeID unless DB_SCHEMA is MedLyfe (columns are absent on other schemas).
 func gormLead(db *gorm.DB) *gorm.DB {
-	d := db
+	var omits []string
 	if !persistencemodels.HasLeadStoreMasterIDColumn() {
-		d = d.Omit("StoreMasterID")
+		omits = append(omits, "StoreMasterID")
 	}
 	if !persistencemodels.HasLeadEmploymentTypeIDColumn() {
-		d = d.Omit("EmploymentTypeID")
+		omits = append(omits, "EmploymentTypeID")
 	}
-	return d
+	if len(omits) > 0 {
+		return db.Omit(omits...)
+	}
+	return db
 }
 
 func (r *leadRepository) FindAll() ([]domain.Lead, error) {
