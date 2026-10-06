@@ -152,36 +152,32 @@ func nullableInt64(n int64) any {
 }
 
 // SelectPendingBatch reads up to batchSize rows where IsSent is 0 or NULL, ordered by CreatedOn.
-// It does not modify rows; use MarkSent / MarkAfterFailure after send attempts.
+// It uses UPDATE...OUTPUT to atomically claim the rows by setting LastUpdatedBy = -1 to prevent concurrent processing.
 func (r *WhatsAppRepository) SelectPendingBatch(ctx context.Context, batchSize int) ([]domain.OutboxWhatsApp, error) {
 	if batchSize < 1 {
 		batchSize = 1
 	}
 
-	var b strings.Builder
-	b.WriteString(`
-SELECT TOP (`)
-	b.WriteString(fmt.Sprintf("%d", batchSize))
-	b.WriteString(`)
-  w.WhatsAppID,
-  w.ClientID,
-  w.FromMobile,
-  w.ToMobile,
-  w.WhatsAppText,
-  w.TemplateID,
+	q := fmt.Sprintf(`
+UPDATE TOP (%d) w
+SET LastUpdatedBy = -1,
+    LastUpdatedOn = GETDATE()
+OUTPUT
+  inserted.WhatsAppID,
+  inserted.ClientID,
+  inserted.FromMobile,
+  inserted.ToMobile,
+  inserted.WhatsAppText,
+  inserted.TemplateID,
   t.TemplateName,
   t.TemplateType,
-  w.CreatedBy
-FROM `)
-	b.WriteString(whatsappTable())
-	b.WriteString(` w WITH (ROWLOCK, READPAST)
-LEFT JOIN `)
-	b.WriteString(whatsappTemplatesTable())
-	b.WriteString(` t ON w.TemplateID = t.TemplateID
-WHERE w.IsSent = 0 OR w.IsSent IS NULL
-ORDER BY w.CreatedOn ASC, w.WhatsAppID ASC`)
+  inserted.CreatedBy
+FROM %s w WITH (ROWLOCK, READPAST, UPDLOCK)
+LEFT JOIN %s t ON w.TemplateID = t.TemplateID
+WHERE (w.IsSent = 0 OR w.IsSent IS NULL) AND w.LastUpdatedBy NOT IN (-1, -2)
+`, batchSize, whatsappTable(), whatsappTemplatesTable())
 
-	rows, err := r.db.QueryContext(ctx, b.String())
+	rows, err := r.db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("select pending batch: %w", err)
 	}
@@ -247,17 +243,33 @@ WHERE WhatsAppID = @p1 AND (IsSent = 0 OR IsSent IS NULL)`, whatsappTable())
 	return nil
 }
 
-// MarkAfterFailure sets IsSent = 0 so the row is picked again on the next cycle (same as new failures).
+// MarkAfterFailure sets IsSent = 0 and clears the processing lock so the row is picked again on the next cycle.
 func (r *WhatsAppRepository) MarkAfterFailure(ctx context.Context, whatsappID int64) error {
 	q := fmt.Sprintf(`
 UPDATE %s
 SET IsSent = 0,
+    LastUpdatedBy = 0, -- Reset so it can be retried
     LastUpdatedOn = GETDATE()
 WHERE WhatsAppID = @id`, whatsappTable())
 
 	_, err := r.db.ExecContext(ctx, q, sql.Named("id", whatsappID))
 	if err != nil {
 		return fmt.Errorf("mark after failure: %w", err)
+	}
+	return nil
+}
+
+// MarkPermanentFailure sets LastUpdatedBy = -2 to prevent the message from being retried, without dropping it.
+func (r *WhatsAppRepository) MarkPermanentFailure(ctx context.Context, whatsappID int64) error {
+	q := fmt.Sprintf(`
+UPDATE %s
+SET LastUpdatedBy = -2,
+    LastUpdatedOn = GETDATE()
+WHERE WhatsAppID = @id`, whatsappTable())
+
+	_, err := r.db.ExecContext(ctx, q, sql.Named("id", whatsappID))
+	if err != nil {
+		return fmt.Errorf("mark permanent failure: %w", err)
 	}
 	return nil
 }

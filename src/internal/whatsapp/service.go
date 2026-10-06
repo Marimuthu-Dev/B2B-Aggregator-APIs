@@ -120,7 +120,7 @@ func (s *Service) resolveTemplateName(w domain.OutboxWhatsApp) string {
 // based on OutboxWhatsApp.TemplateType (mm_lite routes to /mm-lite, anything else to /apikey).
 func (s *Service) SendMessage(ctx context.Context, w domain.OutboxWhatsApp) error {
 	fromMobile := strings.TrimSpace(w.FromMobile)
-	toMobile := strings.TrimSpace(w.ToMobile)
+	toMobile := NormalizePhoneNumber(strings.TrimSpace(w.ToMobile))
 	whatsappText := strings.TrimSpace(w.WhatsAppText)
 
 	if fromMobile == "" {
@@ -174,7 +174,7 @@ func (s *Service) SendBatch(ctx context.Context, messages []domain.OutboxWhatsAp
 	var variables []string
 
 	for _, msg := range messages {
-		toMobile := strings.TrimSpace(msg.ToMobile)
+		toMobile := NormalizePhoneNumber(strings.TrimSpace(msg.ToMobile))
 		whatsappText := strings.TrimSpace(msg.WhatsAppText)
 
 		if toMobile == "" {
@@ -198,6 +198,17 @@ func (s *Service) SendBatch(ctx context.Context, messages []domain.OutboxWhatsAp
 	return s.postSend(ctx, reqBody, endpoint)
 }
 
+type APIError struct {
+	Status      string
+	Code        string
+	Description string
+	Curl        string
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("whatsapp API failed: status=%s code=%s description=%s | curl: %s", e.Status, e.Code, e.Description, e.Curl)
+}
+
 func (s *Service) postSend(ctx context.Context, payload whatsappRequest, endpoint string) error {
 	u, err := url.Parse(endpoint)
 	if err != nil {
@@ -214,7 +225,12 @@ func (s *Service) postSend(ctx context.Context, payload whatsappRequest, endpoin
 	}
 
 	fullURL := u.String()
-	curlCmd := fmt.Sprintf("curl -X POST '%s' -H 'Content-Type: application/json' -d '%s'", fullURL, strings.ReplaceAll(string(body), "'", "'\\''"))
+	maskedURL := fullURL
+	if s.cfg.APIKey != "" {
+		maskedURL = strings.ReplaceAll(maskedURL, s.cfg.APIKey, "********")
+	}
+
+	curlCmd := fmt.Sprintf("curl -X POST '%s' -H 'Content-Type: application/json' -d '%s'", maskedURL, strings.ReplaceAll(string(body), "'", "'\\''"))
 
 	slog.Info("whatsapp 3rd party api call curl",
 		slog.String("templateName", payload.TemplateName),
@@ -247,5 +263,10 @@ func (s *Service) postSend(ctx context.Context, payload whatsappRequest, endpoin
 		return fmt.Errorf("whatsapp API rate limited: code=%s description=%s | curl: %s", response.Code, response.Description, curlCmd)
 	}
 
-	return fmt.Errorf("whatsapp API failed: status=%s code=%s description=%s | curl: %s", response.Status, response.Code, response.Description, curlCmd)
+	return &APIError{
+		Status:      response.Status,
+		Code:        response.Code,
+		Description: response.Description,
+		Curl:        curlCmd,
+	}
 }

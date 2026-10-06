@@ -108,13 +108,15 @@ func RunOnce(ctx context.Context, d Deps) (foundRows bool, err error) {
 	rateLimited := false
 	for _, w := range whatsApps {
 		resolved := resolveMessageMetadata(ctx, d.TemplateRepo, &w, d.Config.DefaultTemplateName)
+		normalizedMobile := whatsapp.NormalizePhoneNumber(w.ToMobile)
 
 		log.Info("processing whatsapp",
 			slog.Int64("whatsappID", w.WhatsAppID),
 			slog.Int64("templateID", w.TemplateID),
 			slog.String("templateName", w.TemplateName),
 			slog.String("templateType", w.TemplateType),
-			slog.String("toMobile", w.ToMobile),
+			slog.String("originalMobile", w.ToMobile),
+			slog.String("normalizedMobile", normalizedMobile),
 			slog.String("resolvedFrom", resolved),
 		)
 
@@ -145,6 +147,21 @@ func RunOnce(ctx context.Context, d Deps) (foundRows bool, err error) {
 				slog.String("error", sendErr.Error()),
 			)
 			rateLimited = true
+			continue
+		}
+
+		var apiErr *whatsapp.APIError
+		if errors.As(sendErr, &apiErr) && apiErr.Code == "004" {
+			log.Error("permanent validation error",
+				slog.Int64("whatsappID", w.WhatsAppID),
+				slog.String("error", sendErr.Error()),
+			)
+			if err := d.Repo.MarkPermanentFailure(ctx, w.WhatsAppID); err != nil {
+				log.Error("mark permanent failure failed",
+					slog.Int64("whatsappID", w.WhatsAppID),
+					slog.String("error", err.Error()),
+				)
+			}
 			continue
 		}
 
