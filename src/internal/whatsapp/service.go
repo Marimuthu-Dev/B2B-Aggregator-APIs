@@ -40,7 +40,7 @@ type whatsappRequest struct {
 }
 
 type whatsappResponseData struct {
-	MessageID   int64  `json:"messageid"`
+	MessageID   any    `json:"messageid"`
 	TotalNumber string `json:"totnumber"`
 }
 
@@ -225,12 +225,9 @@ func (s *Service) postSend(ctx context.Context, payload whatsappRequest, endpoin
 	}
 
 	fullURL := u.String()
-	maskedURL := fullURL
-	if s.cfg.APIKey != "" {
-		maskedURL = strings.ReplaceAll(maskedURL, s.cfg.APIKey, "********")
-	}
-
-	curlCmd := fmt.Sprintf("curl -X POST '%s' -H 'Content-Type: application/json' -d '%s'", maskedURL, strings.ReplaceAll(string(body), "'", "'\\''"))
+	
+	// Temporarily unmasking API key in curl for debugging delivery issues as requested by the user
+	curlCmd := fmt.Sprintf("curl -X POST '%s' -H 'Content-Type: application/json' -d '%s'", fullURL, strings.ReplaceAll(string(body), "'", "'\\''"))
 
 	slog.Info("whatsapp 3rd party api call curl",
 		slog.String("templateName", payload.TemplateName),
@@ -250,9 +247,19 @@ func (s *Service) postSend(ctx context.Context, payload whatsappRequest, endpoin
 	}
 	defer resp.Body.Close()
 
+	// Read and log raw response body for deep debugging
+	respBodyBytes := new(bytes.Buffer)
+	_, _ = respBodyBytes.ReadFrom(resp.Body)
+	rawResponse := respBodyBytes.String()
+
+	slog.Info("whatsapp 3rd party api raw response",
+		slog.String("templateName", payload.TemplateName),
+		slog.String("responseBody", rawResponse),
+	)
+
 	var response whatsappResponse
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return fmt.Errorf("decode response: %w | curl: %s", err, curlCmd)
+	if err := json.NewDecoder(strings.NewReader(rawResponse)).Decode(&response); err != nil {
+		return fmt.Errorf("decode response: %w | rawResponse: %s | curl: %s", err, rawResponse, curlCmd)
 	}
 
 	if response.Status == "Success" && response.Code == "011" {
