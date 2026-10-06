@@ -935,7 +935,7 @@ func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lea
 	case "lab_appointment_confirmation", "appointment_confirmed":
 		if hasMap {
 			resolvedTemplateName = "appointment_confirmed_with_map"
-			text = fmt.Sprintf("Dear %s,\nYour lab appointment has been confirmed.\n\nDate: %s\nTime: %s\nLocation: %s\nMap: %s\nLab Package Name: %s\n\nKindly arrive 10 minutes early with valid ID proof.\n\nThank you for choosing MedLyfe Health.",
+			text = fmt.Sprintf("%s|%s|%s|%s|%s|%s",
 				lead.PatientName,
 				appointmentDate,
 				appointmentTime,
@@ -944,7 +944,7 @@ func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lea
 				packageName)
 		} else {
 			resolvedTemplateName = "appointment_confirmed_without_map"
-			text = fmt.Sprintf("Dear %s,\nYour lab appointment has been confirmed.\n\nDate: %s\nTime: %s\nLocation: %s\nLab Package Name: %s\n\nKindly arrive 10 minutes early with valid ID proof.\n\nThank you for choosing MedLyfe Health.",
+			text = fmt.Sprintf("%s|%s|%s|%s|%s",
 				lead.PatientName,
 				appointmentDate,
 				appointmentTime,
@@ -955,7 +955,7 @@ func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lea
 	case "appointment_rescheduled":
 		if hasMap {
 			resolvedTemplateName = "appointment_rescheduled_with_map"
-			text = fmt.Sprintf("Dear %s,\nYour lab appointment has been rescheduled.\n\nNew Date: %s\nNew Time: %s\nLocation: %s\nMap: %s\nLab Package Name: %s\n\nPlease arrive 10 minutes before with valid ID Proof.\n\nThank you for choosing MedLyfe Health.",
+			text = fmt.Sprintf("%s|%s|%s|%s|%s|%s",
 				lead.PatientName,
 				appointmentDate,
 				appointmentTime,
@@ -964,7 +964,7 @@ func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lea
 				packageName)
 		} else {
 			resolvedTemplateName = "appointment_rescheduled_without_map"
-			text = fmt.Sprintf("Dear %s,\nYour lab appointment has been rescheduled.\n\nNew Date: %s\nNew Time: %s\nLocation: %s\nLab Package Name: %s\n\nPlease arrive 10 minutes before with valid ID Proof.\n\nThank you for choosing MedLyfe Health.",
+			text = fmt.Sprintf("%s|%s|%s|%s|%s",
 				lead.PatientName,
 				appointmentDate,
 				appointmentTime,
@@ -974,13 +974,13 @@ func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lea
 
 	case "lab_report_completed", "lab_report_ready":
 		resolvedTemplateName = "lab_report_ready"
-		text = fmt.Sprintf("Dear %s,\nYour lab report is now ready.\nPlease click on below link to download your report. %s\n\nThank you for choosing MedLyfe Health.",
+		text = fmt.Sprintf("%s|%s",
 			lead.PatientName,
 			lead.ReportURL)
 
 	case "appointment_confirmed_with_map":
 		resolvedTemplateName = "appointment_confirmed_with_map"
-		text = fmt.Sprintf("Dear %s,\nYour lab appointment has been confirmed.\n\nDate: %s\nTime: %s\nLocation: %s\nMap: %s\nLab Package Name: %s\n\nKindly arrive 10 minutes early with valid ID proof.\n\nThank you for choosing MedLyfe Health.",
+		text = fmt.Sprintf("%s|%s|%s|%s|%s|%s",
 			lead.PatientName,
 			appointmentDate,
 			appointmentTime,
@@ -990,7 +990,7 @@ func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lea
 
 	case "appointment_confirmed_without_map":
 		resolvedTemplateName = "appointment_confirmed_without_map"
-		text = fmt.Sprintf("Dear %s,\nYour lab appointment has been confirmed.\n\nDate: %s\nTime: %s\nLocation: %s\nLab Package Name: %s\n\nKindly arrive 10 minutes early with valid ID proof.\n\nThank you for choosing MedLyfe Health.",
+		text = fmt.Sprintf("%s|%s|%s|%s|%s",
 			lead.PatientName,
 			appointmentDate,
 			appointmentTime,
@@ -999,7 +999,7 @@ func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lea
 
 	case "appointment_rescheduled_with_map":
 		resolvedTemplateName = "appointment_rescheduled_with_map"
-		text = fmt.Sprintf("Dear %s,\nYour lab appointment has been rescheduled.\n\nNew Date: %s\nNew Time: %s\nLocation: %s\nMap: %s\nLab Package Name: %s\n\nPlease arrive 10 minutes before with valid ID Proof.\n\nThank you for choosing MedLyfe Health.",
+		text = fmt.Sprintf("%s|%s|%s|%s|%s|%s",
 			lead.PatientName,
 			appointmentDate,
 			appointmentTime,
@@ -1009,7 +1009,7 @@ func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lea
 
 	case "appointment_rescheduled_without_map":
 		resolvedTemplateName = "appointment_rescheduled_without_map"
-		text = fmt.Sprintf("Dear %s,\nYour lab appointment has been rescheduled.\n\nNew Date: %s\nNew Time: %s\nLocation: %s\nLab Package Name: %s\n\nPlease arrive 10 minutes before with valid ID Proof.\n\nThank you for choosing MedLyfe Health.",
+		text = fmt.Sprintf("%s|%s|%s|%s|%s",
 			lead.PatientName,
 			appointmentDate,
 			appointmentTime,

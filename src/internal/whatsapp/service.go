@@ -137,11 +137,18 @@ func (s *Service) SendMessage(ctx context.Context, w domain.OutboxWhatsApp) erro
 	templateType := strings.ToLower(strings.TrimSpace(w.TemplateType))
 	endpoint := s.resolveEndpoint(templateType)
 
+	var variables []string
+	if strings.Contains(whatsappText, "|") {
+		variables = strings.Split(whatsappText, "|")
+	} else {
+		variables = []string{whatsappText}
+	}
+
 	reqBody := whatsappRequest{
 		Number:       []string{toMobile},
 		TemplateName: templateName,
 		CampaignName: s.cfg.CampaignName,
-		Variables:    []string{whatsappText},
+		Variables:    variables,
 	}
 
 	return s.postSend(ctx, reqBody, endpoint)
@@ -188,11 +195,24 @@ func (s *Service) SendBatch(ctx context.Context, messages []domain.OutboxWhatsAp
 		variables = append(variables, whatsappText)
 	}
 
+	// For batch, CPAAS expects each parameter in the variables array.
+	// But it could depend on the API. Let's assume it accepts an array of strings per number,
+	// wait, since `Variables` is `[]string`, for batch it usually means comma-separated params per number.
+	// We'll join by comma if it contains pipe, else just use the text.
+	var finalVariables []string
+	for _, v := range variables {
+		if strings.Contains(v, "|") {
+			finalVariables = append(finalVariables, strings.ReplaceAll(v, "|", ","))
+		} else {
+			finalVariables = append(finalVariables, v)
+		}
+	}
+
 	reqBody := whatsappRequest{
 		Number:       numbers,
 		TemplateName: templateName,
 		CampaignName: s.cfg.CampaignName,
-		Variables:    variables,
+		Variables:    finalVariables,
 	}
 
 	return s.postSend(ctx, reqBody, endpoint)
