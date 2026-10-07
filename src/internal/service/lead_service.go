@@ -934,7 +934,7 @@ func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lea
 	switch templateName {
 	case "lab_appointment_confirmation", "appointment_confirmed":
 		if hasMap {
-			resolvedTemplateName = "appointment_confirmed_with_map"
+			resolvedTemplateName = "appointment_confirmed_with_map_2"
 			text = fmt.Sprintf("%s|%s|%s|%s|%s|%s",
 				lead.PatientName,
 				appointmentDate,
@@ -943,7 +943,7 @@ func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lea
 				strings.TrimSpace(mapURL),
 				packageName)
 		} else {
-			resolvedTemplateName = "appointment_confirmed_without_map"
+			resolvedTemplateName = "appointment_confirmed_without_map_2"
 			text = fmt.Sprintf("%s|%s|%s|%s|%s",
 				lead.PatientName,
 				appointmentDate,
@@ -954,7 +954,7 @@ func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lea
 
 	case "appointment_rescheduled":
 		if hasMap {
-			resolvedTemplateName = "appointment_rescheduled_with_map"
+			resolvedTemplateName = "appointment_rescheduled_with_map_2"
 			text = fmt.Sprintf("%s|%s|%s|%s|%s|%s",
 				lead.PatientName,
 				appointmentDate,
@@ -963,7 +963,7 @@ func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lea
 				strings.TrimSpace(mapURL),
 				packageName)
 		} else {
-			resolvedTemplateName = "appointment_rescheduled_without_map"
+			resolvedTemplateName = "appointment_rescheduled_without_map_2"
 			text = fmt.Sprintf("%s|%s|%s|%s|%s",
 				lead.PatientName,
 				appointmentDate,
@@ -972,14 +972,14 @@ func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lea
 				packageName)
 		}
 
-	case "lab_report_completed", "lab_report_ready":
-		resolvedTemplateName = "lab_report_ready"
+	case "lab_report_completed", "lab_report_ready", "lab_report_ready_2":
+		resolvedTemplateName = "lab_report_ready_2"
 		text = fmt.Sprintf("%s|%s",
 			lead.PatientName,
 			lead.ReportURL)
 
-	case "appointment_confirmed_with_map":
-		resolvedTemplateName = "appointment_confirmed_with_map"
+	case "appointment_confirmed_with_map", "appointment_confirmed_with_map_2":
+		resolvedTemplateName = "appointment_confirmed_with_map_2"
 		text = fmt.Sprintf("%s|%s|%s|%s|%s|%s",
 			lead.PatientName,
 			appointmentDate,
@@ -988,8 +988,8 @@ func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lea
 			strings.TrimSpace(mapURL),
 			packageName)
 
-	case "appointment_confirmed_without_map":
-		resolvedTemplateName = "appointment_confirmed_without_map"
+	case "appointment_confirmed_without_map", "appointment_confirmed_without_map_2":
+		resolvedTemplateName = "appointment_confirmed_without_map_2"
 		text = fmt.Sprintf("%s|%s|%s|%s|%s",
 			lead.PatientName,
 			appointmentDate,
@@ -997,8 +997,8 @@ func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lea
 			labAddress,
 			packageName)
 
-	case "appointment_rescheduled_with_map":
-		resolvedTemplateName = "appointment_rescheduled_with_map"
+	case "appointment_rescheduled_with_map", "appointment_rescheduled_with_map_2":
+		resolvedTemplateName = "appointment_rescheduled_with_map_2"
 		text = fmt.Sprintf("%s|%s|%s|%s|%s|%s",
 			lead.PatientName,
 			appointmentDate,
@@ -1007,8 +1007,8 @@ func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lea
 			strings.TrimSpace(mapURL),
 			packageName)
 
-	case "appointment_rescheduled_without_map":
-		resolvedTemplateName = "appointment_rescheduled_without_map"
+	case "appointment_rescheduled_without_map", "appointment_rescheduled_without_map_2":
+		resolvedTemplateName = "appointment_rescheduled_without_map_2"
 		text = fmt.Sprintf("%s|%s|%s|%s|%s",
 			lead.PatientName,
 			appointmentDate,
