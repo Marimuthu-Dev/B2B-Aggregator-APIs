@@ -17,7 +17,9 @@ import (
 	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/timeutil"
+	"b2b-diagnostic-aggregator/apis/internal/utility"
 	"b2b-diagnostic-aggregator/apis/pkg/utils"
+	"os"
 
 	"gorm.io/gorm"
 )
@@ -974,9 +976,17 @@ func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lea
 
 	case "lab_report_completed", "lab_report_ready", "lab_report_ready_2":
 		resolvedTemplateName = "lab_report_ready_2"
+		
+		encryptedLeadId := utility.BaseEncryptUrlSafe(strconv.FormatInt(lead.LeadID, 10))
+		reportDomain := os.Getenv("REPORT_URL_DOMAIN")
+		if reportDomain == "" {
+			reportDomain = "https://urmediconnect.com" // fallback domain
+		}
+		downloadUrl := fmt.Sprintf("%s/public/download-report/%s", reportDomain, encryptedLeadId)
+		
 		text = fmt.Sprintf("%s|%s",
 			lead.PatientName,
-			lead.ReportURL)
+			downloadUrl)
 
 	case "appointment_confirmed_with_map", "appointment_confirmed_with_map_2":
 		resolvedTemplateName = "appointment_confirmed_with_map_2"

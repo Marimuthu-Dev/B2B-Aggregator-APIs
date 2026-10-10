@@ -62,6 +62,10 @@ func registerPublicRoutes(r *gin.Engine, deps routeDeps) {
 		login.POST("/change-password", deps.loginHandler.ChangePassword)
 		login.GET("/profile", deps.loginHandler.GetProfile) // public with X-Domain + userId or mobileNumber
 	}
+	public := v1.Group("/public")
+	{
+		public.GET("/leads/reports/download/:encrypted_id", deps.leadHandler.GetReportDownloadURLPublic)
+	}
 	r.GET("/ping", handlers.Ping)
 }
 

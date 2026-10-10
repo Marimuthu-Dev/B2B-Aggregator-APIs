@@ -14,6 +14,7 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/repository"
 	"b2b-diagnostic-aggregator/apis/internal/service"
 	"b2b-diagnostic-aggregator/apis/internal/timeutil"
+	"b2b-diagnostic-aggregator/apis/internal/utility"
 	"b2b-diagnostic-aggregator/apis/pkg/utils"
 
 	"github.com/gin-gonic/gin"
@@ -338,6 +339,37 @@ func (h *LeadHandler) GetReportDownloadURL(c *gin.Context) {
 	}
 	userID, _ := middleware.GetUserID(c)
 	downloadURL, expiresAt, err := h.svc.GetLeadReportDownloadURL(c.Request.Context(), params.ID, userType, userID)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	respondData(c, http.StatusOK, gin.H{
+		"DownloadURL": downloadURL,
+		"ExpiresAt":   expiresAt.UTC().Format(time.RFC3339),
+	}, "Success", nil)
+}
+
+// GetReportDownloadURLPublic handles GET /api/v1/public/leads/reports/download/:encrypted_id
+func (h *LeadHandler) GetReportDownloadURLPublic(c *gin.Context) {
+	encryptedID := c.Param("encrypted_id")
+	if encryptedID == "" {
+		respondError(c, apperrors.NewBadRequest("encrypted_id is required", nil))
+		return
+	}
+
+	leadIDStr := utility.BaseDecryptUrlSafe(encryptedID)
+	if leadIDStr == "" {
+		respondError(c, apperrors.NewBadRequest("invalid encrypted_id", nil))
+		return
+	}
+
+	leadID, err := strconv.ParseInt(leadIDStr, 10, 64)
+	if err != nil {
+		respondError(c, apperrors.NewBadRequest("invalid encrypted_id format", err))
+		return
+	}
+
+	downloadURL, expiresAt, err := h.svc.GetLeadReportDownloadURL(c.Request.Context(), leadID, 0, 0)
 	if err != nil {
 		respondError(c, err)
 		return
