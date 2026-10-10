@@ -980,7 +980,11 @@ func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lea
 		encryptedLeadId := utility.BaseEncryptUrlSafe(strconv.FormatInt(lead.LeadID, 10))
 		reportDomain := os.Getenv("REPORT_URL_DOMAIN")
 		if reportDomain == "" {
-			reportDomain = "https://urmediconnect.com" // fallback domain
+			if os.Getenv("DB_SCHEMA") == "MedLyfe" {
+				reportDomain = "https://client.medlyfehealth.com"
+			} else {
+				reportDomain = "https://client.urmediconnect.com"
+			}
 		}
 		downloadUrl := fmt.Sprintf("%s/public/download-report/%s", reportDomain, encryptedLeadId)
 		
