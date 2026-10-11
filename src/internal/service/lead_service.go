@@ -1085,10 +1085,16 @@ func QueueReportReadyWhatsApp(ctx context.Context, whatsappRepo *repository.What
 			reportDomain = "https://client.urmediconnect.com"
 		}
 	}
+	reportDomain = strings.TrimRight(strings.TrimSpace(reportDomain), "/")
 	downloadUrl := fmt.Sprintf("%s/public/download-report/%s", reportDomain, encryptedLeadId)
 
+	patientName := strings.TrimSpace(lead.PatientName)
+	if patientName == "" {
+		patientName = "Customer"
+	}
+
 	text := fmt.Sprintf("%s|%s",
-		lead.PatientName,
+		patientName,
 		downloadUrl)
 
 	toMobile := strings.TrimSpace(lead.ContactNumber)

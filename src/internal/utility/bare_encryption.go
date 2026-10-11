@@ -5,22 +5,33 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"io"
 	"os"
 	"strings"
 )
 
+const defaultEncryptionKey = "B2B_Diagnostic_Aggregator_2026_!" // exactly 32 bytes
+
+func getEncryptionKey() []byte {
+	k := strings.TrimSpace(os.Getenv("ENCRYPTION_KEY"))
+	if len(k) >= 32 {
+		return []byte(k[:32])
+	}
+	if len(k) > 0 {
+		h := sha256.Sum256([]byte(k))
+		return h[:]
+	}
+	return []byte(defaultEncryptionKey)
+}
+
 func BaseEncryptUrlSafe(plainText string) string {
 	if plainText == "" {
 		return ""
 	}
 
-	encryptionKey := os.Getenv("ENCRYPTION_KEY")
-	if len(encryptionKey) < 32 {
-		return "" // Requires at least a 32-byte key
-	}
-	key := []byte(encryptionKey[:32])
+	key := getEncryptionKey()
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return ""
@@ -52,11 +63,7 @@ func BaseDecryptUrlSafe(cipherText string) string {
 		return ""
 	}
 
-	encryptionKey := os.Getenv("ENCRYPTION_KEY")
-	if len(encryptionKey) < 32 {
-		return "" // Requires at least a 32-byte key
-	}
-	key := []byte(encryptionKey[:32])
+	key := getEncryptionKey()
 
 	cipherText = strings.ReplaceAll(cipherText, "-", "+")
 	cipherText = strings.ReplaceAll(cipherText, "_", "/")
