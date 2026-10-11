@@ -48,6 +48,7 @@ type routeDeps struct {
 	testHandler           *handlers.TestHandler
 	employmentTypeHandler *handlers.EmploymentTypeHandler
 	dashboardHandler      *handlers.DashboardHandler
+	locationHandler       *handlers.LocationHandler
 }
 
 func registerPublicRoutes(r *gin.Engine, deps routeDeps) {
@@ -65,6 +66,9 @@ func registerPublicRoutes(r *gin.Engine, deps routeDeps) {
 	public := v1.Group("/public")
 	{
 		public.GET("/leads/reports/download/:encrypted_id", deps.leadHandler.GetReportDownloadURLPublic)
+	}
+	if deps.locationHandler != nil {
+		registerLocationRoutes(v1, deps.locationHandler)
 	}
 	r.GET("/ping", handlers.Ping)
 }
@@ -85,6 +89,16 @@ func registerProtectedRoutes(r *gin.Engine, jwtSecret string, deps routeDeps) {
 		registerEmploymentTypeRoutes(api, deps.employmentTypeHandler)
 		registerDashboardRoutes(api, deps.dashboardHandler)
 	}
+}
+
+func registerLocationRoutes(rg *gin.RouterGroup, handler *handlers.LocationHandler) {
+	rg.GET("/locations/states", handler.GetStates)
+	rg.GET("/locations/cities", handler.GetCities)
+	rg.GET("/locations/cities/:state_id", handler.GetCitiesByStateID)
+	// Also register root /states and /cities under /api/v1 for convenience
+	rg.GET("/states", handler.GetStates)
+	rg.GET("/cities", handler.GetCities)
+	rg.GET("/cities/:state_id", handler.GetCitiesByStateID)
 }
 
 func registerPackageRoutes(api *gin.RouterGroup, handler *handlers.PackageHandler) {

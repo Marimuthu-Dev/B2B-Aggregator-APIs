@@ -34,7 +34,7 @@ func Ping(c *gin.Context) {
 		"Environment":       env,
 		"Current TimeStamp": currentTS,
 		"IST TimeStamp":     istTS,
-		"Last Build Pushed": "03-Oct-2026 22:45:00",
+		"Last Build Pushed": "11-Oct-2026 19:05:00",
 		"Latest commit":     "Dashboard updates.",
 	})
 }

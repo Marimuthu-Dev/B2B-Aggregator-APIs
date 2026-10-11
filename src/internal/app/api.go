@@ -104,6 +104,8 @@ func Run() error {
 	testSvc := service.NewTestService(testRepo)
 	employmentTypeSvc := service.NewEmploymentTypeService(employmentTypeRepo)
 	dashboardSvc := service.NewDashboardService(dashboardRepo)
+	locationRepo := repository.NewLocationRepository(db)
+	locationSvc := service.NewLocationService(locationRepo)
 
 	// Initialize Handlers
 	packageHandler := handlers.NewPackageHandler(packageSvc, storeSvc)
@@ -117,6 +119,7 @@ func Run() error {
 	testHandler := handlers.NewTestHandler(testSvc)
 	employmentTypeHandler := handlers.NewEmploymentTypeHandler(employmentTypeSvc)
 	dashboardHandler := handlers.NewDashboardHandler(dashboardSvc)
+	locationHandler := handlers.NewLocationHandler(locationSvc)
 
 	// Initialize Gin
 	r := gin.Default()
@@ -136,6 +139,7 @@ func Run() error {
 		testHandler:           testHandler,
 		employmentTypeHandler: employmentTypeHandler,
 		dashboardHandler:      dashboardHandler,
+		locationHandler:       locationHandler,
 	})
 
 	// Azure App Service and cloud platforms set PORT env; default 8080

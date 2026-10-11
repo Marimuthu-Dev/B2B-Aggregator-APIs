@@ -95,7 +95,31 @@ WHERE TemplateName = @templateName AND IsActive = 1`, whatsappTemplatesTable())
 	}
 	
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("template not found: %s", templateName)
+		var altName string
+		if strings.HasSuffix(templateName, "_2") {
+			altName = strings.TrimSuffix(templateName, "_2")
+		} else {
+			altName = templateName + "_2"
+		}
+		err = r.db.QueryRowContext(ctx, q, sql.Named("templateName", altName)).Scan(
+			&t.TemplateID,
+			&t.TemplateName,
+			&t.TemplateType,
+			&variableCount,
+			&t.Description,
+			&t.IsActive,
+			&approvedByCPaaS,
+			&t.CreatedBy,
+			&t.CreatedOn,
+			&t.LastUpdatedBy,
+			&t.LastUpdatedOn,
+		)
+		if variableCount.Valid {
+			t.VariableCount = variableCount.Int64
+		}
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("template not found: %s", templateName)
+		}
 	}
 	if err != nil {
 		return nil, fmt.Errorf("find template by name: %w", err)

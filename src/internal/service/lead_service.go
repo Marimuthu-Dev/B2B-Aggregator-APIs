@@ -867,8 +867,10 @@ func (s *leadService) ApproveLeadReport(leadID int64, req *dto.ApproveLeadReques
 		})
 	})
 	
-	if err == nil && isFit == domain.LeadFitFit {
-		go s.queueWhatsAppMessage(context.Background(), lead, "lab_report_completed", lead.LabID)
+	if err == nil && (isFit == domain.LeadFitFit || req.AllowDownload) {
+		leadCopy := *lead
+		leadCopy.LastUpdatedBy = userID
+		go s.queueWhatsAppMessage(context.Background(), &leadCopy, "lab_report_completed", lead.LabID)
 	}
 	
 	return err
@@ -1035,13 +1037,31 @@ func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lea
 		return
 	}
 
+	toMobile := strings.TrimSpace(lead.ContactNumber)
+	digitsOnly := strings.Map(func(r rune) rune {
+		if r >= '0' && r <= '9' {
+			return r
+		}
+		return -1
+	}, toMobile)
+	if len(digitsOnly) >= 10 {
+		toMobile = digitsOnly[len(digitsOnly)-10:]
+	} else if len(digitsOnly) > 0 {
+		toMobile = digitsOnly
+	}
+
+	createdBy := lead.LastUpdatedBy
+	if createdBy <= 0 {
+		createdBy = 1
+	}
+
 	msg := domain.QueuedWhatsApp{
 		ClientID:     lead.ClientID,
 		FromMobile:   "System", // Default fallback if not available
-		ToMobile:     lead.ContactNumber,
+		ToMobile:     toMobile,
 		WhatsAppText: text,
 		TemplateName: resolvedTemplateName,
-		CreatedBy:    lead.LastUpdatedBy,
+		CreatedBy:    createdBy,
 	}
 	
 	err := s.whatsappRepo.EnqueueWithTemplate(ctx, msg, s.whatsappTemplateRepo)
