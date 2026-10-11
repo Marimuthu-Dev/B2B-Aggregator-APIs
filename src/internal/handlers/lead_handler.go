@@ -376,6 +376,8 @@ func (h *LeadHandler) GetReportDownloadURLPublic(c *gin.Context) {
 	}
 	respondData(c, http.StatusOK, gin.H{
 		"DownloadURL": downloadURL,
+		"DownloadUrl": downloadURL,
+		"downloadUrl": downloadURL,
 		"ExpiresAt":   expiresAt.UTC().Format(time.RFC3339),
 	}, "Success", nil)
 }
