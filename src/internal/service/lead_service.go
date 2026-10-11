@@ -401,7 +401,7 @@ func (s *leadService) BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastU
 	}
 
 	var existingLeads []domain.Lead
-	if appointmentAt != nil {
+	if appointmentAt != nil || statusID == domain.LeadStatusIDReportReadyForDownload {
 		for _, id := range leadIDs {
 			if l, err := s.repo.FindByID(id); err == nil && l != nil {
 				existingLeads = append(existingLeads, *l)
@@ -433,31 +433,43 @@ func (s *leadService) BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastU
 		return nil
 	})
 	
-	if err == nil && appointmentAt != nil {
+	if err == nil {
 		ctx := context.Background()
-		for _, l := range existingLeads {
-			currentLabID := l.LabID
-			if labID != nil {
-				currentLabID = labID
+		if statusID == domain.LeadStatusIDReportReadyForDownload {
+			for _, l := range existingLeads {
+				if l.LeadStatusID != domain.LeadStatusIDReportReadyForDownload {
+					leadCopy := l
+					leadCopy.LastUpdatedBy = lastUpdatedBy
+					leadCopy.LeadStatusID = statusID
+					go QueueReportReadyWhatsApp(ctx, s.whatsappRepo, s.whatsappTemplateRepo, &leadCopy)
+				}
 			}
-			if currentLabID == nil {
-				continue
-			}
-			
-			var eventType string
-			if l.AppointmentAt == nil {
-				eventType = "lab_appointment_confirmation"
-			} else if l.AppointmentAt.Unix() != appointmentPersist.Unix() {
-				eventType = "appointment_rescheduled"
-			}
-			
-			if eventType != "" {
-				updatedLead := l
-				ap := timeutil.StoredFromTime(*appointmentPersist)
-				updatedLead.AppointmentAt = &ap
-				updatedLead.LabID = currentLabID
+		}
+		if appointmentAt != nil {
+			for _, l := range existingLeads {
+				currentLabID := l.LabID
+				if labID != nil {
+					currentLabID = labID
+				}
+				if currentLabID == nil {
+					continue
+				}
 				
-				go s.queueWhatsAppMessage(ctx, &updatedLead, eventType, currentLabID)
+				var eventType string
+				if l.AppointmentAt == nil {
+					eventType = "lab_appointment_confirmation"
+				} else if l.AppointmentAt.Unix() != appointmentPersist.Unix() {
+					eventType = "appointment_rescheduled"
+				}
+				
+				if eventType != "" {
+					updatedLead := l
+					ap := timeutil.StoredFromTime(*appointmentPersist)
+					updatedLead.AppointmentAt = &ap
+					updatedLead.LabID = currentLabID
+					
+					go s.queueWhatsAppMessage(ctx, &updatedLead, eventType, currentLabID)
+				}
 			}
 		}
 	}
@@ -866,13 +878,7 @@ func (s *leadService) ApproveLeadReport(leadID int64, req *dto.ApproveLeadReques
 			CreatedBy: userID,
 		})
 	})
-	
-	if err == nil && (isFit == domain.LeadFitFit || req.AllowDownload) {
-		leadCopy := *lead
-		leadCopy.LastUpdatedBy = userID
-		go s.queueWhatsAppMessage(context.Background(), &leadCopy, "lab_report_completed", lead.LabID)
-	}
-	
+
 	return err
 }
 
@@ -977,22 +983,8 @@ func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lea
 		}
 
 	case "lab_report_completed", "lab_report_ready", "lab_report_ready_2":
-		resolvedTemplateName = "lab_report_ready_2"
-		
-		encryptedLeadId := utility.BaseEncryptUrlSafe(strconv.FormatInt(lead.LeadID, 10))
-		reportDomain := os.Getenv("REPORT_URL_DOMAIN")
-		if reportDomain == "" {
-			if os.Getenv("DB_SCHEMA") == "MedLyfe" {
-				reportDomain = "https://client.medlyfehealth.com"
-			} else {
-				reportDomain = "https://client.urmediconnect.com"
-			}
-		}
-		downloadUrl := fmt.Sprintf("%s/public/download-report/%s", reportDomain, encryptedLeadId)
-		
-		text = fmt.Sprintf("%s|%s",
-			lead.PatientName,
-			downloadUrl)
+		QueueReportReadyWhatsApp(ctx, s.whatsappRepo, s.whatsappTemplateRepo, lead)
+		return
 
 	case "appointment_confirmed_with_map", "appointment_confirmed_with_map_2":
 		resolvedTemplateName = "appointment_confirmed_with_map_2"
@@ -1067,5 +1059,69 @@ func (s *leadService) queueWhatsAppMessage(ctx context.Context, lead *domain.Lea
 	err := s.whatsappRepo.EnqueueWithTemplate(ctx, msg, s.whatsappTemplateRepo)
 	if err != nil {
 		slog.Error("Failed to queue WhatsApp message", slog.Any("err", err), slog.Int64("leadID", lead.LeadID))
+	}
+}
+
+// QueueReportReadyWhatsApp enqueues the WhatsApp report download template message for a lead.
+func QueueReportReadyWhatsApp(ctx context.Context, whatsappRepo *repository.WhatsAppRepository, templateRepo *repository.WhatsAppTemplateRepository, lead *domain.Lead) {
+	if lead == nil {
+		return
+	}
+	if whatsappRepo == nil || templateRepo == nil {
+		slog.Warn("WhatsApp repos not configured, skipping report ready notification", slog.Int64("leadID", lead.LeadID))
+		return
+	}
+	if strings.TrimSpace(lead.ContactNumber) == "" {
+		slog.Warn("Lead has no contact number, skipping report ready WhatsApp", slog.Int64("leadID", lead.LeadID))
+		return
+	}
+
+	encryptedLeadId := utility.BaseEncryptUrlSafe(strconv.FormatInt(lead.LeadID, 10))
+	reportDomain := os.Getenv("REPORT_URL_DOMAIN")
+	if reportDomain == "" {
+		if os.Getenv("DB_SCHEMA") == "MedLyfe" {
+			reportDomain = "https://client.medlyfehealth.com"
+		} else {
+			reportDomain = "https://client.urmediconnect.com"
+		}
+	}
+	downloadUrl := fmt.Sprintf("%s/public/download-report/%s", reportDomain, encryptedLeadId)
+
+	text := fmt.Sprintf("%s|%s",
+		lead.PatientName,
+		downloadUrl)
+
+	toMobile := strings.TrimSpace(lead.ContactNumber)
+	digitsOnly := strings.Map(func(r rune) rune {
+		if r >= '0' && r <= '9' {
+			return r
+		}
+		return -1
+	}, toMobile)
+	if len(digitsOnly) >= 10 {
+		toMobile = digitsOnly[len(digitsOnly)-10:]
+	} else if len(digitsOnly) > 0 {
+		toMobile = digitsOnly
+	}
+
+	createdBy := lead.LastUpdatedBy
+	if createdBy <= 0 {
+		createdBy = 1
+	}
+
+	msg := domain.QueuedWhatsApp{
+		ClientID:     lead.ClientID,
+		FromMobile:   "System",
+		ToMobile:     toMobile,
+		WhatsAppText: text,
+		TemplateName: "lab_report_ready_2",
+		CreatedBy:    createdBy,
+	}
+
+	err := whatsappRepo.EnqueueWithTemplate(ctx, msg, templateRepo)
+	if err != nil {
+		slog.Error("Failed to queue report ready WhatsApp message", slog.Any("err", err), slog.Int64("leadID", lead.LeadID))
+	} else {
+		slog.Info("Successfully queued report ready WhatsApp message", slog.Int64("leadID", lead.LeadID), slog.String("toMobile", toMobile))
 	}
 }

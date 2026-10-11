@@ -13,6 +13,7 @@ import (
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/fitnesscert"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
+	"b2b-diagnostic-aggregator/apis/internal/service"
 	"b2b-diagnostic-aggregator/apis/internal/storage"
 	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 
@@ -21,12 +22,14 @@ import (
 
 // Deps bundles dependencies for the fitness certificate worker.
 type Deps struct {
-	DB         *gorm.DB
-	Blob       *storage.AzureMoUBlobService
-	LeadRepo   repository.LeadRepository
-	ClientRepo repository.ClientRepository
-	Config     config.FitnessCertWorkerConfig
-	Log        *slog.Logger
+	DB                   *gorm.DB
+	Blob                 *storage.AzureMoUBlobService
+	LeadRepo             repository.LeadRepository
+	ClientRepo           repository.ClientRepository
+	WhatsAppRepo         *repository.WhatsAppRepository
+	WhatsAppTemplateRepo *repository.WhatsAppTemplateRepository
+	Config               config.FitnessCertWorkerConfig
+	Log                  *slog.Logger
 }
 
 // RunLoop processes pending leads on an interval until ctx is cancelled.
@@ -111,6 +114,7 @@ func processLead(ctx context.Context, d Deps, lead domain.Lead, log *slog.Logger
 				return nil
 			}
 			log.Info("report marked ready to download without certificate generation", slog.Int64("leadID", lead.LeadID))
+			d.queueReportReadyNotification(lead)
 			return nil
 		}
 		return fmt.Errorf("client %d has no ClientTypeID; add certificate template after setting type", lead.ClientID)
@@ -135,6 +139,7 @@ func processLead(ctx context.Context, d Deps, lead domain.Lead, log *slog.Logger
 			return nil
 		}
 		log.Info("report marked ready to download without certificate generation", slog.Int64("leadID", lead.LeadID))
+		d.queueReportReadyNotification(lead)
 		return nil
 	}
 
@@ -232,9 +237,17 @@ func processLead(ctx context.Context, d Deps, lead domain.Lead, log *slog.Logger
 		slog.Int64("leadID", lead.LeadID),
 		slog.Int("mergedPDFBytes", len(merged)),
 	)
+	d.queueReportReadyNotification(lead)
 	return nil
 }
 
 func requiresFitnessCertificate(clientTypeID int8) bool {
 	return clientTypeID == 1 || clientTypeID == 2
+}
+
+func (d *Deps) queueReportReadyNotification(lead domain.Lead) {
+	leadCopy := lead
+	leadCopy.LastUpdatedBy = d.Config.ActorUserID
+	leadCopy.LeadStatusID = d.Config.DoneLeadStatusID
+	go service.QueueReportReadyWhatsApp(context.Background(), d.WhatsAppRepo, d.WhatsAppTemplateRepo, &leadCopy)
 }

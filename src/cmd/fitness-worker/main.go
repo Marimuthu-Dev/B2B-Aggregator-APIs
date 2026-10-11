@@ -64,13 +64,26 @@ func main() {
 		log.Fatalf("azure blob: %v", err)
 	}
 
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatalf("sql db: %v", err)
+	}
+
+	whatsappRepo := repository.NewWhatsAppRepositoryFromSQL(sqlDB)
+	whatsappTemplateRepo, err := repository.NewWhatsAppTemplateRepository(context.Background(), sqlDB)
+	if err != nil {
+		logger.Warn("fitness worker: WhatsApp template repository initialization failed", slog.Any("err", err))
+	}
+
 	deps := fitness.Deps{
-		DB:         db,
-		Blob:       blobSvc,
-		LeadRepo:   repository.NewLeadRepository(db),
-		ClientRepo: repository.NewClientRepository(db),
-		Config:     wc,
-		Log:        logger,
+		DB:                   db,
+		Blob:                 blobSvc,
+		LeadRepo:             repository.NewLeadRepository(db),
+		ClientRepo:           repository.NewClientRepository(db),
+		WhatsAppRepo:         whatsappRepo,
+		WhatsAppTemplateRepo: whatsappTemplateRepo,
+		Config:               wc,
+		Log:                  logger,
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

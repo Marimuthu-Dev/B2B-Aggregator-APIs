@@ -133,6 +133,8 @@ const LeadStatusIDDefault int8 = 1
 const (
 	LeadStatusIDReportUploaded int8 = 8
 	LeadStatusIDReportApproved int8 = 9
+	// LeadStatusIDReportReadyForDownload matches MediAdmin.tbl_LeadStatusMaster for "Report Ready for Download".
+	LeadStatusIDReportReadyForDownload  int8 = 10
 	// LeadStatusIDClientDownloadNoFitGate is the minimum LeadStatusID at which clients may obtain a report
 	// download URL without IsFit / IsReportDownloadable checks (e.g. post certificate merge, typically 10).
 	LeadStatusIDClientDownloadNoFitGate int8 = 10
