@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -378,6 +379,10 @@ func (h *LeadHandler) GetReportDownloadURLPublic(c *gin.Context) {
 		"DownloadURL": downloadURL,
 		"DownloadUrl": downloadURL,
 		"downloadUrl": downloadURL,
+		"LeadID":      leadID,
+		"leadId":      leadID,
+		"FileName":    fmt.Sprintf("Diagnostic_Report_%d.pdf", leadID),
+		"fileName":    fmt.Sprintf("Diagnostic_Report_%d.pdf", leadID),
 		"ExpiresAt":   expiresAt.UTC().Format(time.RFC3339),
 	}, "Success", nil)
 }
