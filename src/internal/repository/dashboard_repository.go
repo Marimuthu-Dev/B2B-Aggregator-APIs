@@ -73,7 +73,8 @@ func (r *dashboardRepository) labTrackingBaseQuery(filter domain.LabTrackingFilt
 
 	q := r.db.Table(leadTable + " AS l").
 		Joins("LEFT JOIN " + clientTable + " AS cm ON l.ClientID = cm.ClientID").
-		Joins("LEFT JOIN " + labTable + " AS lm ON l.LabID = lm.LabID")
+		Joins("LEFT JOIN " + labTable + " AS lm ON l.LabID = lm.LabID").
+		Where("l.IsDeleted = ?", false)
 
 	if filter.From != nil {
 		q = q.Where("l.CreatedOn >= ?", *filter.From)
@@ -160,7 +161,7 @@ func (r *dashboardRepository) LabTrackingFilterOptions() (*domain.LabTrackingFil
 	var cities []dashboardOptionScan
 	if err := r.db.Table(cityTable + " AS ctm").
 		Select("ctm.CityID AS ID, ctm.CityName AS Name").
-		Where("EXISTS (SELECT 1 FROM " + leadTable + " AS l WHERE l.CityID = ctm.CityID)").
+		Where("EXISTS (SELECT 1 FROM " + leadTable + " AS l WHERE l.CityID = ctm.CityID AND l.IsDeleted = 0)").
 		Order("ctm.CityName ASC").
 		Scan(&cities).Error; err != nil {
 		return nil, err

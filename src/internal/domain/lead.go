@@ -202,6 +202,7 @@ type Lead struct {
 	CreatedOn                     timeutil.ISTTime
 	LastUpdatedBy                 int64
 	LastUpdatedOn                 timeutil.ISTTime
+	IsDeleted                     bool                 `json:"IsDeleted"`
 }
 
 // LeadDetail is lead with resolved PackageName and Tests for API response (ClientName is on embedded Lead).

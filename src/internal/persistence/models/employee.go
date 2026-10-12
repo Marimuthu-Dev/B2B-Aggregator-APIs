@@ -15,6 +15,7 @@ type Employee struct {
 	Department         string `gorm:"column:Department;type:varchar(15);not null"`
 	IsActive          bool   `gorm:"column:IsActive;not null;default:1"`
 	IsPriceViewAccess  bool   `gorm:"column:IsPriceViewAccess;not null;default:0"`
+	IsDelete_Access    bool   `gorm:"column:IsDelete_Access;not null;default:0"`
 	CreatedBy          int64  `gorm:"column:CreatedBy;not null"`
 	CreatedOn      time.Time `gorm:"column:CreatedOn;not null;default:GETDATE()"`
 	LastUpdatedBy  int64     `gorm:"column:LastUpdatedBy;not null"`

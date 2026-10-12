@@ -39,6 +39,7 @@ type Lead struct {
 	CreatedOn                     time.Time  `gorm:"column:CreatedOn;not null;default:GETDATE()"`
 	LastUpdatedBy                 int64      `gorm:"column:LastUpdatedBy;not null"`
 	LastUpdatedOn                 time.Time  `gorm:"column:LastUpdatedOn;not null;default:GETDATE()"`
+	IsDeleted                     bool       `gorm:"column:IsDeleted;not null;default:0"`
 }
 
 func (Lead) TableName() string {

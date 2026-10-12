@@ -55,8 +55,8 @@ func (r *employeeRepository) FindByMobileNumber(mobileNumber string) (*domain.Em
 	d := mapEmployeeToDomain(m)
 
 	// Console log: print DB record details (excluding mobile number)
-	fmt.Printf("Employee DB record: UID=%d FullName=%s Address=%s CityID=%d StateID=%d Pincode=%s CompanyEmailID=%s Designation=%s Department=%s IsActive=%v IsPriceViewAccess=%v CreatedBy=%d CreatedOn=%v LastUpdatedBy=%d LastUpdatedOn=%v\n",
-		d.UID, d.FullName, d.Address, d.CityID, d.StateID, d.Pincode, d.CompanyEmailID, d.Designation, d.Department, d.IsActive, d.IsPriceViewAccess, d.CreatedBy, d.CreatedOn.ToTime(), d.LastUpdatedBy, d.LastUpdatedOn.ToTime())
+	fmt.Printf("Employee DB record: UID=%d FullName=%s Address=%s CityID=%d StateID=%d Pincode=%s CompanyEmailID=%s Designation=%s Department=%s IsActive=%v IsPriceViewAccess=%v IsDelete_Access=%v CreatedBy=%d CreatedOn=%v LastUpdatedBy=%d LastUpdatedOn=%v\n",
+		d.UID, d.FullName, d.Address, d.CityID, d.StateID, d.Pincode, d.CompanyEmailID, d.Designation, d.Department, d.IsActive, d.IsPriceViewAccess, d.IsDelete_Access, d.CreatedBy, d.CreatedOn.ToTime(), d.LastUpdatedBy, d.LastUpdatedOn.ToTime())
 
 	return &d, nil
 }
@@ -122,6 +122,7 @@ func mapEmployeeToDomain(p persistencemodels.Employee) domain.Employee {
 		Department:        p.Department,
 		IsActive:         p.IsActive,
 		IsPriceViewAccess: p.IsPriceViewAccess,
+		IsDelete_Access:   p.IsDelete_Access,
 		CreatedBy:         p.CreatedBy,
 		CreatedOn:      timeutil.FromTime(p.CreatedOn),
 		LastUpdatedBy:  p.LastUpdatedBy,
@@ -143,6 +144,7 @@ func mapEmployeeToPersistence(d domain.Employee) persistencemodels.Employee {
 		Department:        d.Department,
 		IsActive:         d.IsActive,
 		IsPriceViewAccess: d.IsPriceViewAccess,
+		IsDelete_Access:   d.IsDelete_Access,
 		CreatedBy:         d.CreatedBy,
 		CreatedOn:      d.CreatedOn.ToTime(),
 		LastUpdatedBy:  d.LastUpdatedBy,

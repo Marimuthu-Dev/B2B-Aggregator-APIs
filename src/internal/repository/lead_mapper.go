@@ -93,6 +93,7 @@ func mapLeadToDomain(p persistencemodels.Lead) domain.Lead {
 		CreatedOn:                     timeutil.FromTime(p.CreatedOn),
 		LastUpdatedBy:                 p.LastUpdatedBy,
 		LastUpdatedOn:                 timeutil.FromTime(p.LastUpdatedOn),
+		IsDeleted:                     p.IsDeleted,
 	}
 }
 
@@ -139,6 +140,7 @@ func mapLeadToPersistence(d domain.Lead) persistencemodels.Lead {
 		CreatedOn:                     d.CreatedOn.ToTime(),
 		LastUpdatedBy:                 d.LastUpdatedBy,
 		LastUpdatedOn:                 d.LastUpdatedOn.ToTime(),
+		IsDeleted:                     d.IsDeleted,
 	}
 }
 

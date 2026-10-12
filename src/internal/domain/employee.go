@@ -15,6 +15,7 @@ type Employee struct {
 	Department        string
 	IsActive         bool
 	IsPriceViewAccess bool
+	IsDelete_Access   bool
 	CreatedBy         int64
 	CreatedOn      timeutil.ISTTime
 	LastUpdatedBy  int64

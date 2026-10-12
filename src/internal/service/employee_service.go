@@ -126,6 +126,9 @@ func (s *employeeService) Update(id int64, update *dto.EmployeeUpdateRequest, la
 	if update.IsActive != nil {
 		e.IsActive = *update.IsActive
 	}
+	if update.IsDelete_Access != nil {
+		e.IsDelete_Access = *update.IsDelete_Access
+	}
 	if err := s.ensureEmployeeMobileUnique(e.MobileNumber, id); err != nil {
 		return nil, err
 	}
