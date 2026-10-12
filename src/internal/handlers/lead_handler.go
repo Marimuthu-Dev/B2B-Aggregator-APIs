@@ -375,16 +375,40 @@ func (h *LeadHandler) GetReportDownloadURLPublic(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
+	leadName := ""
+	if leadDetail, err := h.svc.GetLeadByID(leadID); err == nil && leadDetail != nil {
+		leadName = strings.TrimSpace(leadDetail.PatientName)
+	}
+
+	fileName := fmt.Sprintf("Diagnostic_Report_%d.pdf", leadID)
+	if cleanName := sanitizeReportFilename(leadName); cleanName != "" {
+		fileName = fmt.Sprintf("Diagnostic_Report_%d_%s.pdf", leadID, cleanName)
+	}
+
 	respondData(c, http.StatusOK, gin.H{
 		"DownloadURL": downloadURL,
 		"DownloadUrl": downloadURL,
 		"downloadUrl": downloadURL,
 		"LeadID":      leadID,
 		"leadId":      leadID,
-		"FileName":    fmt.Sprintf("Diagnostic_Report_%d.pdf", leadID),
-		"fileName":    fmt.Sprintf("Diagnostic_Report_%d.pdf", leadID),
+		"LeadName":    leadName,
+		"leadName":    leadName,
+		"FileName":    fileName,
+		"fileName":    fileName,
 		"ExpiresAt":   expiresAt.UTC().Format(time.RFC3339),
 	}, "Success", nil)
+}
+
+func sanitizeReportFilename(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.ReplaceAll(s, " ", "_")
+	var b strings.Builder
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-' {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
 
 func (h *LeadHandler) BulkImportCsv(c *gin.Context) {
