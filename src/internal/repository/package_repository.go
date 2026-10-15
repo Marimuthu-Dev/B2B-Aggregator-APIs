@@ -88,7 +88,7 @@ func (r *packageRepository) FindByID(id int64) (*domain.Package, error) {
 
 func (r *packageRepository) ExistsByID(id int64) (bool, error) {
 	var count int64
-	if err := r.db.Model(&persistencemodels.Package{}).Where("PackageID = ?", id).Limit(1).Count(&count).Error; err != nil {
+	if err := r.db.Model(&persistencemodels.Package{}).Where("PackageID = ?", id).Count(&count).Error; err != nil {
 		return false, err
 	}
 	return count > 0, nil

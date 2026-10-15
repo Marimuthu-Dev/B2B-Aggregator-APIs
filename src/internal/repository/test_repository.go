@@ -59,7 +59,7 @@ func (r *testRepository) FindByIDs(ids []int64) ([]domain.Test, error) {
 
 func (r *testRepository) ExistsByID(id int64) (bool, error) {
 	var count int64
-	if err := r.db.Model(&persistencemodels.Test{}).Where("TestID = ?", id).Limit(1).Count(&count).Error; err != nil {
+	if err := r.db.Model(&persistencemodels.Test{}).Where("TestID = ?", id).Count(&count).Error; err != nil {
 		return false, err
 	}
 	return count > 0, nil

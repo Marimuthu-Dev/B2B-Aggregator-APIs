@@ -108,7 +108,7 @@ func (r *clientRepository) FindByID(id int64) (*domain.Client, error) {
 
 func (r *clientRepository) ExistsByID(id int64) (bool, error) {
 	var count int64
-	if err := r.db.Model(&persistencemodels.Client{}).Where("ClientID = ?", id).Limit(1).Count(&count).Error; err != nil {
+	if err := r.db.Model(&persistencemodels.Client{}).Where("ClientID = ?", id).Count(&count).Error; err != nil {
 		return false, err
 	}
 	return count > 0, nil

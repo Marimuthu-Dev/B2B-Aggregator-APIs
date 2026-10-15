@@ -115,7 +115,7 @@ func (r *labRepository) FindByID(id int64) (*domain.Lab, error) {
 
 func (r *labRepository) ExistsByID(id int64) (bool, error) {
 	var count int64
-	if err := gormLab(r.db.Model(&persistencemodels.Lab{})).Where("LabID = ?", id).Limit(1).Count(&count).Error; err != nil {
+	if err := gormLab(r.db.Model(&persistencemodels.Lab{})).Where("LabID = ?", id).Count(&count).Error; err != nil {
 		return false, err
 	}
 	return count > 0, nil

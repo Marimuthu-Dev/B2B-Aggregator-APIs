@@ -306,7 +306,7 @@ func (r *leadRepository) FindByID(id int64) (*domain.Lead, error) {
 
 func (r *leadRepository) ExistsByID(id int64) (bool, error) {
 	var count int64
-	if err := gormLead(r.db).Model(&persistencemodels.Lead{}).Where("LeadID = ? AND IsDeleted = ?", id, false).Limit(1).Count(&count).Error; err != nil {
+	if err := gormLead(r.db).Model(&persistencemodels.Lead{}).Where("LeadID = ? AND IsDeleted = ?", id, false).Count(&count).Error; err != nil {
 		return false, err
 	}
 	return count > 0, nil
