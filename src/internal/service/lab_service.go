@@ -30,7 +30,7 @@ type LabService interface {
 	GetLabMoUDownloadURL(ctx context.Context, labID int64) (*dto.LabMoUDownloadURLResponse, error)
 	DeleteLab(id int64) error
 	GetActiveLabs() ([]domain.Lab, error)
-	GetLabsByCity(cityID uint8) ([]domain.Lab, error)
+	GetLabsByCity(cityID int16) ([]domain.Lab, error)
 	GetLabsByState(stateID uint8) ([]domain.Lab, error)
 }
 
@@ -449,7 +449,7 @@ func (s *labService) GetActiveLabs() ([]domain.Lab, error) {
 	return s.repo.FindAllActive()
 }
 
-func (s *labService) GetLabsByCity(cityID uint8) ([]domain.Lab, error) {
+func (s *labService) GetLabsByCity(cityID int16) ([]domain.Lab, error) {
 	return s.repo.FindByCity(cityID)
 }
 

@@ -9,7 +9,7 @@ type Lab struct {
 	LabID                      int64
 	LabName                    string
 	Address                    *string
-	CityID                     *uint8
+	CityID                     *int16
 	StateID                    *uint8
 	Pincode                    *string
 	ContactPerson1Name         *string

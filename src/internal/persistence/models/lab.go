@@ -6,7 +6,7 @@ type Lab struct {
 	LabID                      int64      `gorm:"primaryKey;column:LabID;autoIncrement"`
 	LabName                    string     `gorm:"column:LabName;type:varchar(75);not null"`
 	Address                    *string    `gorm:"column:Address;type:varchar(150)"`
-	CityID                     *uint8     `gorm:"column:CityID"`
+	CityID                     *int16     `gorm:"column:CityID"`
 	StateID                    *uint8     `gorm:"column:StateID"`
 	Pincode                    *string    `gorm:"column:Pincode;type:varchar(6)"`
 	ContactPerson1Name         *string    `gorm:"column:ContactPerson1Name;type:varchar(15)"`

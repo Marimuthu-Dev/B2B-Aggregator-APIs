@@ -30,7 +30,7 @@ type LabListFilter struct {
 	PageSize       int
 	SortBy         string
 	SortOrder      string
-	CityID         *uint8
+	CityID         *int16
 	StateID        *uint8
 	IsActive       *bool
 	MouStatuses    []string

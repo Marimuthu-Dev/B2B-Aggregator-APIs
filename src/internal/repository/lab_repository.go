@@ -22,7 +22,7 @@ type LabRepository interface {
 	Delete(id int64) error
 	FindAllActive() ([]domain.Lab, error)
 	FindByContactNumber(contactNumber string) (*domain.Lab, error)
-	FindByCity(cityID uint8) ([]domain.Lab, error)
+	FindByCity(cityID int16) ([]domain.Lab, error)
 	FindByState(stateID uint8) ([]domain.Lab, error)
 	GetLabFullAddressAndMap(id int64) (string, string, error)
 }
@@ -185,7 +185,7 @@ func (r *labRepository) FindByContactNumber(contactNumber string) (*domain.Lab, 
 	return &domainLab, nil
 }
 
-func (r *labRepository) FindByCity(cityID uint8) ([]domain.Lab, error) {
+func (r *labRepository) FindByCity(cityID int16) ([]domain.Lab, error) {
 	var labs []persistencemodels.Lab
 	err := gormLab(r.db).Where("CityID = ?", cityID).Find(&labs).Error
 	return mapLabsToDomain(labs), err
