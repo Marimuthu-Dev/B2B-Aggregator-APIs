@@ -33,7 +33,8 @@ type LeadService interface {
 	BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastUpdatedBy int64, labID *int64, appointmentAt *time.Time) (int64, error)
 	BulkImportFromCSV(csvContent []byte, clientID int64, packageID int, createdBy int64) (int, error)
 	// UploadBloodTestReport validates a PDF, uploads to blob storage, then updates lead + history in one DB transaction.
-	UploadBloodTestReport(ctx context.Context, leadID int64, uploadedBy int64, fh *multipart.FileHeader) (reportURL string, err error)
+	// When the lead is already in Report Uploaded status (or already had a report), the report is overwritten.
+	UploadBloodTestReport(ctx context.Context, leadID int64, uploadedBy int64, fh *multipart.FileHeader) (reportURL string, overwritten bool, err error)
 	// GetLeadReportDownloadURL returns a time-limited SAS URL for the lead's stored ReportURL blob.
 	// Requires LeadStatusID >= LeadStatusIDReportUploaded (8) for all callers. For client JWTs (userType 2) with
 	// LeadStatusID < LeadStatusIDClientDownloadNoFitGate (10): FIT may download; ON HOLD (IsFit=0) only if
@@ -668,42 +669,50 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 	return inserted, nil
 }
 
-func (s *leadService) UploadBloodTestReport(ctx context.Context, leadID int64, uploadedBy int64, fh *multipart.FileHeader) (string, error) {
+func (s *leadService) UploadBloodTestReport(ctx context.Context, leadID int64, uploadedBy int64, fh *multipart.FileHeader) (string, bool, error) {
 	if fh == nil {
-		return "", apperrors.NewBadRequest("PDF file is required", nil)
+		return "", false, apperrors.NewBadRequest("PDF file is required", nil)
 	}
 	if s.blobs == nil {
-		return "", apperrors.NewInternal("Report storage is not configured", nil)
+		return "", false, apperrors.NewInternal("Report storage is not configured", nil)
 	}
 	if err := s.blobs.ValidateDiagnosticReportPDF(fh); err != nil {
-		return "", apperrors.NewBadRequest(err.Error(), err)
+		return "", false, apperrors.NewBadRequest(err.Error(), err)
 	}
 
 	lead, err := s.repo.FindByID(leadID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return "", apperrors.NewNotFound("Lead not found", err)
+			return "", false, apperrors.NewNotFound("Lead not found", err)
 		}
-		return "", err
+		return "", false, err
 	}
-	if strings.TrimSpace(lead.ReportURL) != "" {
-		return "", apperrors.NewConflict("A report is already uploaded for this lead", nil)
+
+	// Re-uploading / overwriting the report is allowed as long as the lead is currently in "Report Uploaded" status (8).
+	// Once the lead progresses past Report Uploaded (e.g. Report Approved, Ready for Download), report upload is forbidden.
+	hasExistingReport := strings.TrimSpace(lead.ReportURL) != ""
+	if hasExistingReport && lead.LeadStatusID != domain.LeadStatusIDReportUploaded {
+		return "", false, apperrors.NewConflict("A report is already uploaded for this lead", nil)
 	}
+	if lead.LeadStatusID > domain.LeadStatusIDReportUploaded {
+		return "", false, apperrors.NewConflict("A report is already uploaded for this lead", nil)
+	}
+	overwritten := hasExistingReport || lead.LeadStatusID == domain.LeadStatusIDReportUploaded
 
 	rc, err := fh.Open()
 	if err != nil {
-		return "", apperrors.NewBadRequest("Failed to read file", err)
+		return "", false, apperrors.NewBadRequest("Failed to read file", err)
 	}
 	defer func() { _ = rc.Close() }()
 
 	reportURL, err := s.blobs.UploadDiagnosticReportPDF(ctx, rc, leadID, fh.Filename)
 	if err != nil {
 		slog.Error("UploadBloodTestReport: blob upload failed", slog.Int64("leadID", leadID), slog.Any("err", err))
-		return "", apperrors.NewInternal("Failed to upload report", err)
+		return "", false, apperrors.NewInternal("Failed to upload report", err)
 	}
 	if len(reportURL) > 500 {
 		slog.Error("UploadBloodTestReport: report URL exceeds column length", slog.Int64("leadID", leadID), slog.Int("len", len(reportURL)))
-		return "", apperrors.NewInternal("Report URL is too long", nil)
+		return "", false, apperrors.NewInternal("Report URL is too long", nil)
 	}
 
 	err = s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
@@ -730,9 +739,9 @@ func (s *leadService) UploadBloodTestReport(ctx context.Context, leadID int64, u
 			slog.String("reportURL", reportURL),
 			slog.Any("err", err),
 		)
-		return "", err
+		return "", false, err
 	}
-	return reportURL, nil
+	return reportURL, overwritten, nil
 }
 
 func (s *leadService) GetLeadReportDownloadURL(ctx context.Context, leadID int64, jwtUserType int, jwtUserID int64) (string, time.Time, error) {

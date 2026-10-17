@@ -245,12 +245,16 @@ func (h *LeadHandler) UploadReport(c *gin.Context) {
 		return
 	}
 
-	reportURL, err := h.svc.UploadBloodTestReport(c.Request.Context(), params.ID, userID, fh)
+	reportURL, overwritten, err := h.svc.UploadBloodTestReport(c.Request.Context(), params.ID, userID, fh)
 	if err != nil {
 		respondError(c, err)
 		return
 	}
-	respondData(c, http.StatusOK, gin.H{"ReportURL": reportURL}, "Report uploaded successfully", nil)
+	msg := "Report uploaded successfully"
+	if overwritten {
+		msg = "New uploaded report overwritten the earlier uploaded report"
+	}
+	respondData(c, http.StatusOK, gin.H{"ReportURL": reportURL, "Overwritten": overwritten}, msg, nil)
 }
 
 // ApproveReport updates lead report approval (fit / unfit / hold), download flag, and remarks.
