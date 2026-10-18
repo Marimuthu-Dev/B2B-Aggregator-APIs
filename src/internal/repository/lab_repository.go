@@ -203,7 +203,7 @@ func (r *labRepository) GetLabFullAddressAndMap(id int64) (string, string, error
 		MapLocationURL string
 	}
 	query := fmt.Sprintf(`
-		SELECT COALESCE(l.LabName, '') + ', ' + COALESCE(l.Address, '') + ', ' + COALESCE(c.CityName, '') + ', ' + COALESCE(s.StateName, '') as Address,
+		SELECT COALESCE(l.LabName, '') + ', ' + COALESCE(l.Address, '') + ', ' + COALESCE(c.CityName, '') + ' - ' + COALESCE(l.Pincode, '') as Address,
 		       COALESCE(l.MapLocationURL, '') as MapLocationURL
 		FROM %s l
 		LEFT JOIN %s c ON l.CityID = c.CityID
