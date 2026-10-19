@@ -47,8 +47,9 @@ type routeDeps struct {
 	leadHandler           *handlers.LeadHandler
 	testHandler           *handlers.TestHandler
 	employmentTypeHandler *handlers.EmploymentTypeHandler
-	dashboardHandler      *handlers.DashboardHandler
-	locationHandler       *handlers.LocationHandler
+	dashboardHandler           *handlers.DashboardHandler
+	locationHandler            *handlers.LocationHandler
+	notificationMonitorHandler *handlers.NotificationMonitorHandler
 }
 
 func registerPublicRoutes(r *gin.Engine, deps routeDeps) {
@@ -88,6 +89,7 @@ func registerProtectedRoutes(r *gin.Engine, jwtSecret string, deps routeDeps) {
 		registerTestRoutes(api, deps.testHandler)
 		registerEmploymentTypeRoutes(api, deps.employmentTypeHandler)
 		registerDashboardRoutes(api, deps.dashboardHandler)
+		registerNotificationRoutes(api, deps.notificationMonitorHandler)
 	}
 }
 
@@ -221,6 +223,20 @@ func registerDashboardRoutes(api *gin.RouterGroup, handler *handlers.DashboardHa
 	{
 		dashboard.GET("/lab-tracking", handler.GetLabTracking)
 		dashboard.GET("/lab-tracking/filters", handler.GetLabTrackingFilters)
+	}
+}
+
+func registerNotificationRoutes(api *gin.RouterGroup, handler *handlers.NotificationMonitorHandler) {
+	if handler == nil {
+		return
+	}
+	notifications := api.Group("/dashboard/notifications")
+	{
+		notifications.GET("/summary", handler.GetSummary)
+		notifications.GET("/:channel/backlog", handler.GetBacklog)
+		notifications.GET("/:channel/history/daily", handler.GetDailyHistory)
+		notifications.GET("/:channel/history/hourly", handler.GetHourlyHistory)
+		notifications.GET("/:channel/messages", handler.GetMessages)
 	}
 }
 

@@ -174,7 +174,8 @@ OUTPUT
   inserted.CreatedBy
 FROM %s w WITH (ROWLOCK, READPAST, UPDLOCK)
 LEFT JOIN %s t ON w.TemplateID = t.TemplateID
-WHERE (w.IsSent = 0 OR w.IsSent IS NULL) AND w.LastUpdatedBy NOT IN (-1, -2)
+WHERE (w.IsSent = 0 OR w.IsSent IS NULL)
+  AND (w.LastUpdatedBy NOT IN (-1, -2) OR w.LastUpdatedBy IS NULL OR (w.LastUpdatedBy = -1 AND w.LastUpdatedOn < DATEADD(MINUTE, -10, GETDATE())))
 `, batchSize, whatsappTable(), whatsappTemplatesTable())
 
 	rows, err := r.db.QueryContext(ctx, q)

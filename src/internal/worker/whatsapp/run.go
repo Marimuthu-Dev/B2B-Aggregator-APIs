@@ -147,6 +147,12 @@ func RunOnce(ctx context.Context, d Deps) (foundRows bool, err error) {
 				slog.String("error", sendErr.Error()),
 			)
 			rateLimited = true
+			if err := d.Repo.MarkAfterFailure(ctx, w.WhatsAppID); err != nil {
+				log.Error("release rate-limited claim failed",
+					slog.Int64("whatsappID", w.WhatsAppID),
+					slog.String("error", err.Error()),
+				)
+			}
 			continue
 		}
 

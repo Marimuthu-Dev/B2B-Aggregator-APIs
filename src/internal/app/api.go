@@ -120,6 +120,9 @@ func Run() error {
 	employmentTypeHandler := handlers.NewEmploymentTypeHandler(employmentTypeSvc)
 	dashboardHandler := handlers.NewDashboardHandler(dashboardSvc)
 	locationHandler := handlers.NewLocationHandler(locationSvc)
+	notificationMonitorRepo := repository.NewNotificationMonitorRepository(sqlDB)
+	notificationMonitorSvc := service.NewNotificationMonitorService(notificationMonitorRepo)
+	notificationMonitorHandler := handlers.NewNotificationMonitorHandler(notificationMonitorSvc)
 
 	// Initialize Gin
 	r := gin.Default()
@@ -128,18 +131,19 @@ func Run() error {
 	registerMiddleware(r, dbReady)
 
 	registerRoutes(r, cfg.JWT.Secret, routeDeps{
-		packageHandler:        packageHandler,
-		loginHandler:          loginHandler,
-		clientHandler:         clientHandler,
-		clientLocationHandler: clientLocationHandler,
-		employeeHandler:       employeeHandler,
-		labHandler:            labHandler,
-		storeHandler:          storeHandler,
-		leadHandler:           leadHandler,
-		testHandler:           testHandler,
-		employmentTypeHandler: employmentTypeHandler,
-		dashboardHandler:      dashboardHandler,
-		locationHandler:       locationHandler,
+		packageHandler:             packageHandler,
+		loginHandler:               loginHandler,
+		clientHandler:              clientHandler,
+		clientLocationHandler:      clientLocationHandler,
+		employeeHandler:            employeeHandler,
+		labHandler:                 labHandler,
+		storeHandler:               storeHandler,
+		leadHandler:                leadHandler,
+		testHandler:                testHandler,
+		employmentTypeHandler:      employmentTypeHandler,
+		dashboardHandler:           dashboardHandler,
+		locationHandler:            locationHandler,
+		notificationMonitorHandler: notificationMonitorHandler,
 	})
 
 	// Azure App Service and cloud platforms set PORT env; default 8080
