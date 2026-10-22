@@ -8,6 +8,7 @@ All documentation is in the **[docs/](docs/)** folder:
 
 | Document | Description |
 |----------|-------------|
+| [../PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md) | **Primary System Context, Architecture Mind Map, and Issue Post-Mortem** |
 | [docs/README.md](docs/README.md) | Documentation index and project info. |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | **Setup and deployment to Azure** (WSL, Docker, Azure CLI, container and binary deploy, troubleshooting). |
 | [docs/GoLang_Technical_Handbook.md](docs/GoLang_Technical_Handbook.md) | Go language and architecture guide for this project. |

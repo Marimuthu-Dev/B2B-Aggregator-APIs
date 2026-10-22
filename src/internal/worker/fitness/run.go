@@ -207,7 +207,7 @@ func processLead(ctx context.Context, d Deps, lead domain.Lead, log *slog.Logger
 		slog.Int("certPDFBytes", len(certPDF)),
 		slog.Int("reportPDFBytes", len(reportPDF)),
 	)
-	merged, err := fitnesscert.MergeCertificateFirst(certPDF, reportPDF)
+	merged, err := fitnesscert.MergeCertificateFirstContext(ctx, certPDF, reportPDF)
 	if err != nil {
 		return fmt.Errorf("merge certificate and report pdf: %w", err)
 	}
