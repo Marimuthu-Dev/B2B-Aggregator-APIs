@@ -237,11 +237,13 @@ func (r *leadRepository) leadListJoinedQuery(filter LeadListFilter) *gorm.DB {
 	case domain.LeadListFitnessFilterEmpty:
 		q = q.Where("l.IsFit IS NULL")
 	case domain.LeadListFitnessFilterOnHold:
-		q = q.Where("l.IsFit = ?", domain.LeadFitHold)
+		q = q.Where("l.LeadStatusID >= ? AND (l.IsFit IS NULL OR l.IsFit = ?)", domain.LeadStatusIDReportUploaded, domain.LeadFitHold)
 	case domain.LeadListFitnessFilterFit:
 		q = q.Where("l.IsFit = ?", domain.LeadFitFit)
 	case domain.LeadListFitnessFilterUnfit:
 		q = q.Where("(l.IsFit = ? OR l.IsFit = ?)", domain.LeadFitUnfit, int8(-1))
+	case domain.LeadListFitnessFilterYetToReport:
+		q = q.Where("l.LeadStatusID < ? AND (l.IsFit IS NULL OR (l.IsFit != ? AND l.IsFit != ? AND l.IsFit != ?))", domain.LeadStatusIDReportUploaded, domain.LeadFitFit, domain.LeadFitUnfit, int8(-1))
 	}
 	return q
 }

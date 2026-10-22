@@ -37,7 +37,36 @@ const (
 	LeadFitUnfit int8 = 2
 )
 
-// FitnessStatusFromIsFitPtr maps MediAdmin.tbl_Leads.IsFit for read APIs (NULL → "Empty").
+// FitnessStatusFromLead maps MediAdmin.tbl_Leads.IsFit and LeadStatusID for read APIs:
+// - Fit: IsFit == 1
+// - Unfit: IsFit == 2 or legacy -1
+// - On Hold: Once report uploaded status (LeadStatusID >= 8) and not Fit/Unfit, or IsFit == 0 when report uploaded
+// - Yet to Reported: Other than Fit, Unfit, On Hold (LeadStatusID < 8 and not Fit/Unfit)
+func FitnessStatusFromLead(isFit *int8, leadStatusID int8) string {
+	if isFit != nil {
+		switch *isFit {
+		case LeadFitFit:
+			return "Fit"
+		case LeadFitUnfit:
+			return "UnFit"
+		case LeadFitHold:
+			if leadStatusID >= LeadStatusIDReportUploaded {
+				return "On Hold"
+			}
+			return "Yet to Reported"
+		default:
+			if *isFit == -1 {
+				return "UnFit"
+			}
+		}
+	}
+	if leadStatusID >= LeadStatusIDReportUploaded {
+		return "On Hold"
+	}
+	return "Yet to Reported"
+}
+
+// FitnessStatusFromIsFitPtr maps MediAdmin.tbl_Leads.IsFit for read APIs when LeadStatusID is not available (NULL → "Empty").
 // Legacy -1 is treated as unfit (same as 2).
 func FitnessStatusFromIsFitPtr(p *int8) string {
 	if p == nil {
@@ -58,7 +87,7 @@ func FitnessStatusFromIsFitPtr(p *int8) string {
 	}
 }
 
-// LeadListFitnessFilter selects rows by MediAdmin.tbl_Leads.IsFit for GET /leads list queries.
+// LeadListFitnessFilter selects rows by MediAdmin.tbl_Leads.IsFit and status for GET /leads list queries.
 type LeadListFitnessFilter int8
 
 const (
@@ -67,10 +96,11 @@ const (
 	LeadListFitnessFilterOnHold LeadListFitnessFilter = 2
 	LeadListFitnessFilterFit LeadListFitnessFilter = 3
 	LeadListFitnessFilterUnfit LeadListFitnessFilter = 4
+	LeadListFitnessFilterYetToReport LeadListFitnessFilter = 5
 )
 
 // ParseLeadListFitnessFilter parses optional query param fitnessStatus / FitnessStatus (case-insensitive).
-// Accepted values align with JSON FitnessStatus: Empty, Not Assessed (same as Empty / IsFit NULL), On Hold, Fit, UnFit (also onhold, hold, unfit).
+// Accepted values align with JSON FitnessStatus: Empty, Not Assessed (same as Empty / IsFit NULL), On Hold, Fit, UnFit, Yet to Reported (also onhold, hold, unfit, yet to report).
 func ParseLeadListFitnessFilter(s string) (LeadListFitnessFilter, error) {
 	n := strings.TrimSpace(s)
 	if n == "" {
@@ -88,8 +118,10 @@ func ParseLeadListFitnessFilter(s string) (LeadListFitnessFilter, error) {
 		return LeadListFitnessFilterFit, nil
 	case compact == "unfit" || lower == "un fit":
 		return LeadListFitnessFilterUnfit, nil
+	case compact == "yettoreport" || compact == "yettoreported" || lower == "yet to report" || lower == "yet to reported":
+		return LeadListFitnessFilterYetToReport, nil
 	default:
-		return 0, fmt.Errorf(`fitnessStatus must be one of: Empty, Not Assessed, On Hold, Fit, UnFit`)
+		return 0, fmt.Errorf(`fitnessStatus must be one of: Empty, Not Assessed, On Hold, Fit, UnFit, Yet to Reported`)
 	}
 }
 

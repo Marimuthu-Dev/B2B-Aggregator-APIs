@@ -127,7 +127,7 @@ type LeadListQuery struct {
 	Search string `form:"search" binding:"omitempty"`
 	// EmploymentTypeID filters by tbl_Leads.EmploymentTypeID.
 	EmploymentTypeID *int16 `form:"employmentTypeId" binding:"omitempty,min=1"`
-	// FitnessStatus filters by tbl_Leads.IsFit (Empty | Not Assessed | On Hold | Fit | UnFit); see domain.ParseLeadListFitnessFilter.
+	// FitnessStatus filters by tbl_Leads.IsFit and status (Empty | Not Assessed | On Hold | Fit | UnFit | Yet to Reported); see domain.ParseLeadListFitnessFilter.
 	FitnessStatus string `form:"fitnessStatus" binding:"omitempty"`
 	// AppointmentAtFrom / AppointmentAtTo filter by l.AppointmentAt (IST calendar day, YYYY-MM-DD); either or both.
 	AppointmentAtFrom string `form:"appointmentAtFrom" binding:"omitempty"`

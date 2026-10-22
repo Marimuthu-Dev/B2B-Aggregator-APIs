@@ -82,7 +82,7 @@ func mapLeadToDomain(p persistencemodels.Lead) domain.Lead {
 		LabID:                         p.LabID,
 		BrandID:                       p.BrandID,
 		IsFit:                         isFitDomainFromDB(p.IsFit),
-		FitnessStatus:                 domain.FitnessStatusFromIsFitPtr(p.IsFit),
+		FitnessStatus:                 domain.FitnessStatusFromLead(isFitDomainFromDB(p.IsFit), p.LeadStatusID),
 		IsReportDownloadable:          p.IsReportDownloadable,
 		ApprovalRemarks:               derefString(p.ApprovalRemarks),
 		FitUpdatedOn:                  timeutil.FromTimePtr(p.FitUpdatedOn),
