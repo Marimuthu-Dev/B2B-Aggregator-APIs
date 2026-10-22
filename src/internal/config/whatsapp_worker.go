@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"os"
 	"strings"
 	"time"
 )
@@ -31,20 +32,40 @@ type WhatsAppWorkerConfig struct {
 // LoadWhatsAppWorkerConfig reads worker settings from the environment.
 // Call after godotenv.Load (same pattern as LoadEmailWorkerConfig and LoadFitnessCertWorkerConfig).
 func LoadWhatsAppWorkerConfig() (WhatsAppWorkerConfig, error) {
+	apiKey := strings.TrimSpace(getEnv("WHATSAPP_API_KEY", ""))
+	if apiKey == "" {
+		apiKey = strings.TrimSpace(getEnv("WHATSAPP_CPAAS_API_KEY", ""))
+	}
+
+	apiEndpoint := strings.TrimSpace(getEnv("WHATSAPP_API_ENDPOINT", ""))
+	if apiEndpoint == "" {
+		apiEndpoint = strings.TrimSpace(getEnv("WHATSAPP_CPAAS_ENDPOINT", "https://cpaaslink.com/api/whatsapp/public/apikey"))
+	}
+
+	singleBatch := getEnvAsBool("WHATSAPP_WORKER_SINGLE_BATCH", false)
+	if !singleBatch {
+		singleBatch = getEnvAsBool("WHATSAPP_WORKER_RUN_ONCE", false)
+	}
+	// In Azure App Service Triggered WebJobs, WEBJOBS_TYPE is set to "triggered".
+	// Default to single batch execution unless explicitly disabled.
+	if !singleBatch && strings.EqualFold(os.Getenv("WEBJOBS_TYPE"), "triggered") {
+		singleBatch = true
+	}
+
 	c := WhatsAppWorkerConfig{
-		SingleBatch:        getEnvAsBool("WHATSAPP_WORKER_SINGLE_BATCH", false),
-		APIKey:             strings.TrimSpace(getEnv("WHATSAPP_API_KEY", "")),
-		APIEndpoint:        strings.TrimSpace(getEnv("WHATSAPP_API_ENDPOINT", "https://cpaaslink.com/api/whatsapp/public/apikey")),
-		UseMMLite:          getEnvAsBool("WHATSAPP_USE_MM_LITE", false),
+		SingleBatch:         singleBatch,
+		APIKey:              apiKey,
+		APIEndpoint:         apiEndpoint,
+		UseMMLite:           getEnvAsBool("WHATSAPP_USE_MM_LITE", false),
 		DefaultTemplateName: strings.TrimSpace(getEnv("WHATSAPP_DEFAULT_TEMPLATE_NAME", "")),
-		CampaignName:       strings.TrimSpace(getEnv("WHATSAPP_CAMPAIGN_NAME", "default_campaign")),
-		BatchSize:          getEnvAsInt("WHATSAPP_BATCH_SIZE", 25),
-		PollInterval:       time.Duration(getEnvAsInt("WHATSAPP_POLL_INTERVAL_SECONDS", 120)) * time.Second,
-		IdleWait:           time.Duration(getEnvAsInt("WHATSAPP_IDLE_WAIT_SECONDS", 60)) * time.Second,
-		SendTimeout:        time.Duration(getEnvAsInt("WHATSAPP_SEND_TIMEOUT_SECONDS", 60)) * time.Second,
+		CampaignName:        strings.TrimSpace(getEnv("WHATSAPP_CAMPAIGN_NAME", "default_campaign")),
+		BatchSize:           getEnvAsInt("WHATSAPP_BATCH_SIZE", 25),
+		PollInterval:        time.Duration(getEnvAsInt("WHATSAPP_POLL_INTERVAL_SECONDS", 120)) * time.Second,
+		IdleWait:            time.Duration(getEnvAsInt("WHATSAPP_IDLE_WAIT_SECONDS", 60)) * time.Second,
+		SendTimeout:         time.Duration(getEnvAsInt("WHATSAPP_SEND_TIMEOUT_SECONDS", 60)) * time.Second,
 	}
 	if c.APIKey == "" {
-		return c, errors.New("WHATSAPP_API_KEY is required")
+		return c, errors.New("WHATSAPP_API_KEY (or WHATSAPP_CPAAS_API_KEY) is required")
 	}
 	if c.APIEndpoint == "" {
 		return c, errors.New("WHATSAPP_API_ENDPOINT is required")

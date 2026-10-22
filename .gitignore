@@ -12,8 +12,8 @@ src/.env
 /build/webjobs-combined
 src/email-worker
 src/fitness-worker
-src/fitness-worker
-/deploy
+src/whatsapp-worker
+src/api
 docs/STORE_LOGIN_PLAN.md
 Database/med-prod-DB.sql
 /src/chrome-linux-deps
@@ -21,8 +21,10 @@ Database/med-prod-DB.sql
 /Whatsapp_docs
 *.example
 Database/whatsapp_schema.sql
-run-whatsapp-worker.bat
-run-whatsapp-worker.sh
+/run-whatsapp-worker.bat
+/run-whatsapp-worker.sh
 WHATSAPP_WORKER_README.md
 WHATSAPP_WORKER_VERIFICATION.md
 scripts/sql/employment_type_master.sql
+src/fitness-worker
+src/whatsapp-worker

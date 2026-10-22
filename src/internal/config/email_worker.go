@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"os"
 	"strings"
 	"time"
 )
@@ -28,8 +29,18 @@ type EmailWorkerConfig struct {
 // LoadEmailWorkerConfig reads worker settings from the environment.
 // Call after godotenv.Load (same pattern as LoadFitnessCertWorkerConfig).
 func LoadEmailWorkerConfig() (EmailWorkerConfig, error) {
+	singleBatch := getEnvAsBool("EMAIL_WORKER_SINGLE_BATCH", false)
+	if !singleBatch {
+		singleBatch = getEnvAsBool("EMAIL_WORKER_RUN_ONCE", false)
+	}
+	// In Azure App Service Triggered WebJobs, WEBJOBS_TYPE is set to "triggered".
+	// Default to single batch execution unless explicitly disabled.
+	if !singleBatch && strings.EqualFold(os.Getenv("WEBJOBS_TYPE"), "triggered") {
+		singleBatch = true
+	}
+
 	c := EmailWorkerConfig{
-		SingleBatch:          getEnvAsBool("EMAIL_WORKER_SINGLE_BATCH", false),
+		SingleBatch:          singleBatch,
 		ACSConnectionString:  strings.TrimSpace(getEnv("ACS_CONNECTION_STRING", "")),
 		ACSSenderDisplayName: strings.TrimSpace(getEnv("ACS_SENDER_DISPLAY_NAME", "")),
 		BatchSize:            getEnvAsInt("EMAIL_BATCH_SIZE", 25),

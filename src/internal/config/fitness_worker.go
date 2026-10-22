@@ -32,6 +32,16 @@ type FitnessCertWorkerConfig struct {
 // LoadFitnessCertWorkerConfig reads worker settings from the environment.
 // Call after godotenv.Load (e.g. same as API).
 func LoadFitnessCertWorkerConfig() (FitnessCertWorkerConfig, error) {
+	runOnce := getEnvAsBool("FITNESS_CERT_WORKER_RUN_ONCE", false)
+	if !runOnce {
+		runOnce = getEnvAsBool("FITNESS_CERT_WORKER_SINGLE_BATCH", false)
+	}
+	// In Azure App Service Triggered WebJobs, WEBJOBS_TYPE is set to "triggered".
+	// Default to single batch execution unless explicitly disabled.
+	if !runOnce && strings.EqualFold(os.Getenv("WEBJOBS_TYPE"), "triggered") {
+		runOnce = true
+	}
+
 	c := FitnessCertWorkerConfig{
 		TemplateDir:         strings.TrimSpace(getEnv("FITNESS_CERT_TEMPLATE_DIR", "./templates")),
 		PendingLeadStatusID: int8(getEnvAsInt("FITNESS_CERT_PENDING_LEAD_STATUS_ID", 9)),
@@ -39,7 +49,7 @@ func LoadFitnessCertWorkerConfig() (FitnessCertWorkerConfig, error) {
 		PollInterval:        time.Duration(getEnvAsInt("FITNESS_CERT_POLL_INTERVAL_SECONDS", 300)) * time.Second,
 		BatchSize:           getEnvAsInt("FITNESS_CERT_BATCH_SIZE", 10),
 		ChromiumPath:        strings.TrimSpace(getEnv("CHROMIUM_PATH", "")),
-		RunOnce:             getEnvAsBool("FITNESS_CERT_WORKER_RUN_ONCE", false),
+		RunOnce:             runOnce,
 	}
 	if c.TemplateDir == "" {
 		c.TemplateDir = "./templates"

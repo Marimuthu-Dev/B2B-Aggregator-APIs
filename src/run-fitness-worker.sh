@@ -16,5 +16,10 @@ if [ -d "./chrome-linux-deps/usr/share" ]; then
   export XDG_DATA_DIRS="$(pwd)/chrome-linux-deps/usr/share${XDG_DATA_DIRS:+:$XDG_DATA_DIRS}"
 fi
 
+# If running as an Azure triggered WebJob, default to run-once mode so the job completes each scheduled run
+if [ "${WEBJOBS_TYPE:-}" = "triggered" ] && [ -z "${FITNESS_CERT_WORKER_RUN_ONCE:-}" ]; then
+  export FITNESS_CERT_WORKER_RUN_ONCE=true
+fi
+
 echo "Starting fitness-worker..."
 exec ./fitness-worker

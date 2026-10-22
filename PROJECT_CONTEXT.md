@@ -230,6 +230,32 @@ level=ERROR msg="fitness cert lead failed" leadID=110 err="merge certificate and
 3. **Context Support:** Added `MergeCertificateFirstContext(ctx, certPDF, reportPDF)` so merging respects caller timeouts.
 4. **Automated Unit Tests:** Added [internal/fitnesscert/merge_test.go](file:///mnt/d/Code/MMK_Projects/B2B-Diagnostic-Aggregator/GitHub/B2B-Aggregator/B2B-Aggregator-APIs/src/internal/fitnesscert/merge_test.go) verifying standard and AES-128 encrypted PDF merging.
 
+### 7.4. Case Study 2: WhatsApp WebJob Showing "Manual" & Stuck in "Running"
+
+#### Symptoms
+1. In Azure App Service (`med-prod-worker-process | WebJobs`), `email-worker-job` and `fitness-worker-job` showed as **`Scheduled`** (`0 */10 * * * *`), but `whatsapp-worker-job` showed as **`Manual`** without a schedule.
+2. `whatsapp-worker-job` stayed indefinitely in status **`Running`** instead of returning to **`Ready`**.
+
+#### Root Causes
+1. **Missing `settings.job` in Git & Zip**:
+   - Azure Linux WebJobs require a `settings.job` file inside `App_Data/jobs/triggered/<job_name>/settings.job` containing JSON `{"schedule": "0 */10 * * * *"}`.
+   - `.gitignore` contained `/deploy`, which caused git to ignore `deploy/linux-webjobs/whatsapp-worker-job/settings.job`.
+   - Build scripts omitted copying `settings.job` for WhatsApp worker.
+2. **Infinite Loop in Triggered WebJob**:
+   - Triggered WebJobs must process a single batch and exit (`exit 0`). Azure's scheduler then restarts them according to the CRON interval.
+   - `whatsapp-worker` defaulted `WHATSAPP_WORKER_SINGLE_BATCH` to `false` (infinite `RunLoop`), keeping the job permanently in `Running` state and blocking subsequent scheduled triggers.
+3. **Environment Variable Naming Mismatch**:
+   - Deployment documentation referenced `WHATSAPP_CPAAS_API_KEY` and `WHATSAPP_CPAAS_ENDPOINT`, while `whatsapp_worker.go` only checked `WHATSAPP_API_KEY` and `WHATSAPP_API_ENDPOINT`.
+
+#### Fixes Implemented
+1. **Unignored `deploy/` in `.gitignore`**: Removed `/deploy` from `.gitignore` so all WebJob configurations and `settings.job` files are tracked in git.
+2. **Unified Schedule to 10 Minutes**: Set `deploy/linux-webjobs/whatsapp-worker-job/settings.job` to `"0 */10 * * * *"` matching email and fitness workers.
+3. **Packaging Integration**: Updated `deploy-all-workers.sh` and `Combined_workers_deployment.md` to package `settings.job` into all 3 WebJobs within `build/worker-combined.zip`.
+4. **Auto-Detection of Azure Triggered Execution**:
+   - In [whatsapp_worker.go](file:///mnt/d/Code/MMK_Projects/B2B-Diagnostic-Aggregator/GitHub/B2B-Aggregator/B2B-Aggregator-APIs/src/internal/config/whatsapp_worker.go), [email_worker.go](file:///mnt/d/Code/MMK_Projects/B2B-Diagnostic-Aggregator/GitHub/B2B-Aggregator/B2B-Aggregator-APIs/src/internal/config/email_worker.go), and [fitness_worker.go](file:///mnt/d/Code/MMK_Projects/B2B-Diagnostic-Aggregator/GitHub/B2B-Aggregator/B2B-Aggregator-APIs/src/internal/config/fitness_worker.go): if `WEBJOBS_TYPE=triggered` is set by Azure, `SingleBatch` / `RunOnce` automatically defaults to `true`.
+   - Added defense-in-depth checks to `run-whatsapp-worker.sh`, `run-email-worker.sh`, and `run-fitness-worker.sh`.
+5. **CPAAS Variable Fallbacks**: In `LoadWhatsAppWorkerConfig()`, added transparent fallback from `WHATSAPP_API_KEY` to `WHATSAPP_CPAAS_API_KEY`, and `WHATSAPP_API_ENDPOINT` to `WHATSAPP_CPAAS_ENDPOINT`.
+
 ---
 
 ## 8. Build, Packaging & Deployment Instructions
