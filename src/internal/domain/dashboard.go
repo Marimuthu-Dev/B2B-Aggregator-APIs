@@ -3,7 +3,7 @@ package domain
 import "time"
 
 // LabTrackingFilter narrows the Ops "Appointment & Report Tracking" dashboard.
-// All fields are optional; nil means "no filter". From/To apply to tbl_Leads.CreatedOn (appointment received).
+// All fields are optional; nil means "no filter". From/To apply to tbl_Leads.AppointmentAt (appointment date).
 type LabTrackingFilter struct {
 	From         *time.Time
 	To           *time.Time

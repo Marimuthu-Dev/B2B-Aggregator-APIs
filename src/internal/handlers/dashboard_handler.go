@@ -35,7 +35,7 @@ func requireOpsUser(c *gin.Context) bool {
 }
 
 // GetLabTracking godoc: GET /api/v1/dashboard/lab-tracking
-// Query (all optional): fromDate, toDate (YYYY-MM-DD, IST, applied to lead CreatedOn), cityId, labId, clientId, clientTypeId.
+// Query (all optional): fromDate, toDate (YYYY-MM-DD, IST, applied to lead AppointmentAt), cityId, labId, clientId, clientTypeId.
 func (h *DashboardHandler) GetLabTracking(c *gin.Context) {
 	if !requireOpsUser(c) {
 		return

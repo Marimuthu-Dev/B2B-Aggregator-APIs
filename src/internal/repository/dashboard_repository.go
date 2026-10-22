@@ -77,10 +77,10 @@ func (r *dashboardRepository) labTrackingBaseQuery(filter domain.LabTrackingFilt
 		Where("l.IsDeleted = ?", false)
 
 	if filter.From != nil {
-		q = q.Where("l.CreatedOn >= ?", *filter.From)
+		q = q.Where("l.AppointmentAt IS NOT NULL AND l.AppointmentAt >= ?", *filter.From)
 	}
 	if filter.To != nil {
-		q = q.Where("l.CreatedOn <= ?", *filter.To)
+		q = q.Where("l.AppointmentAt IS NOT NULL AND l.AppointmentAt <= ?", *filter.To)
 	}
 	if filter.CityID != nil {
 		q = q.Where("l.CityID = ?", *filter.CityID)
