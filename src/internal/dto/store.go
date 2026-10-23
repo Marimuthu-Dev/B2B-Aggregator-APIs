@@ -1,6 +1,10 @@
 package dto
 
-import "b2b-diagnostic-aggregator/apis/internal/domain"
+import (
+	"strings"
+
+	"b2b-diagnostic-aggregator/apis/internal/domain"
+)
 
 type StoreRequest struct {
 	ClientID      int64  `json:"ClientID" binding:"required"`
@@ -24,11 +28,13 @@ type StoreUpdateRequest struct {
 	ContactNumber *string `json:"ContactNumber"`
 	EmailID       *string `json:"EmailID"`
 	IsActive      *bool   `json:"IsActive"`
+	Password      *string `json:"Password"`
 }
 
 func (r StoreUpdateRequest) HasAtLeastOneField() bool {
 	return r.StoreName != nil || r.Address != nil || r.CityID != nil || r.StateID != nil || r.Pincode != nil ||
-		r.ContactNumber != nil || r.EmailID != nil || r.IsActive != nil
+		r.ContactNumber != nil || r.EmailID != nil || r.IsActive != nil ||
+		(r.Password != nil && strings.TrimSpace(*r.Password) != "")
 }
 
 func (r StoreRequest) ToDomain() domain.Store {

@@ -27,6 +27,7 @@ type StoreService interface {
 
 type storeService struct {
 	repo       repository.StoreRepository
+	loginRepo  repository.LoginRepository
 	clientRepo repository.ClientRepository
 	emails     *repository.EmailOutboxRepository
 	forgotRepo repository.ForgotPasswordRepository
@@ -36,6 +37,7 @@ type storeService struct {
 
 func NewStoreService(
 	repo repository.StoreRepository,
+	loginRepo repository.LoginRepository,
 	clientRepo repository.ClientRepository,
 	emails *repository.EmailOutboxRepository,
 	forgotRepo repository.ForgotPasswordRepository,
@@ -44,6 +46,7 @@ func NewStoreService(
 ) StoreService {
 	return &storeService{
 		repo:       repo,
+		loginRepo:  loginRepo,
 		clientRepo: clientRepo,
 		emails:     emails,
 		forgotRepo: forgotRepo,
@@ -196,8 +199,48 @@ func (s *storeService) UpdateStore(id int64, update *dto.StoreUpdateRequest, las
 	if err := s.repo.Update(&st); err != nil {
 		return nil, err
 	}
+	if update.Password != nil && strings.TrimSpace(*update.Password) != "" {
+		if err := s.syncStorePassword(id, *update.Password); err != nil {
+			return nil, err
+		}
+	}
 	s.attachClientName(&st)
 	return &st, nil
+}
+
+func (s *storeService) syncStorePassword(storeID int64, password string) error {
+	pwd := strings.TrimSpace(password)
+	if pwd == "" {
+		return nil
+	}
+	encrypted, err := utils.Encrypt(pwd)
+	if err != nil {
+		return apperrors.NewInternal("Failed to encrypt store password", err)
+	}
+	now := time.Now()
+	login, err := s.loginRepo.FindByUserID(storeID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			newLogin := &domain.Login{
+				UserID:        storeID,
+				Pwd:           encrypted,
+				UserType:      utils.UserTypeToLoginString(utils.UserTypeStore),
+				CreatedOn:     timeutil.FromTime(now),
+				LastUpdatedOn: timeutil.FromTime(now),
+			}
+			if err := s.loginRepo.Create(newLogin); err != nil {
+				return apperrors.NewInternal("Failed to create store login", err)
+			}
+			return nil
+		}
+		return apperrors.NewInternal("Failed to check store login", err)
+	}
+	if login != nil {
+		if err := s.loginRepo.UpdatePasswordWithUserType(storeID, encrypted, utils.UserTypeToLoginString(utils.UserTypeStore)); err != nil {
+			return apperrors.NewInternal("Failed to update store login", err)
+		}
+	}
+	return nil
 }
 
 func (s *storeService) ensureMobileUnique(mobile string, excludeStoreID int64) error {

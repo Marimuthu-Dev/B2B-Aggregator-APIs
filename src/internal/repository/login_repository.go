@@ -2,6 +2,7 @@ package repository
 
 import (
 	"fmt"
+	"time"
 
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
@@ -14,6 +15,7 @@ type LoginRepository interface {
 	Create(l *domain.Login) error
 	Authenticate(userID int64, encryptedPassword, userType string) (bool, error)
 	UpdatePassword(userID int64, newPassword string) error
+	UpdatePasswordWithUserType(userID int64, newPassword, userType string) error
 	ChangePassword(userID int64, oldEncryptedPassword, newEncryptedPassword string) (int64, error)
 }
 
@@ -65,7 +67,18 @@ func (r *loginRepository) Authenticate(userID int64, encryptedPassword, userType
 }
 
 func (r *loginRepository) UpdatePassword(userID int64, newPassword string) error {
-	return r.db.Model(&persistencemodels.Login{}).Where("UserID = ?", userID).Update("Pwd", newPassword).Error
+	return r.UpdatePasswordWithUserType(userID, newPassword, "")
+}
+
+func (r *loginRepository) UpdatePasswordWithUserType(userID int64, newPassword, userType string) error {
+	updates := map[string]interface{}{
+		"Pwd":           newPassword,
+		"LastUpdatedOn": time.Now(),
+	}
+	if userType != "" {
+		updates["UserType"] = userType
+	}
+	return r.db.Model(&persistencemodels.Login{}).Where("UserID = ?", userID).Updates(updates).Error
 }
 
 func (r *loginRepository) ChangePassword(userID int64, oldEncryptedPassword, newEncryptedPassword string) (int64, error) {
