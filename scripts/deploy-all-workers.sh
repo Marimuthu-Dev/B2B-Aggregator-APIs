@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 # Build fitness-worker + email-worker + whatsapp-worker (Linux amd64), pack all three WebJobs under
-# App_Data/jobs/triggered/, and optionally deploy with Azure CLI.
+# App_Data/jobs/continuous/ (default) or App_Data/jobs/triggered/, and optionally deploy with Azure CLI.
 #
 # Usage (from repo root):
 #   ./scripts/deploy-all-workers.sh
 #   OUTPUT_ZIP=/tmp/out.zip ./scripts/deploy-all-workers.sh
 #   AZURE_RESOURCE_GROUP=um-prod-rg-appservice AZURE_WEBAPP_NAME=um-prod-worker-process \
 #     ./scripts/deploy-all-workers.sh --deploy
+#   WEBJOB_TYPE=triggered ./scripts/deploy-all-workers.sh   # legacy: CRON run-once jobs
+#
+# WEBJOB_TYPE:
+#   continuous (default) — workers run forever (RunLoop) and are restarted by Kudu if they exit.
+#                          Requires "Always On" enabled on the App Service.
+#   triggered            — workers run one batch per CRON schedule (deploy/linux-webjobs/*/settings.job).
 #
 # Prerequisites:
 #   - Go toolchain
@@ -28,15 +34,22 @@ fi
 AZURE_RESOURCE_GROUP="${AZURE_RESOURCE_GROUP:-${AZURE_RG:-}}"
 AZURE_WEBAPP_NAME="${AZURE_WEBAPP_NAME:-${AZURE_WEBAPP:-}}"
 
+WEBJOB_TYPE="${WEBJOB_TYPE:-continuous}"
+case "$WEBJOB_TYPE" in
+  continuous|triggered) ;;
+  *) echo "Error: WEBJOB_TYPE must be 'continuous' or 'triggered' (got '$WEBJOB_TYPE')"; exit 1 ;;
+esac
+echo "=== WebJob type: $WEBJOB_TYPE ==="
+
 echo "=== Building Linux amd64 binaries (module: $SRC) ==="
 cd "$SRC"
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o fitness-worker  ./cmd/fitness-worker
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o email-worker    ./cmd/email-worker
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o whatsapp-worker ./cmd/whatsapp-worker
 
-FITNESS_JOB="$BUILD/App_Data/jobs/triggered/fitness-worker-job"
-EMAIL_JOB="$BUILD/App_Data/jobs/triggered/email-worker-job"
-WHATSAPP_JOB="$BUILD/App_Data/jobs/triggered/whatsapp-worker-job"
+FITNESS_JOB="$BUILD/App_Data/jobs/$WEBJOB_TYPE/fitness-worker-job"
+EMAIL_JOB="$BUILD/App_Data/jobs/$WEBJOB_TYPE/email-worker-job"
+WHATSAPP_JOB="$BUILD/App_Data/jobs/$WEBJOB_TYPE/whatsapp-worker-job"
 
 echo "=== Assembling WebJob folders (3 jobs: fitness, email, whatsapp) ==="
 rm -rf "$BUILD"
@@ -90,19 +103,22 @@ chmod +x \
   "$EMAIL_JOB/run.sh"     "$EMAIL_JOB/email-worker" \
   "$WHATSAPP_JOB/run.sh"  "$WHATSAPP_JOB/whatsapp-worker"
 
-SETTINGS="$REPO_ROOT/deploy/linux-webjobs"
-if [ -f "$SETTINGS/fitness-worker-job/settings.job" ]; then
-  cp "$SETTINGS/fitness-worker-job/settings.job" "$FITNESS_JOB/settings.job"
-  echo "Included $SETTINGS/fitness-worker-job/settings.job"
+# settings.job:
+#   continuous -> deploy/linux-webjobs-continuous/<job>/settings.job (no CRON; singleton so a
+#                 scaled-out plan doesn't run duplicate workers that double-send emails/WhatsApp)
+#   triggered  -> deploy/linux-webjobs/<job>/settings.job (CRON schedule)
+if [ "$WEBJOB_TYPE" = "continuous" ]; then
+  SETTINGS="$REPO_ROOT/deploy/linux-webjobs-continuous"
+else
+  SETTINGS="$REPO_ROOT/deploy/linux-webjobs"
 fi
-if [ -f "$SETTINGS/email-worker-job/settings.job" ]; then
-  cp "$SETTINGS/email-worker-job/settings.job" "$EMAIL_JOB/settings.job"
-  echo "Included $SETTINGS/email-worker-job/settings.job"
-fi
-if [ -f "$SETTINGS/whatsapp-worker-job/settings.job" ]; then
-  cp "$SETTINGS/whatsapp-worker-job/settings.job" "$WHATSAPP_JOB/settings.job"
-  echo "Included $SETTINGS/whatsapp-worker-job/settings.job"
-fi
+for pair in "fitness-worker-job:$FITNESS_JOB" "email-worker-job:$EMAIL_JOB" "whatsapp-worker-job:$WHATSAPP_JOB"; do
+  name="${pair%%:*}"; dest="${pair#*:}"
+  if [ -f "$SETTINGS/$name/settings.job" ]; then
+    cp "$SETTINGS/$name/settings.job" "$dest/settings.job"
+    echo "Included $SETTINGS/$name/settings.job"
+  fi
+done
 
 echo "=== Creating zip: $OUTPUT_ZIP ==="
 mkdir -p "$(dirname "$OUTPUT_ZIP")"

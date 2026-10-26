@@ -21,5 +21,11 @@ if [ "${WEBJOBS_TYPE:-}" = "triggered" ] && [ -z "${FITNESS_CERT_WORKER_RUN_ONCE
   export FITNESS_CERT_WORKER_RUN_ONCE=true
 fi
 
+# If running as an Azure continuous WebJob, always use loop mode (RunLoop) so the worker keeps polling
+if [ "${WEBJOBS_TYPE:-}" = "continuous" ]; then
+  export FITNESS_CERT_WORKER_RUN_ONCE=false
+  export FITNESS_CERT_WORKER_SINGLE_BATCH=false
+fi
+
 echo "Starting fitness-worker..."
 exec ./fitness-worker
