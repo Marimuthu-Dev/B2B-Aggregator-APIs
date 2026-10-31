@@ -421,17 +421,71 @@ func (h *LeadHandler) BulkImportCsv(c *gin.Context) {
 		respondError(c, apperrors.NewBadRequest("CSV file is required", err))
 		return
 	}
-	clientIDStr := c.PostForm("ClientID")
-	packageIDStr := c.PostForm("PackageID")
-	if clientIDStr == "" || packageIDStr == "" {
+	clientIDStr := strings.TrimSpace(c.PostForm("ClientID"))
+	packageIDStr := strings.TrimSpace(c.PostForm("PackageID"))
+	if packageIDStr == "" {
 		respondError(c, apperrors.NewBadRequest("ClientID and PackageID are required in the request body", nil))
 		return
 	}
-	clientID, err1 := strconv.ParseInt(clientIDStr, 10, 64)
-	packageID, err2 := strconv.Atoi(packageIDStr)
-	if err1 != nil || err2 != nil || clientID <= 0 || packageID <= 0 {
+	packageID, errPkg := strconv.Atoi(packageIDStr)
+	if errPkg != nil || packageID <= 0 {
 		respondError(c, apperrors.NewBadRequest("ClientID and PackageID must be positive integers", nil))
 		return
+	}
+
+	userID, hasUserID := middleware.GetUserID(c)
+	userType, hasUserType := middleware.GetUserType(c)
+
+	var clientID int64
+	var formStoreMasterID *int64
+
+	if hasUserType && userType == utils.UserTypeLab {
+		respondError(c, apperrors.NewForbidden("You are not authorized for this activity.", nil))
+		return
+	}
+
+	if hasUserType && userType == utils.UserTypeStore {
+		if !hasUserID || userID <= 0 || !persistencemodels.HasStoreMasterTable() || h.storeSvc == nil {
+			respondError(c, apperrors.NewForbidden("You are not authorized for this activity.", nil))
+			return
+		}
+		store, storeErr := h.storeSvc.GetStoreByID(userID)
+		if storeErr != nil {
+			respondError(c, storeErr)
+			return
+		}
+		clientID = store.ClientID
+		sid := store.StoreID
+		formStoreMasterID = &sid
+	} else {
+		if clientIDStr == "" {
+			respondError(c, apperrors.NewBadRequest("ClientID and PackageID are required in the request body", nil))
+			return
+		}
+		var errClient error
+		clientID, errClient = strconv.ParseInt(clientIDStr, 10, 64)
+		if errClient != nil || clientID <= 0 {
+			respondError(c, apperrors.NewBadRequest("ClientID and PackageID must be positive integers", nil))
+			return
+		}
+		if hasUserType && userType == utils.UserTypeClient && hasUserID && userID > 0 && clientID != userID {
+			respondError(c, apperrors.NewForbidden("You are not authorized for this activity.", nil))
+			return
+		}
+		if persistencemodels.HasLeadStoreMasterIDColumn() {
+			rawStoreMasterID := strings.TrimSpace(c.PostForm("StoreMasterID"))
+			if rawStoreMasterID == "" {
+				rawStoreMasterID = strings.TrimSpace(c.PostForm("MasterStoreID"))
+			}
+			if rawStoreMasterID != "" {
+				parsedStoreID, errStore := strconv.ParseInt(rawStoreMasterID, 10, 64)
+				if errStore != nil || parsedStoreID <= 0 {
+					respondError(c, apperrors.NewBadRequest("StoreMasterID must be a positive integer", errStore))
+					return
+				}
+				formStoreMasterID = &parsedStoreID
+			}
+		}
 	}
 
 	f, err := file.Open()
@@ -444,11 +498,10 @@ func (h *LeadHandler) BulkImportCsv(c *gin.Context) {
 	n, _ := f.Read(buf)
 	buf = buf[:n]
 
-	userID, _ := middleware.GetUserID(c)
 	if userID == 0 {
 		userID = 1
 	}
-	inserted, err := h.svc.BulkImportFromCSV(buf, clientID, packageID, userID)
+	inserted, err := h.svc.BulkImportFromCSV(buf, clientID, packageID, formStoreMasterID, userID)
 	if err != nil {
 		respondError(c, err)
 		return

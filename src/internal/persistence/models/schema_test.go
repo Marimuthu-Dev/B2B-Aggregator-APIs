@@ -13,6 +13,8 @@ func TestHasLeadStoreMasterIDColumn(t *testing.T) {
 	}{
 		{schema: "MedLyfe", want: true},
 		{schema: "medlyfe", want: true},
+		{schema: "MedLyfeDB", want: true},
+		{schema: "medlyfedb", want: true},
 		{schema: "MediAdmin", want: false},
 		{schema: DefaultSchema, want: false},
 	}

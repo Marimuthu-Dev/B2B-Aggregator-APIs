@@ -31,7 +31,7 @@ type LeadService interface {
 	UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUpdatedBy int64) (*domain.Lead, error)
 	DeleteLead(id int64, actorID int64) error
 	BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastUpdatedBy int64, labID *int64, appointmentAt *time.Time) (int64, error)
-	BulkImportFromCSV(csvContent []byte, clientID int64, packageID int, createdBy int64) (int, error)
+	BulkImportFromCSV(csvContent []byte, clientID int64, packageID int, storeMasterID *int64, createdBy int64) (int, error)
 	// UploadBloodTestReport validates a PDF, uploads to blob storage, then updates lead + history in one DB transaction.
 	// When the lead is already in Report Uploaded status (or already had a report), the report is overwritten.
 	UploadBloodTestReport(ctx context.Context, leadID int64, uploadedBy int64, fh *multipart.FileHeader) (reportURL string, overwritten bool, err error)
@@ -489,7 +489,7 @@ func (s *leadService) GeneratePatientID(patientName, contactNumber string) strin
 	return fmt.Sprintf("%s%s", initials.String(), contactNumber)
 }
 
-func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packageID int, createdBy int64) (int, error) {
+func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packageID int, selectedStoreMasterID *int64, createdBy int64) (int, error) {
 	if len(csvContent) == 0 {
 		return 0, apperrors.NewBadRequest("CSV file is required", nil)
 	}
@@ -500,7 +500,31 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 		return 0, apperrors.NewBadRequest("ClientID and PackageID are required", nil)
 	}
 
-	reader := csv.NewReader(strings.NewReader(string(csvContent)))
+	if !persistencemodels.HasLeadStoreMasterIDColumn() {
+		selectedStoreMasterID = nil
+	} else if selectedStoreMasterID != nil {
+		if err := s.validateLeadStoreMasterID(clientID, selectedStoreMasterID); err != nil {
+			return 0, err
+		}
+	}
+
+	clientRequiresStore := false
+	if persistencemodels.HasLeadStoreMasterIDColumn() && selectedStoreMasterID == nil && s.clientRepo != nil && s.storeRepo != nil {
+		if cl, clErr := s.clientRepo.FindByID(clientID); clErr == nil && cl != nil && cl.IsStoreLoginEnabled {
+			activeTrue := true
+			if _, activeStoreCount, stErr := s.storeRepo.List(repository.StoreListFilter{
+				Page:     1,
+				PageSize: 1,
+				ClientID: &clientID,
+				IsActive: &activeTrue,
+			}); stErr == nil && activeStoreCount > 0 {
+				clientRequiresStore = true
+			}
+		}
+	}
+
+	csvStr := strings.TrimPrefix(string(csvContent), "\uFEFF")
+	reader := csv.NewReader(strings.NewReader(csvStr))
 	reader.FieldsPerRecord = -1
 	rows, err := reader.ReadAll()
 	if err != nil {
@@ -511,9 +535,17 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 	}
 
 	headers := rows[0]
+	normHeader := func(h string) string {
+		s := strings.TrimPrefix(h, "\uFEFF")
+		s = strings.TrimSpace(strings.ToLower(s))
+		s = strings.ReplaceAll(s, " ", "")
+		s = strings.ReplaceAll(s, "_", "")
+		return s
+	}
 	colIndex := func(name string) int {
+		want := normHeader(name)
 		for i, h := range headers {
-			if strings.TrimSpace(strings.ToLower(h)) == strings.ToLower(name) {
+			if normHeader(h) == want {
 				return i
 			}
 		}
@@ -524,6 +556,22 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 			return strings.TrimSpace(row[i])
 		}
 		return ""
+	}
+	atAny := func(row []string, names ...string) string {
+		for _, n := range names {
+			if i := colIndex(n); i >= 0 && i < len(row) {
+				return strings.TrimSpace(row[i])
+			}
+		}
+		return ""
+	}
+	hasAnyCol := func(names ...string) bool {
+		for _, n := range names {
+			if colIndex(n) >= 0 {
+				return true
+			}
+		}
+		return false
 	}
 	atInt8 := func(row []string, name string) int8 {
 		s := at(row, name)
@@ -542,12 +590,20 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 		return int32(n)
 	}
 
-	requiredCols := []string{"PatientName", "ContactNumber", "Age", "Gender", "Emailid", "Address", "CityID", "StateID", "Pincode"}
+	requiredCols := []string{"PatientName", "Age", "Gender", "Address", "CityID", "StateID", "Pincode"}
 	for _, name := range requiredCols {
 		if colIndex(name) < 0 {
 			return 0, apperrors.NewBadRequest("CSV missing required column: "+name, nil)
 		}
 	}
+	if !hasAnyCol("ContactNumber", "ContactNo", "Mobile", "MobileNumber") {
+		return 0, apperrors.NewBadRequest("CSV missing required column: ContactNumber", nil)
+	}
+	if !hasAnyCol("Emailid", "Email") {
+		return 0, apperrors.NewBadRequest("CSV missing required column: Emailid", nil)
+	}
+
+	isMedLyfe := persistencemodels.IsMedLyfeSchema()
 
 	inserted := 0
 	for rowIdx := 1; rowIdx < len(rows); rowIdx++ {
@@ -555,8 +611,18 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 		if len(row) == 0 {
 			continue
 		}
+		allBlank := true
+		for _, cell := range row {
+			if strings.TrimSpace(cell) != "" {
+				allBlank = false
+				break
+			}
+		}
+		if allBlank {
+			continue
+		}
 		patientName := at(row, "PatientName")
-		contactNumber := at(row, "ContactNumber")
+		contactNumber := atAny(row, "ContactNumber", "ContactNo", "Mobile", "MobileNumber")
 		if patientName == "" || contactNumber == "" {
 			return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: PatientName and ContactNumber are required", rowIdx+1), nil)
 		}
@@ -575,21 +641,28 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 			return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: %s", rowIdx+1, errParse.Error()), errParse)
 		}
 
-		empID := at(row, "EmpID")
+		empID := atAny(row, "EmpID", "EmployeeID")
 		if err := domain.ValidateLeadEmpID(empID); err != nil {
 			return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: %s", rowIdx+1, err.Error()), err)
 		}
 		empID = strings.TrimSpace(empID)
 
-		storeID := at(row, "StoreID")
-		if err := domain.ValidateLeadStoreID(storeID); err != nil {
-			return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: %s", rowIdx+1, err.Error()), err)
+		// StoreID column in bulk CSV applies only when schema is NOT MedLyfe / MedLyfeDB.
+		var storeID string
+		if !isMedLyfe {
+			storeID = at(row, "StoreID")
+			if err := domain.ValidateLeadStoreID(storeID); err != nil {
+				return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: %s", rowIdx+1, err.Error()), err)
+			}
+			storeID = strings.TrimSpace(storeID)
 		}
-		storeID = strings.TrimSpace(storeID)
 
 		var storeMasterID *int64
 		if persistencemodels.HasLeadStoreMasterIDColumn() {
-			if raw := strings.TrimSpace(at(row, "StoreMasterID")); raw != "" {
+			if selectedStoreMasterID != nil {
+				sid := *selectedStoreMasterID
+				storeMasterID = &sid
+			} else if raw := strings.TrimSpace(atAny(row, "StoreMasterID", "MasterStoreID")); raw != "" {
 				id, parseErr := strconv.ParseInt(raw, 10, 64)
 				if parseErr != nil || id < 1 {
 					return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: StoreMasterID must be a positive integer", rowIdx+1), parseErr)
@@ -599,17 +672,15 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 				}
 				storeMasterID = &id
 			}
+			if clientRequiresStore && storeMasterID == nil {
+				return inserted, apperrors.NewBadRequest("Please select a Store for this client before uploading candidates", nil)
+			}
 		}
 
+		// EmploymentType column in bulk CSV applies only when schema is MedLyfe / MedLyfeDB.
 		var employmentTypeID *uint8
 		if persistencemodels.HasLeadEmploymentTypeIDColumn() {
-			etRaw := strings.TrimSpace(at(row, "EmploymentType"))
-			if etRaw == "" {
-				etRaw = strings.TrimSpace(at(row, "Employment Type"))
-			}
-			if etRaw == "" {
-				etRaw = strings.TrimSpace(at(row, "EmploymentTypeID"))
-			}
+			etRaw := strings.TrimSpace(atAny(row, "EmploymentType", "EmploymentTypeID"))
 			if etRaw != "" {
 				switch strings.ToLower(etRaw) {
 				case "new", "1":
@@ -633,7 +704,7 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 			Gender:           at(row, "Gender"),
 			PackageID:        int(packageID),
 			ContactNumber:    contactNumber,
-			Emailid:          at(row, "Emailid"),
+			Emailid:          atAny(row, "Emailid", "Email"),
 			Address:          at(row, "Address"),
 			CityID:           atInt32(row, "CityID"),
 			StateID:          atInt32(row, "StateID"),

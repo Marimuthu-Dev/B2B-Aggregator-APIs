@@ -11,6 +11,9 @@ const DefaultSchema = "MediAdmin"
 // MedLyfeSchema is the SQL Server schema that includes tbl_StoreMaster and tbl_Leads.StoreMasterID.
 const MedLyfeSchema = "MedLyfe"
 
+// MedLyfeDBSchemaAlias is accepted when DB_SCHEMA is configured with the MedLyfe database identifier.
+const MedLyfeDBSchemaAlias = "MedLyfeDB"
+
 var (
 	schemaMu   sync.RWMutex
 	schemaName = DefaultSchema
@@ -41,9 +44,10 @@ func Table(table string) string {
 	return Schema() + "." + table
 }
 
-// IsMedLyfeSchema is true when DB_SCHEMA is MedLyfe (store login and StoreMasterID).
+// IsMedLyfeSchema is true when DB_SCHEMA is MedLyfe or MedLyfeDB (store login, StoreMasterID, and EmploymentTypeID).
 func IsMedLyfeSchema() bool {
-	return strings.EqualFold(Schema(), MedLyfeSchema)
+	s := strings.TrimSpace(Schema())
+	return strings.EqualFold(s, MedLyfeSchema) || strings.EqualFold(s, MedLyfeDBSchemaAlias)
 }
 
 // HasStoreMasterTable is true when tbl_StoreMaster exists (MedLyfe only).
