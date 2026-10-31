@@ -123,11 +123,13 @@ func TestBulkImportFromCSV_MedLyfeSchema_StoreMasterIDMappingAndValidation(t *te
 				clients: map[int64]*domain.Client{
 					101: {ClientID: 101, ClientName: "Client With Stores", IsStoreLoginEnabled: true, IsAcitve: true},
 					102: {ClientID: 102, ClientName: "Client Without Stores", IsStoreLoginEnabled: false, IsAcitve: true},
+					103: {ClientID: 103, ClientName: "Client With Stores Login Disabled", IsStoreLoginEnabled: false, IsAcitve: true},
 				},
 			}
 			storeRepo := &mockStoreRepoForBulkCSV{
 				stores: map[int64]*domain.Store{
 					55: {StoreID: 55, ClientID: 101, StoreName: "Chennai Main Store", IsActive: true},
+					77: {StoreID: 77, ClientID: 103, StoreName: "Delhi Outlet", IsActive: true},
 					99: {StoreID: 99, ClientID: 999, StoreName: "Other Client Store", IsActive: true},
 				},
 			}
@@ -183,6 +185,26 @@ func TestBulkImportFromCSV_MedLyfeSchema_StoreMasterIDMappingAndValidation(t *te
 			}
 			if inserted2 != 2 || leadRepo2.created[0].StoreMasterID != nil {
 				t.Errorf("expected nil StoreMasterID for client without stores, got %v", leadRepo2.created[0].StoreMasterID)
+			}
+
+			// 5. Client 103 has active stores even with IsStoreLoginEnabled = false: StoreMasterID is still required and mapped.
+			leadRepo3 := &mockLeadRepoForBulkCSV{}
+			svc3 := &leadService{
+				repo:       leadRepo3,
+				uow:        &mockLeadUowForUpload{leadRepo: leadRepo3, historyRepo: &mockLeadHistoryRepoForUpload{}},
+				clientRepo: clientRepo,
+				storeRepo:  storeRepo,
+			}
+			if _, err3 := svc3.BulkImportFromCSV([]byte(csvData), 103, 5, nil, 1); err3 == nil {
+				t.Fatalf("expected error when client has active stores (even with IsStoreLoginEnabled=false) and StoreMasterID is omitted")
+			}
+			store77 := int64(77)
+			inserted3, err3 := svc3.BulkImportFromCSV([]byte(csvData), 103, 5, &store77, 1)
+			if err3 != nil {
+				t.Fatalf("unexpected error with valid StoreMasterID on client 103: %v", err3)
+			}
+			if inserted3 != 2 || leadRepo3.created[0].StoreMasterID == nil || *leadRepo3.created[0].StoreMasterID != 77 {
+				t.Errorf("expected StoreMasterID=77 on client 103 leads, got %v", leadRepo3.created[0].StoreMasterID)
 			}
 		})
 	}

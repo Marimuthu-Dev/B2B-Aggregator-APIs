@@ -509,17 +509,15 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 	}
 
 	clientRequiresStore := false
-	if persistencemodels.HasLeadStoreMasterIDColumn() && selectedStoreMasterID == nil && s.clientRepo != nil && s.storeRepo != nil {
-		if cl, clErr := s.clientRepo.FindByID(clientID); clErr == nil && cl != nil && cl.IsStoreLoginEnabled {
-			activeTrue := true
-			if _, activeStoreCount, stErr := s.storeRepo.List(repository.StoreListFilter{
-				Page:     1,
-				PageSize: 1,
-				ClientID: &clientID,
-				IsActive: &activeTrue,
-			}); stErr == nil && activeStoreCount > 0 {
-				clientRequiresStore = true
-			}
+	if persistencemodels.HasLeadStoreMasterIDColumn() && selectedStoreMasterID == nil && s.storeRepo != nil {
+		activeTrue := true
+		if _, activeStoreCount, stErr := s.storeRepo.List(repository.StoreListFilter{
+			Page:     1,
+			PageSize: 1,
+			ClientID: &clientID,
+			IsActive: &activeTrue,
+		}); stErr == nil && activeStoreCount > 0 {
+			clientRequiresStore = true
 		}
 	}
 
