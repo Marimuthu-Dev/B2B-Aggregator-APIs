@@ -17,7 +17,7 @@ type CreatePackageWithTestsRequest struct {
 }
 
 type PackageStatusUpdateRequest struct {
-	IsActive bool `json:"IsActive" binding:"required"`
+	IsActive *bool `json:"IsActive" binding:"required"`
 }
 
 type PackageClientMappingRequest struct {

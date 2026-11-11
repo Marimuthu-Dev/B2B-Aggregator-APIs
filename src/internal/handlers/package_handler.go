@@ -170,7 +170,7 @@ func (h *PackageHandler) UpdatePackageStatus(c *gin.Context) {
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
-	result, err := h.svc.UpdatePackageStatus(params.ID, req.IsActive, userID)
+	result, err := h.svc.UpdatePackageStatus(params.ID, *req.IsActive, userID)
 	if err != nil {
 		respondError(c, err)
 		return
