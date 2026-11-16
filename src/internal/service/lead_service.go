@@ -260,13 +260,20 @@ func (s *leadService) UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUp
 		}
 		l.LeadStatusID = *update.LeadStatusID
 	}
+	if update.CollectionType != nil {
+		ct, err := domain.ParseLeadCollectionType(*update.CollectionType)
+		if err != nil {
+			return nil, apperrors.NewBadRequest(err.Error(), err)
+		}
+		l.CollectionType = ct
+	}
 	if update.AppointmentAt != nil {
 		appt := *update.AppointmentAt
-		if appt.Before(time.Now()) {
-			return nil, apperrors.NewBadRequest(
-				"AppointmentAt must be at or after the current time (India Standard Time)",
-				nil,
-			)
+		unchangedAppt := existing.AppointmentAt != nil && existing.AppointmentAt.Time.Unix() == appt.Unix()
+		if !unchangedAppt {
+			if err := validateLeadAppointmentAt(appt, l.CollectionType); err != nil {
+				return nil, err
+			}
 		}
 		at := timeutil.StoredFromTime(appt)
 		l.AppointmentAt = &at
@@ -298,13 +305,6 @@ func (s *leadService) UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUp
 		}
 	} else {
 		l.EmploymentTypeID = nil
-	}
-	if update.CollectionType != nil {
-		ct, err := domain.ParseLeadCollectionType(*update.CollectionType)
-		if err != nil {
-			return nil, apperrors.NewBadRequest(err.Error(), err)
-		}
-		l.CollectionType = ct
 	}
 
 	l.LeadID = id
@@ -387,20 +387,38 @@ func (s *leadService) DeleteLead(id int64, actorID int64) error {
 	})
 }
 
-func (s *leadService) BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastUpdatedBy int64, labID *int64, appointmentAt *time.Time) (int64, error) {
-	var appointmentPersist *time.Time
-	if appointmentAt != nil {
-		appt := *appointmentAt
-		if appt.Before(time.Now()) {
-			return 0, apperrors.NewBadRequest(
-				"AppointmentAt must be at or after the current time (India Standard Time)",
+const campAppointmentPastDaysAllowed = 3
+
+func validateLeadAppointmentAt(appt time.Time, collectionType string) error {
+	now := time.Now()
+	if strings.EqualFold(strings.TrimSpace(collectionType), domain.LeadCollectionCamp) {
+		nowIST := now.In(timeutil.ISTLocation())
+		var minAllowed time.Time
+		if appt.Location() == time.UTC {
+			minAllowed = time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 0, 0, 0, 0, time.UTC).
+				AddDate(0, 0, -campAppointmentPastDaysAllowed)
+		} else {
+			minAllowed = time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 0, 0, 0, 0, timeutil.ISTLocation()).
+				AddDate(0, 0, -campAppointmentPastDaysAllowed)
+		}
+		if appt.Before(minAllowed) {
+			return apperrors.NewBadRequest(
+				"AppointmentAt for Camp collection type must be within the last 3 days or at/after the current time (India Standard Time)",
 				nil,
 			)
 		}
-		st := timeutil.StoredFromTime(appt)
-		appointmentPersist = timeutil.StoredToTimePtr(&st)
+		return nil
 	}
+	if appt.Before(now) {
+		return apperrors.NewBadRequest(
+			"AppointmentAt must be at or after the current time (India Standard Time)",
+			nil,
+		)
+	}
+	return nil
+}
 
+func (s *leadService) BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastUpdatedBy int64, labID *int64, appointmentAt *time.Time) (int64, error) {
 	var existingLeads []domain.Lead
 	if appointmentAt != nil || statusID == domain.LeadStatusIDReportReadyForDownload {
 		for _, id := range leadIDs {
@@ -408,6 +426,29 @@ func (s *leadService) BulkUpdateLeadStatus(leadIDs []int64, statusID int8, lastU
 				existingLeads = append(existingLeads, *l)
 			}
 		}
+	}
+
+	var appointmentPersist *time.Time
+	if appointmentAt != nil {
+		appt := *appointmentAt
+		bulkCollectionType := domain.LeadCollectionCenter
+		if len(existingLeads) > 0 {
+			allCamp := true
+			for _, l := range existingLeads {
+				if !strings.EqualFold(strings.TrimSpace(l.CollectionType), domain.LeadCollectionCamp) {
+					allCamp = false
+					break
+				}
+			}
+			if allCamp {
+				bulkCollectionType = domain.LeadCollectionCamp
+			}
+		}
+		if err := validateLeadAppointmentAt(appt, bulkCollectionType); err != nil {
+			return 0, err
+		}
+		st := timeutil.StoredFromTime(appt)
+		appointmentPersist = timeutil.StoredToTimePtr(&st)
 	}
 
 	var affected int64

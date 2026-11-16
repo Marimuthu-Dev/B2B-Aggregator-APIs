@@ -6,10 +6,12 @@ import (
 	"mime/multipart"
 	"net/textproto"
 	"testing"
+	"time"
 
 	"b2b-diagnostic-aggregator/apis/internal/apperrors"
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	"b2b-diagnostic-aggregator/apis/internal/repository"
+	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 )
 
 type mockLeadRepoForUpload struct {
@@ -233,5 +235,33 @@ func TestUploadBloodTestReport_ConflictWhenLeadPastReportUploaded(t *testing.T) 
 		if !ok || appErr.Kind != apperrors.KindConflict {
 			t.Fatalf("expected conflict AppError for status %d, got %v", st, err)
 		}
+	}
+}
+
+func TestValidateLeadAppointmentAt_CampAllowsLast3Days(t *testing.T) {
+	nowIST := time.Now().In(timeutil.ISTLocation())
+	twoDaysAgoUTC := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 10, 0, 0, 0, time.UTC).AddDate(0, 0, -2)
+	threeDaysAgoMorningUTC := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 0, 0, 0, time.UTC).AddDate(0, 0, -3)
+	fourDaysAgoUTC := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 23, 59, 0, 0, time.UTC).AddDate(0, 0, -4)
+	futureUTC := time.Now().UTC().Add(2 * time.Hour)
+
+	if err := validateLeadAppointmentAt(twoDaysAgoUTC, domain.LeadCollectionCamp); err != nil {
+		t.Fatalf("expected Camp collection to allow 2 days ago, got error: %v", err)
+	}
+	if err := validateLeadAppointmentAt(threeDaysAgoMorningUTC, domain.LeadCollectionCamp); err != nil {
+		t.Fatalf("expected Camp collection to allow 3 days ago morning, got error: %v", err)
+	}
+	if err := validateLeadAppointmentAt(futureUTC, domain.LeadCollectionCamp); err != nil {
+		t.Fatalf("expected Camp collection to allow future date, got error: %v", err)
+	}
+	if err := validateLeadAppointmentAt(fourDaysAgoUTC, domain.LeadCollectionCamp); err == nil {
+		t.Fatalf("expected Camp collection to reject 4 days ago, got nil")
+	}
+
+	if err := validateLeadAppointmentAt(twoDaysAgoUTC, domain.LeadCollectionHome); err == nil {
+		t.Fatalf("expected Home collection to reject past date, got nil")
+	}
+	if err := validateLeadAppointmentAt(twoDaysAgoUTC, domain.LeadCollectionCenter); err == nil {
+		t.Fatalf("expected Center collection to reject past date, got nil")
 	}
 }
