@@ -58,6 +58,10 @@ func mapLeadToDomainWithOptionalJoinedNames(p persistencemodels.Lead, names lead
 }
 
 func mapLeadToDomain(p persistencemodels.Lead) domain.Lead {
+	var requestedApptAt *timeutil.StoredTime
+	if persistencemodels.HasLeadRequestedAppointmentAtColumn() {
+		requestedApptAt = timeutil.StoredFromTimePtr(p.RequestedAppointmentAt)
+	}
 	return domain.Lead{
 		LeadID:                        p.LeadID,
 		ClientID:                      p.ClientID,
@@ -79,6 +83,7 @@ func mapLeadToDomain(p persistencemodels.Lead) domain.Lead {
 		CollectionType:                p.CollectionType,
 		LeadStatusID:                  p.LeadStatusID,
 		AppointmentAt:                 timeutil.StoredFromTimePtr(p.AppointmentAt),
+		RequestedAppointmentAt:        requestedApptAt,
 		LabID:                         p.LabID,
 		BrandID:                       p.BrandID,
 		IsFit:                         isFitDomainFromDB(p.IsFit),
@@ -106,6 +111,10 @@ func mapLeadToPersistence(d domain.Lead) persistencemodels.Lead {
 	if !persistencemodels.HasLeadEmploymentTypeIDColumn() {
 		employmentTypeID = nil
 	}
+	requestedApptAt := timeutil.StoredToTimePtr(d.RequestedAppointmentAt)
+	if !persistencemodels.HasLeadRequestedAppointmentAtColumn() {
+		requestedApptAt = nil
+	}
 	return persistencemodels.Lead{
 		LeadID:                        d.LeadID,
 		ClientID:                      d.ClientID,
@@ -127,6 +136,7 @@ func mapLeadToPersistence(d domain.Lead) persistencemodels.Lead {
 		CollectionType:                d.CollectionType,
 		LeadStatusID:                  d.LeadStatusID,
 		AppointmentAt:                 timeutil.StoredToTimePtr(d.AppointmentAt),
+		RequestedAppointmentAt:        requestedApptAt,
 		LabID:                         d.LabID,
 		BrandID:                       d.BrandID,
 		IsFit:                         isFitDBFromDomain(d.IsFit),

@@ -165,6 +165,9 @@ func (s *leadService) CreateLead(l *domain.Lead, createdBy int64) error {
 	if !persistencemodels.HasLeadEmploymentTypeIDColumn() {
 		l.EmploymentTypeID = nil
 	}
+	if !persistencemodels.HasLeadRequestedAppointmentAtColumn() {
+		l.RequestedAppointmentAt = nil
+	}
 
 	if l.LeadStatusID > 5 && l.LabID == nil {
 		return apperrors.NewBadRequest("Lab is not assigned, so it may not be able to update..!", nil)
@@ -277,6 +280,18 @@ func (s *leadService) UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUp
 		}
 		at := timeutil.StoredFromTime(appt)
 		l.AppointmentAt = &at
+	}
+	if persistencemodels.HasLeadRequestedAppointmentAtColumn() {
+		if update.RequestedAppointmentAt != nil {
+			if update.RequestedAppointmentAt.IsZero() {
+				l.RequestedAppointmentAt = nil
+			} else {
+				rat := timeutil.StoredFromTime(*update.RequestedAppointmentAt)
+				l.RequestedAppointmentAt = &rat
+			}
+		}
+	} else {
+		l.RequestedAppointmentAt = nil
 	}
 	if update.LabID != nil {
 		l.LabID = update.LabID
@@ -734,30 +749,61 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 			}
 		}
 
+		// RequestedAppointmentAt column in bulk CSV applies only when schema is MedLyfe / MedLyfeDB.
+		var requestedApptAt *timeutil.StoredTime
+		if persistencemodels.HasLeadRequestedAppointmentAtColumn() {
+			reqApptRaw := strings.TrimSpace(atAny(row,
+				"RequestedAppointmentAt",
+				"RequestedAppointmentDateTime",
+				"RequestedAppointment",
+				"PreferredAppointmentAt",
+				"PreferredAppointmentDateTime",
+				"AppointmentRequestedAt",
+				"RequestedDateTime",
+			))
+			if reqApptRaw == "" {
+				reqDatePart := strings.TrimSpace(atAny(row, "RequestedAppointmentDate", "PreferredAppointmentDate"))
+				reqTimePart := strings.TrimSpace(atAny(row, "RequestedAppointmentTime", "PreferredAppointmentTime"))
+				if reqDatePart != "" && reqTimePart != "" {
+					reqApptRaw = reqDatePart + " " + reqTimePart
+				} else if reqDatePart != "" {
+					reqApptRaw = reqDatePart
+				}
+			}
+			if reqApptRaw != "" {
+				parsedReqAppt, parseReqErr := parseBulkCSVRequestedAppointmentAt(reqApptRaw)
+				if parseReqErr != nil {
+					return inserted, apperrors.NewBadRequest(fmt.Sprintf("Row %d: Invalid RequestedAppointmentAt %q (use YYYY-MM-DD HH:MM or DD-MM-YYYY HH:MM AM/PM)", rowIdx+1, reqApptRaw), parseReqErr)
+				}
+				requestedApptAt = parsedReqAppt
+			}
+		}
+
 		now := time.Now()
 		lead := &domain.Lead{
-			ClientID:         clientID,
-			PatientID:        s.GeneratePatientID(patientName, contactNumber),
-			PatientName:      patientName,
-			Age:              atInt8(row, "Age"),
-			Gender:           at(row, "Gender"),
-			PackageID:        int(packageID),
-			ContactNumber:    contactNumber,
-			Emailid:          atAny(row, "Emailid", "Email"),
-			Address:          at(row, "Address"),
-			CityID:           atInt32(row, "CityID"),
-			StateID:          atInt32(row, "StateID"),
-			Pincode:          at(row, "Pincode"),
-			EmpID:            empID,
-			StoreID:          storeID,
-			StoreMasterID:    storeMasterID,
-			EmploymentTypeID: employmentTypeID,
-			CollectionType:   collectionType,
-			LeadStatusID:     leadStatusID,
-			CreatedBy:        createdBy,
-			CreatedOn:        timeutil.FromTime(now),
-			LastUpdatedBy:    createdBy,
-			LastUpdatedOn:    timeutil.FromTime(now),
+			ClientID:               clientID,
+			PatientID:              s.GeneratePatientID(patientName, contactNumber),
+			PatientName:            patientName,
+			Age:                    atInt8(row, "Age"),
+			Gender:                 at(row, "Gender"),
+			PackageID:              int(packageID),
+			ContactNumber:          contactNumber,
+			Emailid:                atAny(row, "Emailid", "Email"),
+			Address:                at(row, "Address"),
+			CityID:                 atInt32(row, "CityID"),
+			StateID:                atInt32(row, "StateID"),
+			Pincode:                at(row, "Pincode"),
+			EmpID:                  empID,
+			StoreID:                storeID,
+			StoreMasterID:          storeMasterID,
+			EmploymentTypeID:       employmentTypeID,
+			CollectionType:         collectionType,
+			LeadStatusID:           leadStatusID,
+			RequestedAppointmentAt: requestedApptAt,
+			CreatedBy:              createdBy,
+			CreatedOn:              timeutil.FromTime(now),
+			LastUpdatedBy:          createdBy,
+			LastUpdatedOn:          timeutil.FromTime(now),
 		}
 
 		err := s.uow.WithinTransaction(func(leadRepo repository.LeadRepository, historyRepo repository.LeadHistoryRepository) error {
@@ -777,6 +823,99 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 	}
 
 	return inserted, nil
+}
+
+// parseBulkCSVRequestedAppointmentAt parses a requested appointment date/time string from CSV
+// and returns it wrapped as a wall-clock StoredTime (UTC location, matching AppointmentAt storage).
+func parseBulkCSVRequestedAppointmentAt(raw string) (*timeutil.StoredTime, error) {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return nil, nil
+	}
+	// Normalize multiple internal spaces to single space
+	s = strings.Join(strings.Fields(s), " ")
+
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		wall := time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), 0, time.UTC)
+		st := timeutil.StoredFromTime(wall)
+		return &st, nil
+	}
+
+	layouts := []string{
+		"2006-01-02T15:04:05",
+		"2006-01-02T15:04",
+		"2006-01-02 15:04:05",
+		"2006-01-02 15:04",
+		"2006-01-02 03:04:05 PM",
+		"2006-01-02 3:04:05 PM",
+		"2006-01-02 03:04 PM",
+		"2006-01-02 3:04 PM",
+		"02-01-2006 15:04:05",
+		"02-01-2006 15:04",
+		"02-01-2006 03:04:05 PM",
+		"02-01-2006 3:04:05 PM",
+		"02-01-2006 03:04 PM",
+		"02-01-2006 3:04 PM",
+		"2-1-2006 15:04:05",
+		"2-1-2006 15:04",
+		"2-1-2006 03:04 PM",
+		"2-1-2006 3:04 PM",
+		"02/01/2006 15:04:05",
+		"02/01/2006 15:04",
+		"02/01/2006 03:04:05 PM",
+		"02/01/2006 3:04:05 PM",
+		"02/01/2006 03:04 PM",
+		"02/01/2006 3:04 PM",
+		"2/1/2006 15:04:05",
+		"2/1/2006 15:04",
+		"2/1/2006 03:04 PM",
+		"2/1/2006 3:04 PM",
+		"01/02/2006 15:04:05",
+		"01/02/2006 15:04",
+		"01/02/2006 03:04:05 PM",
+		"01/02/2006 3:04:05 PM",
+		"01/02/2006 03:04 PM",
+		"01/02/2006 3:04 PM",
+		"1/2/2006 15:04:05",
+		"1/2/2006 15:04",
+		"1/2/2006 03:04 PM",
+		"1/2/2006 3:04 PM",
+		"02-Jan-2006 15:04:05",
+		"02-Jan-2006 15:04",
+		"02-Jan-2006 03:04 PM",
+		"02-Jan-2006 3:04 PM",
+		"2-Jan-2006 15:04",
+		"2-Jan-2006 3:04 PM",
+		"2006-01-02",
+		"02-01-2006",
+		"2-1-2006",
+		"02/01/2006",
+		"2/1/2006",
+		"02-Jan-2006",
+		"2-Jan-2006",
+	}
+
+	// Normalize lowercase am/pm to uppercase AM/PM for layout matching
+	sNorm := s
+	lower := strings.ToLower(sNorm)
+	if strings.HasSuffix(lower, " am") {
+		sNorm = sNorm[:len(sNorm)-3] + " AM"
+	} else if strings.HasSuffix(lower, " pm") {
+		sNorm = sNorm[:len(sNorm)-3] + " PM"
+	} else if strings.HasSuffix(lower, "am") && len(sNorm) > 2 {
+		sNorm = strings.TrimSpace(sNorm[:len(sNorm)-2]) + " AM"
+	} else if strings.HasSuffix(lower, "pm") && len(sNorm) > 2 {
+		sNorm = strings.TrimSpace(sNorm[:len(sNorm)-2]) + " PM"
+	}
+
+	for _, layout := range layouts {
+		if t, err := time.ParseInLocation(layout, sNorm, time.UTC); err == nil {
+			st := timeutil.StoredFromTime(t)
+			return &st, nil
+		}
+	}
+
+	return nil, fmt.Errorf("unsupported date-time format %q", raw)
 }
 
 func (s *leadService) UploadBloodTestReport(ctx context.Context, leadID int64, uploadedBy int64, fh *multipart.FileHeader) (string, bool, error) {

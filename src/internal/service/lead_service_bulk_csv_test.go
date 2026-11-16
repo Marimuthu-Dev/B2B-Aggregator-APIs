@@ -252,3 +252,60 @@ func TestBulkImportFromCSV_NonMedLyfeSchema_EmpIDAndStoreIDOnly(t *testing.T) {
 		t.Errorf("row 2 optional blank fields = EmpID:%q StoreID:%q StoreMasterID:%v EmploymentTypeID:%v", r2.EmpID, r2.StoreID, r2.StoreMasterID, r2.EmploymentTypeID)
 	}
 }
+
+func TestBulkImportFromCSV_RequestedAppointmentAtParsing(t *testing.T) {
+	prevSchema := persistencemodels.Schema()
+	t.Cleanup(func() { persistencemodels.SetSchema(prevSchema) })
+	persistencemodels.SetSchema("MedLyfe")
+
+	leadRepo := &mockLeadRepoForBulkCSV{}
+	histRepo := &mockLeadHistoryRepoForUpload{}
+	uow := &mockLeadUowForUpload{leadRepo: leadRepo, historyRepo: histRepo}
+	svc := &leadService{repo: leadRepo, uow: uow}
+
+	csvData := "PatientName,Age,Gender,CollectionType,ContactNumber,Emailid,Address,CityID,StateID,Pincode,EmpID,EmploymentType,RequestedAppointmentAt\n" +
+		"Rahul Sharma,28,M,Home,9876543210,rahul@example.com,221B Baker Street,10,1,400001,EMP001,New,2026-11-25 10:30\n" +
+		"Anita Verma,32,F,Center,9123456789,anita@example.com,14 MG Road,11,1,500001,EMP002,Existing,26-11-2026 02:15 PM\n" +
+		"Amit Patel,45,M,Home,9988776655,amit@example.com,12 Gandhi Road,10,1,380001,,New,\n"
+
+	inserted, err := svc.BulkImportFromCSV([]byte(csvData), 101, 5, nil, 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if inserted != 3 || len(leadRepo.created) != 3 {
+		t.Fatalf("expected 3 inserted rows, got inserted=%d len=%d", inserted, len(leadRepo.created))
+	}
+
+	if leadRepo.created[0].RequestedAppointmentAt == nil {
+		t.Fatalf("row 1 RequestedAppointmentAt is nil, want 2026-11-25 10:30")
+	}
+	if got := leadRepo.created[0].RequestedAppointmentAt.Format("2006-01-02 15:04"); got != "2026-11-25 10:30" {
+		t.Errorf("row 1 RequestedAppointmentAt = %q, want 2026-11-25 10:30", got)
+	}
+
+	if leadRepo.created[1].RequestedAppointmentAt == nil {
+		t.Fatalf("row 2 RequestedAppointmentAt is nil, want 2026-11-26 14:15")
+	}
+	if got := leadRepo.created[1].RequestedAppointmentAt.Format("2006-01-02 15:04"); got != "2026-11-26 14:15" {
+		t.Errorf("row 2 RequestedAppointmentAt = %q, want 2026-11-26 14:15", got)
+	}
+
+	if leadRepo.created[2].RequestedAppointmentAt != nil {
+		t.Errorf("row 3 RequestedAppointmentAt = %v, want nil", leadRepo.created[2].RequestedAppointmentAt)
+	}
+
+	// Non-MedLyfe schema (e.g. MediAdmin): RequestedAppointmentAt must be ignored / nil
+	persistencemodels.SetSchema("MediAdmin")
+	leadRepoLegacy := &mockLeadRepoForBulkCSV{}
+	uowLegacy := &mockLeadUowForUpload{leadRepo: leadRepoLegacy, historyRepo: &mockLeadHistoryRepoForUpload{}}
+	svcLegacy := &leadService{repo: leadRepoLegacy, uow: uowLegacy}
+	if _, err := svcLegacy.BulkImportFromCSV([]byte(csvData), 101, 5, nil, 1); err != nil {
+		t.Fatalf("unexpected error on MediAdmin: %v", err)
+	}
+	for i, c := range leadRepoLegacy.created {
+		if c.RequestedAppointmentAt != nil {
+			t.Errorf("MediAdmin row %d RequestedAppointmentAt = %v, want nil", i+1, c.RequestedAppointmentAt)
+		}
+	}
+}
+

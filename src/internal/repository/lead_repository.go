@@ -76,7 +76,7 @@ func NewLeadRepository(db *gorm.DB) LeadRepository {
 	return &leadRepository{db: db}
 }
 
-// gormLead omits StoreMasterID / EmploymentTypeID unless DB_SCHEMA is MedLyfe (columns are absent on other schemas).
+// gormLead omits StoreMasterID / EmploymentTypeID / RequestedAppointmentAt unless DB_SCHEMA is MedLyfe (columns are absent on other schemas).
 func gormLead(db *gorm.DB) *gorm.DB {
 	var omits []string
 	if !persistencemodels.HasLeadStoreMasterIDColumn() {
@@ -84,6 +84,9 @@ func gormLead(db *gorm.DB) *gorm.DB {
 	}
 	if !persistencemodels.HasLeadEmploymentTypeIDColumn() {
 		omits = append(omits, "EmploymentTypeID")
+	}
+	if !persistencemodels.HasLeadRequestedAppointmentAtColumn() {
+		omits = append(omits, "RequestedAppointmentAt")
 	}
 	if len(omits) > 0 {
 		return db.Omit(omits...)
@@ -260,6 +263,13 @@ func mapLeadSortColumn(sortBy string) string {
 		return "LeadStatusID"
 	case "createdOn":
 		return "CreatedOn"
+	case "appointmentAt":
+		return "AppointmentAt"
+	case "requestedAppointmentAt":
+		if persistencemodels.HasLeadRequestedAppointmentAtColumn() {
+			return "RequestedAppointmentAt"
+		}
+		return "LeadID"
 	case "collectionType":
 		return "CollectionType"
 	case "leadId":

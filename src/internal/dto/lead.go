@@ -27,9 +27,10 @@ type LeadRequest struct {
 	StoreMasterID    *int64     `json:"StoreMasterID" binding:"omitempty,min=1"`
 	EmploymentTypeID *uint8     `json:"EmploymentTypeID" binding:"omitempty"`
 	CollectionType   string     `json:"CollectionType" binding:"required"`
-	LeadStatusID     int8       // omitted or 0 → service uses domain.LeadStatusIDDefault (1)
-	AppointmentAt    *time.Time `json:"AppointmentAt"`
-	LabID            *int64     `json:"LabID"`
+	LeadStatusID           int8       // omitted or 0 → service uses domain.LeadStatusIDDefault (1)
+	AppointmentAt          *time.Time `json:"AppointmentAt"`
+	RequestedAppointmentAt *time.Time `json:"RequestedAppointmentAt"`
+	LabID                  *int64     `json:"LabID"`
 }
 
 type BulkUpdateLeadStatusRequest struct {
@@ -69,16 +70,17 @@ type LeadUpdateRequest struct {
 	StoreMasterID    *int64     `json:"StoreMasterID"`
 	EmploymentTypeID *uint8     `json:"EmploymentTypeID"`
 	CollectionType   *string    `json:"CollectionType"`
-	LeadStatusID     *int8      `json:"LeadStatusID"`
-	AppointmentAt    *time.Time `json:"AppointmentAt"`
-	LabID            *int64     `json:"LabID"`
+	LeadStatusID           *int8      `json:"LeadStatusID"`
+	AppointmentAt          *time.Time `json:"AppointmentAt"`
+	RequestedAppointmentAt *time.Time `json:"RequestedAppointmentAt"`
+	LabID                  *int64     `json:"LabID"`
 }
 
 func (r LeadUpdateRequest) HasAtLeastOneField() bool {
 	return r.ClientID != nil || r.PatientName != nil || r.Age != nil || r.Gender != nil ||
 		r.PackageID != nil || r.ContactNumber != nil || r.Emailid != nil || r.Address != nil ||
 		r.CityID != nil || r.StateID != nil || r.Pincode != nil || r.EmpID != nil || r.StoreMasterID != nil || r.EmploymentTypeID != nil || r.CollectionType != nil || r.LeadStatusID != nil ||
-		r.AppointmentAt != nil || r.LabID != nil
+		r.AppointmentAt != nil || r.RequestedAppointmentAt != nil || r.LabID != nil
 }
 
 func (r LeadRequest) ToDomain() domain.Lead {
@@ -107,6 +109,10 @@ func (r LeadRequest) ToDomain() domain.Lead {
 	if r.AppointmentAt != nil {
 		at := timeutil.StoredFromTime(*r.AppointmentAt)
 		l.AppointmentAt = &at
+	}
+	if r.RequestedAppointmentAt != nil {
+		rat := timeutil.StoredFromTime(*r.RequestedAppointmentAt)
+		l.RequestedAppointmentAt = &rat
 	}
 	return l
 }

@@ -27,6 +27,8 @@ type Lead struct {
 	LabID                         *int64     `gorm:"column:LabID"`
 	BrandID                       *int64     `gorm:"column:BrandID"`
 	AppointmentAt                 *time.Time `gorm:"column:AppointmentAt"`
+	// RequestedAppointmentAt exists only on MedLyfe.tbl_Leads. GORM omits it when DB_SCHEMA is not MedLyfe.
+	RequestedAppointmentAt        *time.Time `gorm:"column:RequestedAppointmentAt"`
 	ReportURL                     *string    `gorm:"column:ReportURL;type:varchar(500)"`
 	IsFit                         *int8      `gorm:"column:IsFit"`
 	IsReportDownloadable          bool       `gorm:"column:IsReportDownloadable;not null;default:false"`

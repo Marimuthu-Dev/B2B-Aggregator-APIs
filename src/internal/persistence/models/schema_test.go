@@ -29,5 +29,8 @@ func TestHasLeadStoreMasterIDColumn(t *testing.T) {
 		if got := HasLabMapLocationURLColumn(); got != tc.want {
 			t.Errorf("schema %q: HasLabMapLocationURLColumn() = %v, want %v", tc.schema, got, tc.want)
 		}
+		if got := HasLeadRequestedAppointmentAtColumn(); got != tc.want {
+			t.Errorf("schema %q: HasLeadRequestedAppointmentAtColumn() = %v, want %v", tc.schema, got, tc.want)
+		}
 	}
 }

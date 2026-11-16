@@ -75,3 +75,8 @@ func HasLeadEmploymentTypeIDColumn() bool {
 	return IsMedLyfeSchema()
 }
 
+// HasLeadRequestedAppointmentAtColumn is true when tbl_Leads includes RequestedAppointmentAt (MedLyfe only).
+func HasLeadRequestedAppointmentAtColumn() bool {
+	return IsMedLyfeSchema()
+}
+

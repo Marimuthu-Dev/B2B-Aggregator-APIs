@@ -219,6 +219,8 @@ type Lead struct {
 	LeadStatusID                  int8
 	JoinedLeadStatusName          string               `json:"JoinedLeadStatusName,omitempty"`
 	AppointmentAt                 *timeutil.StoredTime `json:"AppointmentAt"`
+	// RequestedAppointmentAt exists only on MedLyfe.tbl_Leads. Omitted on other schemas.
+	RequestedAppointmentAt        *timeutil.StoredTime `json:"RequestedAppointmentAt,omitempty"`
 	LabID                         *int64               `json:"LabID,omitempty"`
 	BrandID                       *int64               `json:"BrandID,omitempty"`
 	LabName                       string               `json:"LabName,omitempty"`
