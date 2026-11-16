@@ -40,6 +40,56 @@ func (t *FlexDate) ToTimePtr() *time.Time {
 	return &tt
 }
 
+// FlexDateTime unmarshals optional JSON date-time strings (RFC3339, "2006-01-02T15:04", "2006-01-02 15:04", date-only, or empty/null).
+type FlexDateTime time.Time
+
+func (t *FlexDateTime) UnmarshalJSON(b []byte) error {
+	s := strings.TrimSpace(strings.Trim(string(b), `"`))
+	if s == "" || strings.EqualFold(s, "null") {
+		*t = FlexDateTime(time.Time{})
+		return nil
+	}
+	if parsed, err := time.Parse(time.RFC3339, s); err == nil {
+		*t = FlexDateTime(parsed)
+		return nil
+	}
+	layouts := []string{
+		"2006-01-02T15:04:05",
+		"2006-01-02T15:04",
+		"2006-01-02 15:04:05",
+		"2006-01-02 15:04",
+		"2006-01-02",
+	}
+	for _, layout := range layouts {
+		if parsed, err := time.ParseInLocation(layout, s, time.UTC); err == nil {
+			*t = FlexDateTime(parsed)
+			return nil
+		}
+	}
+	return fmt.Errorf("datetime must be RFC3339 or YYYY-MM-DDTHH:MM")
+}
+
+// ToTimePtr returns nil if receiver is nil or zero, else *time.Time.
+func (t *FlexDateTime) ToTimePtr() *time.Time {
+	if t == nil {
+		return nil
+	}
+	tt := time.Time(*t)
+	if tt.IsZero() {
+		return nil
+	}
+	return &tt
+}
+
+// RawTimePtr returns nil if receiver is nil, else *time.Time (preserving zero time when JSON was "" to allow clearing on PUT).
+func (t *FlexDateTime) RawTimePtr() *time.Time {
+	if t == nil {
+		return nil
+	}
+	tt := time.Time(*t)
+	return &tt
+}
+
 // FlexArrayString unmarshals JSON string or array (e.g. [1,2] or ["a","b"]) into a comma-separated string.
 // Use *FlexArrayString in DTOs so omit/null is preserved; call ToStringPtr() for *string.
 type FlexArrayString string

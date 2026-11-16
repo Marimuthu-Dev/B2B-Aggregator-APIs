@@ -283,10 +283,11 @@ func (s *leadService) UpdateLead(id int64, update *dto.LeadUpdateRequest, lastUp
 	}
 	if persistencemodels.HasLeadRequestedAppointmentAtColumn() {
 		if update.RequestedAppointmentAt != nil {
-			if update.RequestedAppointmentAt.IsZero() {
+			rawReq := update.RequestedAppointmentAt.RawTimePtr()
+			if rawReq == nil || rawReq.IsZero() {
 				l.RequestedAppointmentAt = nil
 			} else {
-				rat := timeutil.StoredFromTime(*update.RequestedAppointmentAt)
+				rat := timeutil.StoredFromTime(*rawReq)
 				l.RequestedAppointmentAt = &rat
 			}
 		}
@@ -830,6 +831,10 @@ func (s *leadService) BulkImportFromCSV(csvContent []byte, clientID int64, packa
 func parseBulkCSVRequestedAppointmentAt(raw string) (*timeutil.StoredTime, error) {
 	s := strings.TrimSpace(raw)
 	if s == "" {
+		return nil, nil
+	}
+	switch strings.ToLower(s) {
+	case "-", "na", "n/a", "null", "nil", "none":
 		return nil, nil
 	}
 	// Normalize multiple internal spaces to single space

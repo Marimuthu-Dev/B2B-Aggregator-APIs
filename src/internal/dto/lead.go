@@ -27,10 +27,10 @@ type LeadRequest struct {
 	StoreMasterID    *int64     `json:"StoreMasterID" binding:"omitempty,min=1"`
 	EmploymentTypeID *uint8     `json:"EmploymentTypeID" binding:"omitempty"`
 	CollectionType   string     `json:"CollectionType" binding:"required"`
-	LeadStatusID           int8       // omitted or 0 → service uses domain.LeadStatusIDDefault (1)
-	AppointmentAt          *time.Time `json:"AppointmentAt"`
-	RequestedAppointmentAt *time.Time `json:"RequestedAppointmentAt"`
-	LabID                  *int64     `json:"LabID"`
+	LeadStatusID           int8          // omitted or 0 → service uses domain.LeadStatusIDDefault (1)
+	AppointmentAt          *time.Time    `json:"AppointmentAt"`
+	RequestedAppointmentAt *FlexDateTime `json:"RequestedAppointmentAt" binding:"omitempty"`
+	LabID                  *int64        `json:"LabID"`
 }
 
 type BulkUpdateLeadStatusRequest struct {
@@ -70,10 +70,10 @@ type LeadUpdateRequest struct {
 	StoreMasterID    *int64     `json:"StoreMasterID"`
 	EmploymentTypeID *uint8     `json:"EmploymentTypeID"`
 	CollectionType   *string    `json:"CollectionType"`
-	LeadStatusID           *int8      `json:"LeadStatusID"`
-	AppointmentAt          *time.Time `json:"AppointmentAt"`
-	RequestedAppointmentAt *time.Time `json:"RequestedAppointmentAt"`
-	LabID                  *int64     `json:"LabID"`
+	LeadStatusID           *int8         `json:"LeadStatusID"`
+	AppointmentAt          *time.Time    `json:"AppointmentAt"`
+	RequestedAppointmentAt *FlexDateTime `json:"RequestedAppointmentAt" binding:"omitempty"`
+	LabID                  *int64        `json:"LabID"`
 }
 
 func (r LeadUpdateRequest) HasAtLeastOneField() bool {
@@ -111,8 +111,10 @@ func (r LeadRequest) ToDomain() domain.Lead {
 		l.AppointmentAt = &at
 	}
 	if r.RequestedAppointmentAt != nil {
-		rat := timeutil.StoredFromTime(*r.RequestedAppointmentAt)
-		l.RequestedAppointmentAt = &rat
+		if tp := r.RequestedAppointmentAt.ToTimePtr(); tp != nil {
+			rat := timeutil.StoredFromTime(*tp)
+			l.RequestedAppointmentAt = &rat
+		}
 	}
 	return l
 }
