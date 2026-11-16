@@ -8,6 +8,7 @@ import (
 
 	"b2b-diagnostic-aggregator/apis/internal/domain"
 	persistencemodels "b2b-diagnostic-aggregator/apis/internal/persistence/models"
+	"b2b-diagnostic-aggregator/apis/internal/timeutil"
 
 	"gorm.io/gorm"
 )
@@ -235,6 +236,11 @@ func (r *leadRepository) leadListJoinedQuery(filter LeadListFilter) *gorm.DB {
 	}
 	if filter.AppointmentAtMax != nil {
 		q = q.Where("l.AppointmentAt IS NOT NULL AND l.AppointmentAt <= ?", *filter.AppointmentAtMax)
+	}
+	if filter.SampleNotCollectedYet {
+		nowIST := time.Now().In(timeutil.ISTLocation())
+		nowISTWallUTC := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), nowIST.Hour(), nowIST.Minute(), nowIST.Second(), 0, time.UTC)
+		q = q.Where("l.LeadStatusID > 0 AND l.LeadStatusID < ? AND l.AppointmentAt IS NOT NULL AND l.AppointmentAt < ?", 6, nowISTWallUTC)
 	}
 	switch filter.FitnessStatus {
 	case domain.LeadListFitnessFilterEmpty:

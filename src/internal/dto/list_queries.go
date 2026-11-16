@@ -132,6 +132,8 @@ type LeadListQuery struct {
 	// AppointmentAtFrom / AppointmentAtTo filter by l.AppointmentAt (IST calendar day, YYYY-MM-DD); either or both.
 	AppointmentAtFrom string `form:"appointmentAtFrom" binding:"omitempty"`
 	AppointmentAtTo   string `form:"appointmentAtTo" binding:"omitempty"`
+	// SampleNotCollectedYet filters leads where appointment time has passed in IST and sample is not yet collected (LeadStatusID < 6).
+	SampleNotCollectedYet *bool `form:"sampleNotCollectedYet" binding:"omitempty"`
 }
 
 type PackageListQuery struct {

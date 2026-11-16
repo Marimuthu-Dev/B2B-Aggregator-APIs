@@ -80,9 +80,10 @@ func (h *LeadHandler) GetAll(c *gin.Context) {
 		RestrictToStoreID: storeIDFromJWT(c),
 		EmploymentTypeID:  query.EmploymentTypeID,
 		Search:            query.Search,
-		FitnessStatus:     fitnessFilter,
-		AppointmentAtMin: apptMin,
-		AppointmentAtMax: apptMax,
+		FitnessStatus:         fitnessFilter,
+		AppointmentAtMin:      apptMin,
+		AppointmentAtMax:      apptMax,
+		SampleNotCollectedYet: query.SampleNotCollectedYet != nil && *query.SampleNotCollectedYet,
 	}
 
 	data, total, err := h.svc.ListLeads(filter)
@@ -674,6 +675,18 @@ func enrichLeadListQueryFromPascalCaseKeys(c *gin.Context, q *dto.LeadListQuery)
 	if strings.TrimSpace(q.AppointmentAtTo) == "" {
 		if s := strings.TrimSpace(c.Query("AppointmentAtTo")); s != "" {
 			q.AppointmentAtTo = s
+		}
+	}
+	if q.SampleNotCollectedYet == nil {
+		for _, key := range []string{"SampleNotCollectedYet", "samplenotcollectedyet"} {
+			if raw := strings.TrimSpace(c.Query(key)); raw != "" {
+				b, err := strconv.ParseBool(raw)
+				if err != nil {
+					return apperrors.NewBadRequest("Invalid query parameter "+key+": must be true or false", err)
+				}
+				q.SampleNotCollectedYet = &b
+				break
+			}
 		}
 	}
 	return mergeLeadCollectionTypeQueryParam(c, q)

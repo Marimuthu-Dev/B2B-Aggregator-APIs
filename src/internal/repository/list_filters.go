@@ -64,6 +64,8 @@ type LeadListFilter struct {
 	AppointmentAtMin *time.Time
 	// AppointmentAtMax is inclusive upper bound (appointmentAtTo at 23:59:59.999999999 IST); nil = no upper filter.
 	AppointmentAtMax *time.Time
+	// SampleNotCollectedYet filters leads where LeadStatusID < 6 and AppointmentAt < current IST wall-clock time.
+	SampleNotCollectedYet bool
 }
 
 type PackageListFilter struct {
