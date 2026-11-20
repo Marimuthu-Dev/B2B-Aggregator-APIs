@@ -69,8 +69,8 @@ func RunLoop(ctx context.Context, d Deps) error {
 					slog.Bool("hadRowsInPreviousCycle", foundRows),
 					slog.String("reason", "rate limit"),
 				)
-				// Use a ticker to print a heartbeat every minute to prevent Azure WebJob idle timeout (WEBJOBS_IDLE_TIMEOUT)
-				ticker := time.NewTicker(1 * time.Minute)
+				// Use a ticker to print a heartbeat every 10 minutes to prevent Azure WebJob idle timeout without flooding Kudu's log line limit
+				ticker := time.NewTicker(10 * time.Minute)
 				timer := time.NewTimer(wait)
 			WaitLoop:
 				for {
@@ -149,7 +149,12 @@ func RunOnce(ctx context.Context, d Deps) (foundRows bool, err error) {
 			}
 		}
 
-		log.Info("processing email", slog.Int64("emailID", e.EmailID))
+		log.Info("processing email",
+			slog.Int64("emailID", e.EmailID),
+			slog.String("from", strings.TrimSpace(e.FromAddress)),
+			slog.String("to", strings.TrimSpace(e.ToAddress)),
+			slog.String("acsEndpoint", d.Sender.EndpointHost()),
+		)
 		log.Info("attempting to send email via ACS", slog.Int64("emailID", e.EmailID))
 		sendCtx, cancel := context.WithTimeout(ctx, d.Config.SendTimeout)
 		sendErr := d.Sender.SendHTML(sendCtx, e)

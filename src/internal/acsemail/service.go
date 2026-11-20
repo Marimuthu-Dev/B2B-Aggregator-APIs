@@ -113,6 +113,14 @@ type Service struct {
 	ver    string
 }
 
+// EndpointHost returns the configured ACS endpoint hostname for diagnostic logging.
+func (s *Service) EndpointHost() string {
+	if s == nil || s.conn == nil || s.conn.endpointURL == nil {
+		return ""
+	}
+	return s.conn.endpointURL.Host
+}
+
 // NewService builds a sender from config.
 func NewService(cfg Config) (*Service, error) {
 	conn, err := parseConnectionString(cfg.ConnectionString)
@@ -198,13 +206,28 @@ func (s *Service) postSend(ctx context.Context, payload sendEmailRequest) error 
 		return fmt.Errorf("acs email failed: status=%d, read body: %w", resp.StatusCode, err)
 	}
 	bodyStr := strings.TrimSpace(buf.String())
-	
+	diagHeaders := formatACSDiagnosticHeaders(resp.Header)
+
 	// Special handling for rate limiting (429)
 	if resp.StatusCode == http.StatusTooManyRequests {
-		return fmt.Errorf("acs email rate limited: status=%d body=%s", resp.StatusCode, bodyStr)
+		return fmt.Errorf("acs email rate limited: status=%d endpoint=%s %s body=%s", resp.StatusCode, s.EndpointHost(), diagHeaders, bodyStr)
 	}
-	
-	return fmt.Errorf("acs email failed: status=%d body=%s", resp.StatusCode, bodyStr)
+
+	return fmt.Errorf("acs email failed: status=%d endpoint=%s %s body=%s", resp.StatusCode, s.EndpointHost(), diagHeaders, bodyStr)
+}
+
+func formatACSDiagnosticHeaders(h http.Header) string {
+	if h == nil {
+		return ""
+	}
+	keys := []string{"x-ms-request-id", "apim-request-id", "ms-cv", "Retry-After", "x-ms-ratelimit-remaining-calls-per-hour"}
+	var parts []string
+	for _, k := range keys {
+		if v := strings.TrimSpace(h.Get(k)); v != "" {
+			parts = append(parts, k+"="+v)
+		}
+	}
+	return strings.Join(parts, " ")
 }
 
 func signACSRequest(req *http.Request, body []byte, accessKey []byte) error {
