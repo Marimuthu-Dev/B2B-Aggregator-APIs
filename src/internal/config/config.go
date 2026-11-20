@@ -150,30 +150,35 @@ func LoadConfig() *Config {
 }
 
 func loadOutboundEmailConfig() OutboundEmailConfig {
-	from := strings.TrimSpace(getEnv("EMAIL_FROM_ADDRESS", "support@urmediconnect.com"))
-	if from == "" {
-		from = "support@urmediconnect.com"
-	}
-	logo := strings.TrimSpace(getEnv("EMAIL_LOGO_URL", "https://urmediconnect.com/img/logo.jpeg"))
-	if logo == "" {
-		logo = "https://urmediconnect.com/img/logo.jpeg"
-	}
-	supportEmail := strings.TrimSpace(getEnv("EMAIL_SUPPORT_EMAIL", "support@urmediconnect.com"))
-	if supportEmail == "" {
-		supportEmail = "support@urmediconnect.com"
-	}
-	supportPhone := strings.TrimSpace(getEnv("EMAIL_SUPPORT_PHONE", "+91 9036302806"))
-	if supportPhone == "" {
-		supportPhone = "+91 9036302806"
-	}
 	return OutboundEmailConfig{
-		FromAddress:  from,
+		FromAddress:  strings.TrimSpace(getEnv("EMAIL_FROM_ADDRESS", "")),
 		CCAddress:    strings.TrimSpace(getEnv("EMAIL_CC_ADDRESS", "")),
 		BCCAddress:   strings.TrimSpace(getEnv("EMAIL_BCC_ADDRESS", "")),
-		SupportPhone: supportPhone,
-		SupportEmail: supportEmail,
-		LogoURL:      logo,
+		SupportPhone: strings.TrimSpace(getEnv("EMAIL_SUPPORT_PHONE", "")),
+		SupportEmail: strings.TrimSpace(getEnv("EMAIL_SUPPORT_EMAIL", "")),
+		LogoURL:      strings.TrimSpace(getEnv("EMAIL_LOGO_URL", "")),
 	}
+}
+
+// Validate ensures all required outbound email environment variables are set and non-empty.
+func (c OutboundEmailConfig) Validate() error {
+	var missing []string
+	if strings.TrimSpace(c.FromAddress) == "" {
+		missing = append(missing, "EMAIL_FROM_ADDRESS")
+	}
+	if strings.TrimSpace(c.LogoURL) == "" {
+		missing = append(missing, "EMAIL_LOGO_URL")
+	}
+	if strings.TrimSpace(c.SupportEmail) == "" {
+		missing = append(missing, "EMAIL_SUPPORT_EMAIL")
+	}
+	if strings.TrimSpace(c.SupportPhone) == "" {
+		missing = append(missing, "EMAIL_SUPPORT_PHONE")
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("missing required outbound email environment variable(s): %s", strings.Join(missing, ", "))
+	}
+	return nil
 }
 
 // resolveAzureStorageConnectionString prefers AZURE_STORAGE_CONNECTION_STRING;

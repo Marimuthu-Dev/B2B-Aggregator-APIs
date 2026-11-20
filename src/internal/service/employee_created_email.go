@@ -25,6 +25,12 @@ func (s *employeeService) queueEmployeeCreatedEmail(ctx context.Context, e *doma
 	if s == nil || s.emails == nil || e == nil {
 		return
 	}
+	if err := s.emailCfg.Validate(); err != nil {
+		slog.Error("employee created email skipped: invalid outbound email config",
+			slog.Int64("employeeUID", e.UID),
+			slog.Any("err", err))
+		return
+	}
 	if ctx == nil {
 		ctx = context.Background()
 	}

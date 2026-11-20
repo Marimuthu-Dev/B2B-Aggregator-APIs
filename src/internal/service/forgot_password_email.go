@@ -62,6 +62,12 @@ func (s *loginService) queueForgotPasswordEmail(ctx context.Context, userType in
 	if !shouldQueueForgotPasswordEmail() {
 		return
 	}
+	if err := s.emailCfg.Validate(); err != nil {
+		slog.Error("forgot password email skipped: invalid outbound email config",
+			slog.Int("userType", userType),
+			slog.Any("err", err))
+		return
+	}
 	if ctx == nil {
 		ctx = context.Background()
 	}

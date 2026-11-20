@@ -25,6 +25,12 @@ func (s *labService) queueLabCreatedEmail(ctx context.Context, l *domain.Lab) {
 	if s == nil || s.emails == nil || l == nil {
 		return
 	}
+	if err := s.emailCfg.Validate(); err != nil {
+		slog.Error("lab created email skipped: invalid outbound email config",
+			slog.Int64("labID", l.LabID),
+			slog.Any("err", err))
+		return
+	}
 	if ctx == nil {
 		ctx = context.Background()
 	}

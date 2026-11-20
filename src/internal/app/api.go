@@ -22,6 +22,9 @@ import (
 func Run() error {
 	// Load configuration
 	cfg := config.LoadConfig()
+	if err := cfg.Email.Validate(); err != nil {
+		return err
+	}
 
 	logWriter, err := logging.NewHourlyFileWriter(logging.Config{
 		Dir:            cfg.Log.Dir,

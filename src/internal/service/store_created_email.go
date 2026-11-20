@@ -21,6 +21,12 @@ func (s *storeService) queueStoreCreatedEmail(ctx context.Context, st *domain.St
 	if !persistencemodels.IsMedLyfeSchema() {
 		return
 	}
+	if err := s.emailCfg.Validate(); err != nil {
+		slog.Error("store created email skipped: invalid outbound email config",
+			slog.Int64("storeID", st.StoreID),
+			slog.Any("err", err))
+		return
+	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
