@@ -55,7 +55,7 @@ func formatLinkExpiry(d time.Duration) string {
 	return fmt.Sprintf("%d minutes", mins)
 }
 
-func (s *loginService) queueForgotPasswordEmail(ctx context.Context, userType int, userData interface{}, resetKey string) {
+func (s *loginService) queueForgotPasswordEmail(ctx context.Context, requestDomain string, userType int, userData interface{}, resetKey string) {
 	if s == nil || s.emails == nil || userData == nil {
 		return
 	}
@@ -63,10 +63,9 @@ func (s *loginService) queueForgotPasswordEmail(ctx context.Context, userType in
 		return
 	}
 	if err := s.emailCfg.Validate(); err != nil {
-		slog.Error("forgot password email skipped: invalid outbound email config",
+		slog.Warn("forgot password email: outbound email config incomplete",
 			slog.Int("userType", userType),
 			slog.Any("err", err))
-		return
 	}
 	if ctx == nil {
 		ctx = context.Background()
@@ -80,9 +79,13 @@ func (s *loginService) queueForgotPasswordEmail(ctx context.Context, userType in
 	}
 
 	portalURL := normalizePortalHomeURL(s.portalURLForUserType(userType))
+	if portalURL == "" && strings.Contains(requestDomain, ".") {
+		portalURL = normalizePortalHomeURL(requestDomain)
+	}
 	if portalURL == "" {
 		slog.Warn("forgot password email skipped: portal URL env is empty",
-			slog.Int("userType", userType))
+			slog.Int("userType", userType),
+			slog.String("requestDomain", requestDomain))
 		return
 	}
 	generateURL := buildClientResetPasswordURL(portalURL, resetKey)

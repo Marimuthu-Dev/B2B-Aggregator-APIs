@@ -291,7 +291,7 @@ func (s *loginService) CreateForgotPasswordRecord(domainName, mobileNumber strin
 	if err != nil {
 		return 0, err
 	}
-	s.queueForgotPasswordEmail(context.Background(), userType, userData, resetKey)
+	s.queueForgotPasswordEmail(context.Background(), domainName, userType, userData, resetKey)
 	return 1, nil
 }
 

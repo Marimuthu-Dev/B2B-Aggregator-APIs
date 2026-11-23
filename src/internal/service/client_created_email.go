@@ -30,10 +30,9 @@ func (s *clientService) queueClientCreatedEmail(ctx context.Context, c *domain.C
 		return
 	}
 	if err := s.emailCfg.Validate(); err != nil {
-		slog.Error("client created email skipped: invalid outbound email config",
+		slog.Warn("client created email: outbound email config incomplete",
 			slog.Int64("clientID", c.ClientID),
 			slog.Any("err", err))
-		return
 	}
 	if ctx == nil {
 		ctx = context.Background()

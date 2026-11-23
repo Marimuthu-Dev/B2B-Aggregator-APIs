@@ -22,10 +22,9 @@ func (s *storeService) queueStoreCreatedEmail(ctx context.Context, st *domain.St
 		return
 	}
 	if err := s.emailCfg.Validate(); err != nil {
-		slog.Error("store created email skipped: invalid outbound email config",
+		slog.Warn("store created email: outbound email config incomplete",
 			slog.Int64("storeID", st.StoreID),
 			slog.Any("err", err))
-		return
 	}
 	if ctx == nil {
 		ctx = context.Background()

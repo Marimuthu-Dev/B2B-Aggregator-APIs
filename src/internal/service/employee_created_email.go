@@ -26,10 +26,9 @@ func (s *employeeService) queueEmployeeCreatedEmail(ctx context.Context, e *doma
 		return
 	}
 	if err := s.emailCfg.Validate(); err != nil {
-		slog.Error("employee created email skipped: invalid outbound email config",
+		slog.Warn("employee created email: outbound email config incomplete",
 			slog.Int64("employeeUID", e.UID),
 			slog.Any("err", err))
-		return
 	}
 	if ctx == nil {
 		ctx = context.Background()

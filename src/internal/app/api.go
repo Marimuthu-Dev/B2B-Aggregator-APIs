@@ -22,9 +22,6 @@ import (
 func Run() error {
 	// Load configuration
 	cfg := config.LoadConfig()
-	if err := cfg.Email.Validate(); err != nil {
-		log.Printf("Outbound email disabled (invalid config): %v", err)
-	}
 
 	logWriter, err := logging.NewHourlyFileWriter(logging.Config{
 		Dir:            cfg.Log.Dir,
@@ -38,6 +35,10 @@ func Run() error {
 		log.SetOutput(logWriter)
 	}
 	log.SetFlags(0)
+
+	if err := cfg.Email.Validate(); err != nil {
+		log.Printf("Outbound email config incomplete: %v", err)
+	}
 
 	// Connect to database
 	db, err := config.ConnectDatabase(cfg.DB)
