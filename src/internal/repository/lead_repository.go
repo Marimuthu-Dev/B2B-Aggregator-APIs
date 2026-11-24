@@ -196,6 +196,12 @@ func (r *leadRepository) leadListJoinedQuery(filter LeadListFilter) *gorm.DB {
 	if filter.PackageID != nil {
 		q = q.Where("l.PackageID = ?", *filter.PackageID)
 	}
+	if filter.StateID != nil {
+		q = q.Where("l.StateID = ?", *filter.StateID)
+	}
+	if filter.CityID != nil {
+		q = q.Where("l.CityID = ?", *filter.CityID)
+	}
 	if filter.CollectionType != nil && *filter.CollectionType != "" {
 		q = q.Where("l.CollectionType = ?", *filter.CollectionType)
 	}

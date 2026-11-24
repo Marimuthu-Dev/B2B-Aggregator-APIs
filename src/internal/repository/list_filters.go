@@ -48,6 +48,10 @@ type LeadListFilter struct {
 	LabID            *int64
 	StatusID         *int8
 	PackageID        *int
+	// StateID filters tbl_Leads.StateID (candidate state).
+	StateID *int32
+	// CityID filters tbl_Leads.CityID (candidate city).
+	CityID *int32
 	CollectionType   *string
 	StoreID          *string
 	StoreMasterID    *int64

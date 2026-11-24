@@ -72,6 +72,8 @@ func (h *LeadHandler) GetAll(c *gin.Context) {
 		LabID:          query.LabID,
 		StatusID:       query.StatusID,
 		PackageID:      query.PackageID,
+		StateID:        query.StateID,
+		CityID:         query.CityID,
 		CollectionType: query.CollectionType,
 		StoreID:          query.StoreID,
 		StoreMasterID:    query.StoreMasterID,
@@ -641,6 +643,12 @@ func enrichLeadListQueryFromPascalCaseKeys(c *gin.Context, q *dto.LeadListQuery)
 	if err := mergePositiveIntQueryMulti(c, &q.PackageID, "PackageID", "packageid"); err != nil {
 		return err
 	}
+	if err := mergePositiveInt32QueryMulti(c, &q.StateID, "StateID", "stateID", "stateid", "candidateStateId", "CandidateStateID", "candidateStateID", "candidatestateid"); err != nil {
+		return err
+	}
+	if err := mergePositiveInt32QueryMulti(c, &q.CityID, "CityID", "cityID", "cityid", "candidateCityId", "CandidateCityID", "candidateCityID", "candidatecityid"); err != nil {
+		return err
+	}
 	if strings.TrimSpace(q.Search) == "" {
 		if s := strings.TrimSpace(c.Query("Search")); s != "" {
 			q.Search = s
@@ -824,6 +832,26 @@ func mergePositiveInt16QueryMulti(c *gin.Context, dest **int16, keys ...string) 
 			return apperrors.NewBadRequest("Invalid query parameter "+key+": must be a positive integer", err)
 		}
 		v := int16(n64)
+		*dest = &v
+		return nil
+	}
+	return nil
+}
+
+func mergePositiveInt32QueryMulti(c *gin.Context, dest **int32, keys ...string) error {
+	if *dest != nil {
+		return nil
+	}
+	for _, key := range keys {
+		raw := strings.TrimSpace(c.Query(key))
+		if raw == "" {
+			continue
+		}
+		n64, err := strconv.ParseInt(raw, 10, 32)
+		if err != nil || n64 < 1 {
+			return apperrors.NewBadRequest("Invalid query parameter "+key+": must be a positive integer", err)
+		}
+		v := int32(n64)
 		*dest = &v
 		return nil
 	}

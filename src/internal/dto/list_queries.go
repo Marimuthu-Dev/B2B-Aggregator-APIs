@@ -114,6 +114,10 @@ type LeadListQuery struct {
 	LabID            *int64  `form:"labId" binding:"omitempty,min=1"`
 	StatusID         *int8   `form:"statusId" binding:"omitempty,min=1"`
 	PackageID        *int    `form:"packageId" binding:"omitempty,min=1"`
+	// StateID filters by tbl_Leads.StateID (candidate state).
+	StateID *int32 `form:"stateId" binding:"omitempty,min=1"`
+	// CityID filters by tbl_Leads.CityID (candidate city).
+	CityID *int32 `form:"cityId" binding:"omitempty,min=1"`
 	CollectionType   *string `form:"collectionType" binding:"omitempty"`
 	// StoreID filters by tbl_Leads.StoreID (exact match after trim). Free-text field; not StoreMasterID.
 	StoreID *string `form:"storeId" binding:"omitempty"`
